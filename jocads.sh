@@ -29,9 +29,7 @@ fi
 
 # Other fixed variables
 xml_folder_default="/Users/Shared/Jamf/JOCADS"
-template_folder="${this_script_dir}/templates"
 log_file="$HOME/Library/Logs/JAMF/JOCADS.log"
-slack_webhook_url="https://hooks.slack.com/services/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"
 policy_testing_category="Untested"
 
 # Reset group action before reading command line flags
