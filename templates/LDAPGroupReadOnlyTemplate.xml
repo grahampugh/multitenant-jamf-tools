@@ -1,0 +1,146 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<group>
+  <name>%LDAP_GROUP_NAME%</name>
+  <access_level>Full Access</access_level>
+  <privilege_set>Custom</privilege_set>
+  <ldap_server>
+    <id>%LDAP_SERVER_ID%</id>
+    <name>%LDAP_SERVER%</name>
+  </ldap_server>
+  <site>
+    <id>-1</id>
+    <name>None</name>
+  </site>
+  <privileges>
+    <jss_objects>
+      <privilege>Read Advanced Computer Searches</privilege>
+      <privilege>Read Advanced Mobile Device Searches</privilege>
+      <privilege>Read Advanced User Searches</privilege>
+      <privilege>Read AirPlay Permissions</privilege>
+      <privilege>Read Allowed File Extension</privilege>
+      <privilege>Read Attachment Assignments</privilege>
+      <privilege>Read Device Enrollment Program Instances</privilege>
+      <privilege>Read Buildings</privilege>
+      <privilege>Read Categories</privilege>
+      <privilege>Read Classes</privilege>
+      <privilege>Read Computer Enrollment Invitations</privilege>
+      <privilege>Read Computer Extension Attributes</privilege>
+      <privilege>Read Computer PreStage Enrollments</privilege>
+      <privilege>Read Computers</privilege>
+      <privilege>Read Departments</privilege>
+      <privilege>Read Device Name Patterns</privilege>
+      <privilege>Read Directory Bindings</privilege>
+      <privilege>Read Disk Encryption Configurations</privilege>
+      <privilege>Read Disk Encryption Institutional Configurations</privilege>
+      <privilege>Read Dock Items</privilege>
+      <privilege>Read eBooks</privilege>
+      <privilege>Read Enrollment Customizations</privilege>
+      <privilege>Read Enrollment Profiles</privilege>
+      <privilege>Read Patch External Source</privilege>
+      <privilege>Read File Attachments</privilege>
+      <privilege>Read Push Certificates</privilege>
+      <privilege>Read Inventory Preload Records</privilege>
+      <privilege>Read VPP Invitations</privilege>
+      <privilege>Read Licensed Software</privilege>
+      <privilege>Read Mac Applications</privilege>
+      <privilege>Read macOS Configuration Profiles</privilege>
+      <privilege>Read Managed Preference Profiles</privilege>
+      <privilege>Read Managed Software Update Plans</privilege>
+      <privilege>Read Mobile Device Applications</privilege>
+      <privilege>Read iOS Configuration Profiles</privilege>
+      <privilege>Read Mobile Device Enrollment Invitations</privilege>
+      <privilege>Read Mobile Device Extension Attributes</privilege>
+      <privilege>Read Mobile Device Managed App Configurations</privilege>
+      <privilege>Read Mobile Device PreStage Enrollments</privilege>
+      <privilege>Read Mobile Devices</privilege>
+      <privilege>Read Network Segments</privilege>
+      <privilege>Read Packages</privilege>
+      <privilege>Read Patch Management Software Titles</privilege>
+      <privilege>Read Patch Policies</privilege>
+      <privilege>Read Peripheral Types</privilege>
+      <privilege>Read Personal Device Configurations</privilege>
+      <privilege>Read Personal Device Profiles</privilege>
+      <privilege>Read Policies</privilege>
+      <privilege>Read Printers</privilege>
+      <privilege>Read Provisioning Profiles</privilege>
+      <privilege>Read Push Certificates</privilege>
+      <privilege>Read Removable MAC Address</privilege>
+      <privilege>Read Restricted Software</privilege>
+      <privilege>Read Scripts</privilege>
+      <privilege>Read Self Service Bookmarks</privilege>
+      <privilege>Read Smart Computer Groups</privilege>
+      <privilege>Read Smart Mobile Device Groups</privilege>
+      <privilege>Read Smart User Groups</privilege>
+      <privilege>Read Static Computer Groups</privilege>
+      <privilege>Read Static Mobile Device Groups</privilege>
+      <privilege>Read Static User Groups</privilege>
+      <privilege>Read User Extension Attributes</privilege>
+      <privilege>Read User</privilege>
+      <privilege>Read Webhooks</privilege>
+    </jss_objects>
+    <jss_settings>
+      <privilege>Read Apple Configurator Enrollment</privilege>
+      <privilege>Read Mobile Device App Maintenance Settings</privilege>
+      <privilege>Read Automatic Mac App Updates Settings</privilege>
+      <privilege>Read Cache</privilege>
+      <privilege>Read Computer Check-In</privilege>
+      <privilege>Read Computer Check-In</privilege>
+      <privilege>Read Computer Inventory Collection</privilege>
+      <privilege>Read Computer Inventory Collection Settings</privilege>
+      <privilege>Read Device Compliance Information</privilege>
+      <privilege>Read Engage Settings</privilege>
+      <privilege>Read Patch Internal Source</privilege>
+      <privilege>Read Mobile Device Inventory Collection</privilege>
+      <privilege>Read Password Policy</privilege>
+      <privilege>Read Re-enrollment</privilege>
+      <privilege>Read Self Service</privilege>
+      <privilege>Read Mobile Device Self Service</privilege>
+      <privilege>Read SMTP Server</privilege>
+      <privilege>Read User-Initiated Enrollment</privilege>
+    </jss_settings>
+    <jss_actions>
+      <privilege>Flush MDM Commands</privilege>
+      <privilege>Flush Policy Logs</privilege>
+      <privilege>Send Blank Pushes to Mobile Devices</privilege>
+      <privilege>Send Command to Renew MDM Profile</privilege>
+      <privilege>Send Computer Bluetooth Command</privilege>
+      <privilege>Send Computer Remote Command to Download and Install OS X Update</privilege>
+      <privilege>Send Computer Remote Desktop Command</privilege>
+      <privilege>Send Computer Remote Lock Command</privilege>
+      <privilege>Send Computer Unlock User Account Command</privilege>
+      <privilege>Send Declarative Management Command</privilege>
+      <privilege>Send Enable Bootstrap Token Command</privilege>
+      <privilege>Send Inventory Requests to Mobile Devices</privilege>
+      <privilege>Send MDM Check In Command</privilege>
+      <privilege>Send Messages to Self Service Mobile</privilege>
+      <privilege>Send Mobile Device Bluetooth Command</privilege>
+      <privilege>Send Mobile Device Diagnostics and Usage Reporting and App Analytics Commands</privilege>
+      <privilege>Send Mobile Device Disable Data Roaming Command</privilege>
+      <privilege>Send Mobile Device Disable Voice Roaming Command</privilege>
+      <privilege>Send Mobile Device Enable Data Roaming Command</privilege>
+      <privilege>Send Mobile Device Enable Voice Roaming Command</privilege>
+      <privilege>Send Mobile Device Lost Mode Command</privilege>
+      <privilege>Send Mobile Device Managed Settings Command</privilege>
+      <privilege>Send Mobile Device Mirroring Command</privilege>
+      <privilege>Send Mobile Device Personal Hotspot Command</privilege>
+      <privilege>Send Mobile Device Refresh Cellular Plans Command</privilege>
+      <privilege>Send Mobile Device Remote Command to Download and Install iOS Update</privilege>
+      <privilege>Send Mobile Device Remote Lock Command</privilege>
+      <privilege>Send Mobile Device Restart Device Command</privilege>
+      <privilege>Send Mobile Device Set Device Name Command</privilege>
+      <privilege>Send Mobile Device Shut Down Command</privilege>
+      <privilege>Send Mobile Device Software Update Recommendation Cadence Command</privilege>
+      <privilege>View Activation Lock Bypass Code</privilege>
+      <privilege>View Disk Encryption Recovery Key</privilege>
+      <privilege>View Event Logs</privilege>
+      <privilege>View Local Admin Password</privilege>
+      <privilege>View Local Admin Password Audit History</privilege>
+      <privilege>View Mobile Device Lost Mode Location</privilege>
+      <privilege>View Recovery Lock</privilege>
+    </jss_actions>
+    <casper_admin>
+      <privilege>Use Casper Admin</privilege>
+    </casper_admin>
+  </privileges>
+  <members/>
+</group>

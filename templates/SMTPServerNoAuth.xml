@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<smtp_server>
+    <enabled>true</enabled>
+    <host>%HOST%</host>
+    <port>25</port>
+    <timeout>5</timeout>
+    <authorization_required>false</authorization_required>
+    <username/>
+    <password_sha256/>
+    <ssl>false</ssl>
+    <tls>false</tls>
+    <encryption>0</encryption>
+    <send_from_name>%SENDER_NAME%</send_from_name>
+    <send_from_email>%SENDER_EMAIL%</send_from_email>
+</smtp_server>

@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<distribution_point>
+    <name>%SHARE_NAME%</name>
+    <ipAddress>%SERVER%</ipAddress>
+    <ip_address>%SERVER%</ip_address>
+    <is_master>true</is_master>
+    <failover_point/>
+    <failover_point_url/>
+    <enable_load_balancing>false</enable_load_balancing>
+    <local_path/>
+    <ssh_username/>
+    <ssh_password/>
+    <connection_type>SMB</connection_type>
+    <share_name>%SHARE_NAME%</share_name>
+    <workgroup_or_domain/>
+    <share_port>139</share_port>
+    <read_only_username>%READ_ONLY_USERNAME%</read_only_username>
+    <read_only_password>%READ_ONLY_PASSWORD%</read_only_password>
+    <read_write_username>%READ_WRITE_USERNAME%</read_write_username>
+    <read_write_password>%READ_WRITE_PASSWORD%</read_write_password>
+    <http_downloads_enabled>true</http_downloads_enabled>
+    <http_url>https://%SERVER%/%SHARE_NAME%/</http_url>
+    <context>%SHARE_NAME%</context>
+    <protocol>https</protocol>
+    <port>443</port>
+    <no_authentication_required>false</no_authentication_required>
+    <username_password_required>true</username_password_required>
+    <http_username>%READ_ONLY_USERNAME%</http_username>
+    <http_password>%READ_ONLY_PASSWORD%</http_password>
+</distribution_point>

@@ -1,0 +1,22 @@
+{
+    "computerInventoryCollectionPreferences": {
+        "includeAccounts": true,
+        "calculateSizes": false,
+        "includeHiddenAccounts": false,
+        "includePrinters": true,
+        "includeServices": true,
+        "collectSyncedMobileDeviceInfo": false,
+        "updateLdapInfoOnComputerInventorySubmissions": true,
+        "includePackages": true,
+        "includeSoftwareUpdates": false,
+        "monitorBeacons": false,
+        "allowChangingUserAndLocation": true,
+        "useUnixUserPaths": true,
+        "monitorApplicationUsage": false,
+        "includeFonts": false,
+        "includePlugins": false
+    },
+    "applicationPaths": [],
+    "fontPaths": [],
+    "pluginPaths": []
+}
