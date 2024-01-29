@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <distribution_point>
-    <name>%SHARE_NAME%</name>
+    <name>%DISPLAY_NAME%</name>
     <ipAddress>%SERVER%</ipAddress>
     <ip_address>%SERVER%</ip_address>
     <is_master>true</is_master>
@@ -19,7 +19,7 @@
     <read_write_username>%READ_WRITE_USERNAME%</read_write_username>
     <read_write_password>%READ_WRITE_PASSWORD%</read_write_password>
     <http_downloads_enabled>true</http_downloads_enabled>
-    <http_url>https://%SERVER%/%SHARE_NAME%/</http_url>
+    <http_url>%HTTP_URL%</http_url>
     <context>%SHARE_NAME%</context>
     <protocol>https</protocol>
     <port>443</port>

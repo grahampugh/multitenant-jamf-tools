@@ -1016,9 +1016,10 @@ delete_pkg() {
         if [[ $dp ]]; then
             echo "   [check_for_smb_repo] Checking credentials for '$dp'."
             # check for existing service entry in login keychain
-            dp_check=$(/usr/bin/security find-generic-password -s "$dp" -g 2>/dev/null)
+            dp_check=$(/usr/bin/security find-generic-password -s "$dp" 2>/dev/null)
             if [[ $dp_check ]]; then
-                smb_url="$dp"
+                # smb_url="$dp"
+                smb_url=$(/usr/bin/grep "0x0000007" <<< "$dp_check" 2>&1 | /usr/bin/cut -d \" -f 2 |/usr/bin/cut -d " " -f 1)
                 smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
                 smb_pass=$(/usr/bin/security find-generic-password -s "$dp" -w -g 2>/dev/null)
                 echo "Username and password for $dp found in keychain"
