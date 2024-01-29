@@ -34,7 +34,7 @@ echo
 # 1. Ask for the instance list, show list, ask to apply to one, multiple or all
 # ------------------------------------------------------------------------------------
 
-choose_instance_list
+choose_destination_instances
 
 # ------------------------------------------------------------------------------------
 # 2. Ask for the username (show any existing value of first instance in list as default)

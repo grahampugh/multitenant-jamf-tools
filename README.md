@@ -28,7 +28,7 @@ Each list should be represented by a text file in the `instance-lists` folder. T
 
 Each file should contain a list of full URLs of the instances. See `prd-example.txt` for an example. The first instance in the list is considered the template/source instance.
 
-It's possible to specify iOS-only instances on which you would prefer not to push settings that are specific to computers only. To do this, specify it in the text file by adding `,iOS` to the line, as follows:
+It's possible to specify iOS-only instances on which you would prefer not to push settings that are specific to computers only. To do this, specify it in the text file by adding `, iOS` to the line, as follows:
 
 ```txt
 https://some.jamfcloud.instance, iOS
@@ -48,7 +48,7 @@ Some of the scripts require an XML or JSON template in order to function, for ex
 
 ## Setting credentials
 
-API actions are performed using credentials stored in the login keychain. To get API credentials into the keychain, run the `set-credentials.sh` script. This interactive script will ask you to provide credentials for instance list or lists that you specify. If the credentials are the same for all or a subset of the lists, the script gives you the ability to provide the credentials just once and it will write the credentials to all the specified instances.
+API actions are performed using credentials stored in the login keychain. To get API credentials into the keychain, run the `set-credentials.sh` script. This interactive script will ask you to provide credentials for an instance list or lists that you specify. If the credentials are the same for all or a subset of the lists, the script gives you the ability to provide the credentials just once and it will write the credentials to all the specified instances.
 
 ### Setting credentials for an SMB server
 
