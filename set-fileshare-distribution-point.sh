@@ -177,7 +177,7 @@ if [[ ! $user_rw ]]; then
 fi
 
 # check for existing service entry in login keychain
-kc_check=$(security find-generic-password -s "$display_name" -l "$share_url ($user_rw)" -a "$user_rw" -g 2>/dev/null)
+kc_check=$(security find-generic-password -s "$display_name" -l "$share_url (readwrite)" -a "$user_rw" -g 2>/dev/null)
 
 if [[ $kc_check ]]; then
     echo "Keychain entry for $user_rw found for $display_name"
@@ -187,7 +187,7 @@ fi
 
 echo
 # check for existing password entry in login keychain
-pass_rw=$(security find-generic-password -s "$display_name" -l "$share_url ($user_rw)" -a "$user_rw" -w -g 2>/dev/null)
+pass_rw=$(security find-generic-password -s "$display_name" -l "$share_url (readwrite)" -a "$user_rw" -w -g 2>/dev/null)
 
 if [[ $pass_rw ]]; then
     echo "Password for $user_rw found for $display_name"
@@ -205,7 +205,7 @@ elif [[ ! $pass_rw ]]; then
     echo "No password supplied"
     exit 1
 fi
-security add-generic-password -U -s "$display_name" -l "$share_url ($user_rw)" -a "$user_rw" -w "$pass_rw"
+security add-generic-password -U -s "$display_name" -l "$share_url (readwrite)" -a "$user_rw" -w "$pass_rw"
 
 # set read-only username
 if [[ ! $user_ro ]]; then
@@ -218,7 +218,7 @@ if [[ ! $user_ro ]]; then
 fi
 
 # check for existing service entry in login keychain
-kc_check=$(security find-generic-password -s "$display_name" -l "$share_url ($user_ro)" -a "$user_ro" -g 2>/dev/null)
+kc_check=$(security find-generic-password -s "$display_name" -l "$share_url (readonly)" -a "$user_ro" -g 2>/dev/null)
 
 if [[ $kc_check ]]; then
     echo "Keychain entry for $user_ro found for $display_name"
@@ -228,7 +228,7 @@ fi
 
 echo
 # check for existing password entry in login keychain
-pass_ro=$(security find-generic-password -s "$display_name" -l "$share_url ($user_ro)" -a "$user_ro" -w -g 2>/dev/null)
+pass_ro=$(security find-generic-password -s "$display_name" -l "$share_url (readonly)" -a "$user_ro" -w -g 2>/dev/null)
 
 if [[ $pass_ro ]]; then
     echo "Password for $user_ro found for $display_name"
@@ -248,7 +248,7 @@ elif [[ ! $pass_ro ]]; then
     exit 1
 fi
 
-security add-generic-password -U -s "$display_name" -l "$share_url ($user_ro)" -a "$user_ro" -w "$pass_rw"
+security add-generic-password -U -s "$display_name" -l "$share_url (readonly)" -a "$user_ro" -w "$pass_rw"
 
 echo "Passwords added to Keychain"
 

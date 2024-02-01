@@ -1018,26 +1018,31 @@ delete_pkg() {
             # check for existing service entry in login keychain
             dp_check=$(/usr/bin/security find-generic-password -s "$dp" 2>/dev/null)
             if [[ $dp_check ]]; then
-                # smb_url="$dp"
-                smb_url=$(/usr/bin/grep "0x0000007" <<< "$dp_check" 2>&1 | /usr/bin/cut -d \" -f 2 |/usr/bin/cut -d " " -f 1)
-                smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
-                smb_pass=$(/usr/bin/security find-generic-password -s "$dp" -w -g 2>/dev/null)
-                echo "Username and password for $dp found in keychain"
-                dp_found=1
-                break
+                echo "   [check_for_smb_repo] Checking keychain entry for $dp_check" # TEMP
+                smb_url=$(/usr/bin/grep "0x00000007" <<< "$dp_check" 2>&1 | /usr/bin/cut -d \" -f 2 |/usr/bin/cut -d " " -f 1)
+                if [[ $smb_url ]]; then
+                    echo "   [check_for_smb_repo] Checking $smb_url" # TEMP
+                    smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
+                    smb_pass=$(/usr/bin/security find-generic-password -s "$dp" -w -g 2>/dev/null)
+                    if [[ $smb_url == *"(readwrite)"* && $smb_user && $smb_pass ]]; then
+                        echo "Username and password for $dp found in keychain - URL=$smb_url"
+                        dp_found=1
+                        break
+                    fi
+                fi
             fi
         fi
     done <<< "$dp_names_list"
 
     if [[ $dp_found ]]; then
         echo
-        echo "   [main] Deleting ${chosen_api_obj_name_decoded} from ${smb_mount}..."
+        echo "   [main] Deleting ${chosen_api_obj_name_decoded} from ${smb_url}..."
         # mount the SMB server if not already mounted
         mount_smb_share
 
         # is the package there?
         if [[ -f "${smb_mountpoint}/Packages/${pkg_name}" ]]; then
-            echo "   [delete_pkg] Deleting package '$pkg_name' from $smb_mount..."
+            echo "   [delete_pkg] Deleting package '$pkg_name' from $smb_url..."
             if rm -f "${smb_mountpoint}/Packages/${pkg_name}"; then
                 echo "   [delete_pkg] ${pkg_name} successfuilly deleted"
             else
@@ -1045,7 +1050,7 @@ delete_pkg() {
                 exit 6  # abort before going on to delete package metadata objects
             fi
         else
-            echo "   [delete_pkg] Package '$pkg_name' does not exist on $smb_mount"
+            echo "   [delete_pkg] Package '$pkg_name' does not exist on $smb_url"
         fi
     fi
     echo
@@ -1152,20 +1157,19 @@ fetch_icon() {
 }
 
 mount_smb_share() {
-    smb_mount=$(cut -d"/" -f3-4 <<< "$smb_url")
-    smb_share=$(cut -d"/" -f4 <<< "$smb_url")
+    smb_share=$(cut -d"/" -f2 <<< "$smb_url")
     smb_mountpoint="/Volumes/$smb_share-$source_instance_list"
     if mount | grep "on ${smb_mountpoint} " > /dev/null; then
         echo "   [mount_smb_share] ${smb_mountpoint} is mounted."
         return
     else
-        echo "   [mount_smb_share] ${smb_mount} is not mounted..."
+        echo "   [mount_smb_share] ${smb_url} is not mounted..."
 
         # Make sure the mount point exists
         sudo mkdir -p "${smb_mountpoint}"
         sudo chown "${USER}":admin "${smb_mountpoint}"
 
-        mount -t smbfs "//${smb_user}:${smb_pass}@${smb_mount}" "${smb_mountpoint}"
+        mount -t smbfs "//${smb_user}:${smb_pass}@${smb_url}" "${smb_mountpoint}"
     fi
 }
 
@@ -1240,14 +1244,13 @@ send_slack_notification() {
 unmount_smb_share() {
     echo
     echo
-    smb_mount=$(cut -d"/" -f3-4 <<< "$smb_url")
     smb_share=$(cut -d"/" -f4 <<< "$smb_url")
     smb_mountpoint="/Volumes/$smb_share-$source_instance_list"
     if mount | grep "on ${smb_mountpoint} " > /dev/null; then
         echo "   [unmount_smb_share] ${smb_mountpoint} is mounted."
         sudo umount "${smb_mountpoint}"
     else
-        echo "   [unmount_smb_share] ${smb_mount} is not mounted..."
+        echo "   [unmount_smb_share] ${smb_url} is not mounted..."
     fi
 }
 
@@ -1390,6 +1393,7 @@ main() {
     fi
     choose_source_instance
     source_instance_list="$instance_list_file"
+    default_instance_list="$source_instance_list" # reset default to match source
 
     # now select the destination instances
     if [[ $dest_instance_list ]]; then
