@@ -1036,19 +1036,28 @@ delete_pkg() {
 
     if [[ $dp_found ]]; then
         echo
-        echo "   [main] Deleting ${chosen_api_obj_name_decoded} from ${smb_url}..."
+        echo "   [main] Checking for ${chosen_api_obj_name_decoded} on ${smb_url}..."
         # mount the SMB server if not already mounted
         mount_smb_share
 
         # is the package there?
         if [[ -f "${smb_mountpoint}/Packages/${pkg_name}" ]]; then
-            echo "   [delete_pkg] Deleting package '$pkg_name' from $smb_url..."
-            if rm -f "${smb_mountpoint}/Packages/${pkg_name}"; then
-                echo "   [delete_pkg] ${pkg_name} successfuilly deleted"
-            else
-                echo "   [delete_pkg] ${pkg_name} was not deleted - aborting."
-                exit 6  # abort before going on to delete package metadata objects
-            fi
+            echo "   [delete_pkg] Package '$pkg_name' found on $smb_url"
+            echo
+            read -r -p "Do you want to delete the actual package from the SMB repo (requires inputting admin password)? (Y/N) : " delete_pkg_from_repo
+            case "$delete_pkg_from_repo" in
+                Y|y)
+                    echo "   [delete_pkg] Deleting package '$pkg_name' from $smb_url..."
+                    if rm -f "${smb_mountpoint}/Packages/${pkg_name}"; then
+                        echo "   [delete_pkg] ${pkg_name} successfuilly deleted"
+                    else
+                        echo "   [delete_pkg] WARNING! successfully ${pkg_name} was not deleted."
+                    fi
+                ;;
+                *)
+                    echo "   [delete_pkg] Not deleting - package '$pkg_name' will remain on $smb_url"
+                ;;
+            esac
         else
             echo "   [delete_pkg] Package '$pkg_name' does not exist on $smb_url"
         fi
@@ -1838,8 +1847,14 @@ main() {
 
             case $api_obj_action in
                 delete )
+                    # first delete the pkg metadata object
                     echo "   [main] Deleting ${api_xml_object} '$chosen_api_obj_name_decoded'"
                     delete_api_object $api_xml_object "$chosen_api_obj_name"
+
+                    # now delete package from an SMB repo (TODO - delete from S3)
+                    if [[ $api_obj_action == "delete" && $api_xml_object == "package" ]]; then
+                        delete_pkg "${chosen_api_obj_name}"
+                    fi
                     ;;
                 copy )
                     echo "   [main] Copying ${api_xml_object} '$chosen_api_obj_name'"
@@ -1858,11 +1873,6 @@ main() {
             esac
             ((instance_count++))
         done
-
-        # delete package from an SMB repo
-        if [[ $api_obj_action == "delete" && $api_xml_object == "package" && $do_all_instances == "yes" ]]; then
-            delete_pkg "${chosen_api_obj_name}"
-        fi
     done
 }
 
