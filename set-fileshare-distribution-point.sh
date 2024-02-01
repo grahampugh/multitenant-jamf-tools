@@ -18,7 +18,8 @@ NOTE: LDAP server is obtained automatically from the instance (must be configure
 
 [no arguments]                      - interactive mode
 --template /path/to/Template.xml    - template to use (must be a .xml file)
---smb_url SMB_URL                   - SMB server + share (URL, e.g. smb://myserver.com/MyShare)
+--name NAME                         - Display name for the share. If left blank will match the Share Name
+--smb_url SMB_URL                   - SMB server + share, excluding smb:// (URL, e.g. myserver.com/MyShare)
 --readwrite READWRITE_USER          - SMB server read/write user
 --readonly READONLY_USER            - SMB server read-only user
 --il FILENAME (without .txt)        - provide an instance list filename
@@ -26,17 +27,17 @@ NOTE: LDAP server is obtained automatically from the instance (must be configure
 --i JSS_URL                         - perform action on a single instance
                                         (must exist in the relevant instance list)
 --all                               - perform action on ALL instances in the instance list
--v                                  - add verbose curl output
+-v                                  - show parsed template prior to uploading
 USAGE
 }
 
 parse_template() {
-    if [[ ! $dp_server || ! $dp_share || ! $user_rw || ! $user_ro || ! $pass_rw || ! $pass_ro ]]; then
+    if [[ ! $display_name || ! $dp_server || ! $dp_share || ! $user_rw || ! $user_ro || ! $pass_rw || ! $pass_ro ]]; then
         echo "ERROR: Incomplete credentials, cannot continue"
         exit 1
     fi
 
-    parsed_template=$(/usr/bin/sed "s|%SERVER%|${dp_server}|g" "$template_file" | /usr/bin/sed "s|%SHARE_NAME%|${dp_share}|g" | /usr/bin/sed "s|%READ_WRITE_USERNAME%|${user_rw}|g" | /usr/bin/sed "s|%READ_WRITE_PASSWORD%|${pass_rw}|g" | /usr/bin/sed "s|%READ_ONLY_USERNAME%|${user_ro}|g" | /usr/bin/sed "s|%READ_ONLY_PASSWORD%|${pass_ro}|g")
+    parsed_template=$(/usr/bin/sed "s|%DISPLAY_NAME%|${display_name}|g" "$template_file" | /usr/bin/sed "s|%SERVER%|${dp_server}|g" | /usr/bin/sed "s|%HTTP_URL%|${http_url}|g" | /usr/bin/sed "s|%SHARE_NAME%|${dp_share}|g" | /usr/bin/sed "s|%READ_WRITE_USERNAME%|${user_rw}|g" | /usr/bin/sed "s|%READ_WRITE_PASSWORD%|${pass_rw}|g" | /usr/bin/sed "s|%READ_ONLY_USERNAME%|${user_ro}|g" | /usr/bin/sed "s|%READ_ONLY_PASSWORD%|${pass_ro}|g")
 }
 
 upload_data() {
@@ -52,7 +53,7 @@ upload_data() {
     send_curl_request
 
     # get id from output
-    existing_id=$(xmllint --xpath "//distribution_points/distribution_point[name = '$dp_share']/id/text()" "$curl_output_file" 2>/dev/null)
+    existing_id=$(xmllint --xpath "//distribution_points/distribution_point[name = '$display_name']/id/text()" "$curl_output_file" 2>/dev/null)
 
     # send request
     curl_args=("--header")
@@ -91,6 +92,10 @@ while [[ "$#" -gt 0 ]]; do
         -t|--template)
             shift
             template="$1"
+        ;;
+        -n|--name)
+            shift
+            display_name="$1"
         ;;
         -s|--smb-url)
             shift
@@ -137,6 +142,13 @@ choose_template_file
 # select the instances that will be changed
 choose_destination_instances
 
+# set Display Name
+if [[ ! $display_name ]]; then
+    echo "Enter Fileshare Distribution Point Server Display Name"
+    echo "(or press ENTER to use the same value as the SMB Share Name)"
+    read -r -p "Display Name : " display_name
+fi
+
 # set URL
 if [[ ! $smb_url ]]; then
     read -r -p "Enter Fileshare Distribution Point Server Name with share : " smb_url
@@ -145,8 +157,15 @@ if [[ ! $smb_url ]]; then
     echo "No DP supplied, cannot continue"
     exit 1
 fi
-dp_server=$(cut -d"/" -f1-3 <<< "$smb_url")
-dp_share=$(cut -d"/" -f4 <<< "$smb_url")
+# get server and share name from url
+share_url=$(sed 's|smb:\/\/||' <<< "$smb_url")
+dp_server=$(cut -d"/" -f1 <<< "$share_url")
+dp_share=$(cut -d"/" -f2 <<< "$share_url")
+
+# set display_name if not supplied earlier
+if [[ ! $display_name ]]; then
+    display_name="$dp_share"
+fi
 
 # set read-write username
 if [[ ! $user_rw ]]; then
@@ -158,26 +177,26 @@ if [[ ! $user_rw ]]; then
 fi
 
 # check for existing service entry in login keychain
-kc_check=$(security find-generic-password -s "$smb_url" -l "$smb_url ($user_rw)" -a "$user_rw" -g 2>/dev/null)
+kc_check=$(security find-generic-password -s "$display_name" -l "$share_url (readwrite)" -a "$user_rw" -g 2>/dev/null)
 
 if [[ $kc_check ]]; then
-    echo "Keychain entry for $user_rw found on $smb_url"
+    echo "Keychain entry for $user_rw found for $display_name"
 else
-    echo "Keychain entry for $user_rw not found on $smb_url"
+    echo "Keychain entry for $user_rw not found for $display_name"
 fi
 
 echo
 # check for existing password entry in login keychain
-pass_rw=$(security find-generic-password -s "$smb_url" -l "$smb_url ($user_rw)" -a "$user_rw" -w -g 2>/dev/null)
+pass_rw=$(security find-generic-password -s "$display_name" -l "$share_url (readwrite)" -a "$user_rw" -w -g 2>/dev/null)
 
 if [[ $pass_rw ]]; then
-    echo "Password for $user_rw found on $smb_url"
+    echo "Password for $user_rw found for $display_name"
 else
-    echo "Password for $user_rw not found on $smb_url"
+    echo "Password for $user_rw not found for $display_name"
 fi
 
 # set read-write password
-echo "Enter password for $user_rw on $smb_url"
+echo "Enter password for $user_rw on $display_name"
 [[ $pass_rw ]] && echo "(or press ENTER to use existing password from keychain for $user_rw)"
 read -r -s -p "Pass : " inputted_pass_rw
 if [[ "$inputted_pass_rw" ]]; then
@@ -186,7 +205,7 @@ elif [[ ! $pass_rw ]]; then
     echo "No password supplied"
     exit 1
 fi
-security add-generic-password -U -s "$smb_url" -l "$smb_url ($user_rw)" -a "$user_rw" -w "$pass_rw"
+security add-generic-password -U -s "$display_name" -l "$share_url (readwrite)" -a "$user_rw" -w "$pass_rw"
 
 # set read-only username
 if [[ ! $user_ro ]]; then
@@ -199,35 +218,54 @@ if [[ ! $user_ro ]]; then
 fi
 
 # check for existing service entry in login keychain
-kc_check=$(security find-generic-password -s "$smb_url" -l "$smb_url ($user_ro)" -a "$user_ro" -g 2>/dev/null)
+kc_check=$(security find-generic-password -s "$display_name" -l "$share_url (readonly)" -a "$user_ro" -g 2>/dev/null)
 
 if [[ $kc_check ]]; then
-    echo "Keychain entry for $user_ro found on $dp_server/$dp_share"
+    echo "Keychain entry for $user_ro found for $display_name"
 else
-    echo "Keychain entry for $user_ro not found on $dp_server/$dp_share"
+    echo "Keychain entry for $user_ro not found for $display_name"
 fi
 
 echo
 # check for existing password entry in login keychain
-pass_ro=$(security find-generic-password -s "$smb_url" -l "$smb_url ($user_ro)" -a "$user_ro" -w -g 2>/dev/null)
+pass_ro=$(security find-generic-password -s "$display_name" -l "$share_url (readonly)" -a "$user_ro" -w -g 2>/dev/null)
 
 if [[ $pass_ro ]]; then
-    echo "Password for $user_ro found on $dp_server/$dp_share"
+    echo "Password for $user_ro found for $display_name"
 else
-    echo "Password for $user_ro not found on $dp_server/$dp_share"
+    echo "Password for $user_ro not found for $display_name"
 fi
 
 # set read-only password
-echo "Enter password for $user_ro on $smb_url"
+echo "Enter password for $user_ro on $display_name"
 [[ $pass_rw ]] && echo "(or press ENTER to use existing password from keychain for $user_ro)"
 read -r -s -p "Pass : " inputted_pass_ro
+echo
 if [[ "$inputted_pass_ro" ]]; then
     pass_ro="$inputted_pass_ro"
 elif [[ ! $pass_ro ]]; then
     echo "No password supplied"
     exit 1
 fi
-security add-generic-password -U -s "$smb_url" -l "$smb_url ($user_ro)" -a "$user_ro" -w "$pass_rw"
+
+security add-generic-password -U -s "$display_name" -l "$share_url (readonly)" -a "$user_ro" -w "$pass_rw"
+
+echo "Passwords added to Keychain"
+
+# now update the JSS
+echo
+read -r -p "WARNING! This will update the File Share Distribution Point on ALL chosen instances! Are you sure? (Y/N) : " are_you_sure
+case "$are_you_sure" in
+    Y|y)
+        echo "Confirmed"
+    ;;
+    *)
+        echo "Cancelled"
+        exit
+    ;;
+esac
+
+http_url="https://$share_url"
 
 # parse the template
 parse_template
