@@ -1018,10 +1018,10 @@ delete_pkg() {
             # check for existing service entry in login keychain
             dp_check=$(/usr/bin/security find-generic-password -s "$dp" 2>/dev/null)
             if [[ $dp_check ]]; then
-                echo "   [check_for_smb_repo] Checking keychain entry for $dp_check" # TEMP
+                # echo "   [check_for_smb_repo] Checking keychain entry for $dp_check" # TEMP
                 smb_url=$(/usr/bin/grep "0x00000007" <<< "$dp_check" 2>&1 | /usr/bin/cut -d \" -f 2 |/usr/bin/cut -d " " -f 1)
                 if [[ $smb_url ]]; then
-                    echo "   [check_for_smb_repo] Checking $smb_url" # TEMP
+                    # echo "   [check_for_smb_repo] Checking $smb_url" # TEMP
                     smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
                     smb_pass=$(/usr/bin/security find-generic-password -s "$dp" -w -g 2>/dev/null)
                     if [[ $smb_url == *"(readwrite)"* && $smb_user && $smb_pass ]]; then
