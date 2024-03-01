@@ -1875,8 +1875,10 @@ main() {
                     if [[ $api_xml_object == "policy" ]]; then
                         copy_policy "$chosen_api_obj_name" "$chosen_api_obj_id"
                     elif [[ $api_xml_object == "computer_group" ]]; then
-                        check_eas_in_groups "$chosen_api_obj_name"
-                        copy_groups_in_group "$chosen_api_obj_name"
+                        if [[ $skip_dependencies == "no" ]]; then
+                            check_eas_in_groups "$chosen_api_obj_name"
+                            copy_groups_in_group "$chosen_api_obj_name"
+                        fi
                         copy_computer_group "$chosen_api_obj_name"
                     else
                         copy_api_object "$api_xml_object" "$chosen_api_obj_id" "$chosen_api_obj_name"
