@@ -284,96 +284,98 @@ copy_api_object() {
     parsed_file_temp="${parsed_file}"
     api_object_type_temp="${api_object_type}"
 
-    # now check for dependencies
-    if [[ "${api_xml_object}" == "script" || "${api_xml_object}" == "package" ]]; then
-        # Look for category in script info and create if necessary
-        local category_name
-        category_name=$( 
-            xmllint --xpath '//category/text()' "${parsed_file}" 2>/dev/null 
-        )
-        create_category "$category_name"
-    elif [[ "${api_xml_object}" == "os_x_configuration_profile" || "${api_xml_object}" == "mac_application" ]]; then
-        # Look for categories and create them if necessary
-        echo "   [copy_api_object] Checking the category in '${chosen_api_obj_name}'"
-        category_name=$( 
-            xmllint --xpath '//general/category/name/text()' "${parsed_file}" 2>/dev/null 
-        )
-        category_name_decoded="${category_name/&amp;/&}"
-        if [[ $category_name_decoded == "" ]]; then
-            echo "   [copy_api_object] No category found in this ${api_xml_object}! If this is a mistake, the policy copy will fail."
-            echo "   [copy_api_object] Fetched XML: ${parsed_file}"
-            exit 1
-        else
-            echo "   [copy_api_object] Category to check: ${category_name_decoded}"
+    # now check for dependencies unless we say otherwise
+    if [[ $skip_dependencies == "no" ]]; then
+        if [[ "${api_xml_object}" == "script" || "${api_xml_object}" == "package" ]]; then
+            # Look for category in script info and create if necessary
+            local category_name
+            category_name=$( 
+                xmllint --xpath '//category/text()' "${parsed_file}" 2>/dev/null 
+            )
             create_category "$category_name"
-        fi
+        elif [[ "${api_xml_object}" == "os_x_configuration_profile" || "${api_xml_object}" == "mac_application" ]]; then
+            # Look for categories and create them if necessary
+            echo "   [copy_api_object] Checking the category in '${chosen_api_obj_name}'"
+            category_name=$( 
+                xmllint --xpath '//general/category/name/text()' "${parsed_file}" 2>/dev/null 
+            )
+            category_name_decoded="${category_name/&amp;/&}"
+            if [[ $category_name_decoded == "" ]]; then
+                echo "   [copy_api_object] No category found in this ${api_xml_object}! If this is a mistake, the policy copy will fail."
+                echo "   [copy_api_object] Fetched XML: ${parsed_file}"
+                exit 1
+            else
+                echo "   [copy_api_object] Category to check: ${category_name_decoded}"
+                create_category "$category_name"
+            fi
 
-        # Look for computer groups in the object (targets and exclusions)
-        echo "   [copy_api_object] Checking for computer groups in ${chosen_api_obj_name}"
+            # Look for computer groups in the object (targets and exclusions)
+            echo "   [copy_api_object] Checking for computer groups in ${chosen_api_obj_name}"
 
-        group_array=$(
-            xmllint --xpath '//scope/computer_groups/computer_group/name' \
-            "${parsed_file}" 2>/dev/null \
-            | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
-        )
-        excluded_group_array=$(
-            xmllint --xpath  '//scope/exclusions/computer_groups/computer_group/name' \
-            "${parsed_file}" 2>/dev/null \
-            | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
-        )
+            group_array=$(
+                xmllint --xpath '//scope/computer_groups/computer_group/name' \
+                "${parsed_file}" 2>/dev/null \
+                | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+            )
+            excluded_group_array=$(
+                xmllint --xpath  '//scope/exclusions/computer_groups/computer_group/name' \
+                "${parsed_file}" 2>/dev/null \
+                | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+            )
 
-        # Combine the two into a list of unique groups
-        unique_group_list=()
-        u=0
+            # Combine the two into a list of unique groups
+            unique_group_list=()
+            u=0
 
-        if [[ $excluded_group_array ]]; then
-            while read -r group; do
-                if [[ $group ]]; then
-                    if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
-                        echo "   [copy_api_object] Excluded Computer group found: ${group}"
-                        unique_group_list[$u]="${group}"
-                        u=$(($u + 1))
+            if [[ $excluded_group_array ]]; then
+                while read -r group; do
+                    if [[ $group ]]; then
+                        if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
+                            echo "   [copy_api_object] Excluded Computer group found: ${group}"
+                            unique_group_list[$u]="${group}"
+                            u=$(($u + 1))
+                        fi
                     fi
-                fi
-            done <<< "${excluded_group_array}"
-        fi
+                done <<< "${excluded_group_array}"
+            fi
 
-        if [[ $group_array ]]; then
-            while read -r group; do
-                if [[ $group ]]; then
-                    if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
-                        echo "   [copy_api_object] Computer group found: ${group}"
-                        unique_group_list[$u]="${group}"
-                        u=$(($u + 1))
+            if [[ $group_array ]]; then
+                while read -r group; do
+                    if [[ $group ]]; then
+                        if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
+                            echo "   [copy_api_object] Computer group found: ${group}"
+                            unique_group_list[$u]="${group}"
+                            u=$(($u + 1))
+                        fi
                     fi
-                fi
-            done <<< "${group_array}"
+                done <<< "${group_array}"
+            fi
+
+            # transfer the unique list to a new list so that we can add further groups from
+            # embedded groups whilst iterating through the unique list
+            final_group_list=()
+            for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
+                final_group_list[$i]="${unique_group_list[$i]}"
+            done
+
+            echo "   [copy_api_object] Total ${#unique_group_list[@]} groups found in policy."
+
+            # Read all the groups to find groups within
+            for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+                echo "   [copy_api_object] Fetching '${unique_group_list[$i]}'."
+                fetch_api_object_by_name "computer_group" "${unique_group_list[$i]}"
+                check_groups_in_groups "${unique_group_list[$i]}"
+            done
+
+            # Process all the groups in reverse order, since the embedded groups
+            # will then appear first, which should be safer for avoiding failed group creation
+            for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
+                echo "   [copy_api_object] Computer group to process: ${final_group_list[$i]}"
+                check_eas_in_groups "${final_group_list[$i]}"
+                parse_api_object_by_name_for_copying "computer_group" "${final_group_list[$i]}"
+                copy_computer_group "${final_group_list[$i]}"
+            done
         fi
-
-        # transfer the unique list to a new list so that we can add further groups from
-        # embedded groups whilst iterating through the unique list
-        final_group_list=()
-        for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
-            final_group_list[$i]="${unique_group_list[$i]}"
-        done
-
-        echo "   [copy_api_object] Total ${#unique_group_list[@]} groups found in policy."
-
-        # Read all the groups to find groups within
-        for (( i=0; i<${#unique_group_list[@]}; i++ )); do
-            echo "   [copy_api_object] Fetching '${unique_group_list[$i]}'."
-            fetch_api_object_by_name "computer_group" "${unique_group_list[$i]}"
-            check_groups_in_groups "${unique_group_list[$i]}"
-        done
-
-        # Process all the groups in reverse order, since the embedded groups
-        # will then appear first, which should be safer for avoiding failed group creation
-        for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
-            echo "   [copy_api_object] Computer group to process: ${final_group_list[$i]}"
-            check_eas_in_groups "${final_group_list[$i]}"
-            parse_api_object_by_name_for_copying "computer_group" "${final_group_list[$i]}"
-            copy_computer_group "${final_group_list[$i]}"
-        done
     fi
 
     # now revert $parsed_file & $api_object_type
@@ -698,139 +700,142 @@ copy_policy() {
 
     echo "   [copy_policy] Copying policy '$chosen_api_obj_name' (id=$chosen_api_obj_id)"
 
-    # Look for packages and copy them if necessary
-    echo "   [copy_policy] Checking for packages in ${chosen_api_obj_name}"
-    packages_count=$( 
-        xmllint --xpath '//package_configuration/packages/size/text()' \
-        "${fetched_policy_file}" 2>/dev/null 
-    )
-    [[ ! $packages_count ]] && packages_count=0
-
-    for (( n=1; n<=packages_count; n++ )); do
-        package_id=$( 
-            xmllint --xpath "//package_configuration/packages/package[$n]/id/text()" \
+    # look for all dependencies of the policy unless we say otherwise
+    if [[ $skip_dependencies == "no" ]]; then
+        # Look for packages and copy them if necessary
+        echo "   [copy_policy] Checking for packages in ${chosen_api_obj_name}"
+        packages_count=$( 
+            xmllint --xpath '//package_configuration/packages/size/text()' \
             "${fetched_policy_file}" 2>/dev/null 
         )
-        if [[ ${package_id} ]]; then
-            package_name=$( 
-                xmllint --xpath "//package_configuration/packages/package[$n]/name/text()" \
+        [[ ! $packages_count ]] && packages_count=0
+
+        for (( n=1; n<=packages_count; n++ )); do
+            package_id=$( 
+                xmllint --xpath "//package_configuration/packages/package[$n]/id/text()" \
                 "${fetched_policy_file}" 2>/dev/null 
             )
-            echo "   [copy_policy] Package to check: $package_name (ID ${package_id})"
-            fetch_api_object "package" "${package_id}"
-            parse_api_obj_for_copying "package" "${package_id}"
-            copy_api_object "package" "${package_id}" "$package_name"
-        fi
-    done
-
-    # Look for categories and create them if necessary
-    echo "   [copy_policy] Checking the category in '${chosen_api_obj_name}'"
-    category_name=$( 
-        xmllint --xpath '//general/category/name/text()' \
-        "${fetched_policy_file}" 2>/dev/null 
-    )
-    category_name_decoded="${category_name//&amp;/&}"
-    if [[ $category_name_decoded == "" ]]; then
-        echo "   [copy_policy] No category found in this policy! If this is a mistake, the policy copy will fail."
-        echo "   [copy_policy] Fetched XML: ${fetched_policy_file}"
-        exit 1
-    else
-        echo "   [copy_policy] Category to check: ${category_name_decoded}"
-        create_category "$category_name"
-    fi
- 
-    # Look for scripts and copy them if necessary
-    echo "   [copy_policy] Checking for scripts in ${chosen_api_obj_name}"
-    script_count=$(
-        xmllint --xpath '//scripts/size/text()' \
-        "${fetched_policy_file}" 2>/dev/null 
-    )
-
-    if [[ $script_count -gt 0 ]]; then
-        for (( n=1; n<=${script_count}; n++ )); do
-            script_id=$( 
-                xmllint --xpath "//scripts/script[$n]/id/text()" \
-                "${fetched_policy_file}" 2>/dev/null 
-            )
-            if [[ $script_id ]]; then
-                script_name=$( 
-                    xmllint --xpath "//scripts/script[$n]/name/text()" \
+            if [[ ${package_id} ]]; then
+                package_name=$( 
+                    xmllint --xpath "//package_configuration/packages/package[$n]/name/text()" \
                     "${fetched_policy_file}" 2>/dev/null 
                 )
-                echo "   [copy_policy] Script to check: $script_name (ID ${script_id})"
-                fetch_api_object script "${script_id}"
-                parse_api_obj_for_copying script "${script_id}"
-                copy_api_object "script" "${script_id}" "$script_name"
+                echo "   [copy_policy] Package to check: $package_name (ID ${package_id})"
+                fetch_api_object "package" "${package_id}"
+                parse_api_obj_for_copying "package" "${package_id}"
+                copy_api_object "package" "${package_id}" "$package_name"
             fi
         done
-    fi
 
-    # Look for computer groups in the policy (targets and exclusions)
-    echo "   [copy_policy] Checking for computer groups in ${chosen_api_obj_name}"
+        # Look for categories and create them if necessary
+        echo "   [copy_policy] Checking the category in '${chosen_api_obj_name}'"
+        category_name=$( 
+            xmllint --xpath '//general/category/name/text()' \
+            "${fetched_policy_file}" 2>/dev/null 
+        )
+        category_name_decoded="${category_name//&amp;/&}"
+        if [[ $category_name_decoded == "" ]]; then
+            echo "   [copy_policy] No category found in this policy! If this is a mistake, the policy copy will fail."
+            echo "   [copy_policy] Fetched XML: ${fetched_policy_file}"
+            exit 1
+        else
+            echo "   [copy_policy] Category to check: ${category_name_decoded}"
+            create_category "$category_name"
+        fi
+    
+        # Look for scripts and copy them if necessary
+        echo "   [copy_policy] Checking for scripts in ${chosen_api_obj_name}"
+        script_count=$(
+            xmllint --xpath '//scripts/size/text()' \
+            "${fetched_policy_file}" 2>/dev/null 
+        )
 
-    group_array=$(
-        xmllint --xpath '//scope/computer_groups/computer_group/name' \
-        "${fetched_policy_file}" 2>/dev/null \
-        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
-    )
-    excluded_group_array=$(
-        xmllint --xpath '//scope/exclusions/computer_groups/computer_group/name' \
-         "${fetched_policy_file}" 2>/dev/null \
-        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
-    )
-
-    # Combine the two into a list of unique groups
-    unique_group_list=()
-    u=0
-
-    if [[ $excluded_group_array ]]; then
-        while read -r group; do
-            if [[ $group ]]; then
-                if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
-                    echo "   [copy_policy] Excluded Computer group found: ${group}"
-                    unique_group_list[$u]="${group}"
-                    u=$(($u + 1))
+        if [[ $script_count -gt 0 ]]; then
+            for (( n=1; n<=${script_count}; n++ )); do
+                script_id=$( 
+                    xmllint --xpath "//scripts/script[$n]/id/text()" \
+                    "${fetched_policy_file}" 2>/dev/null 
+                )
+                if [[ $script_id ]]; then
+                    script_name=$( 
+                        xmllint --xpath "//scripts/script[$n]/name/text()" \
+                        "${fetched_policy_file}" 2>/dev/null 
+                    )
+                    echo "   [copy_policy] Script to check: $script_name (ID ${script_id})"
+                    fetch_api_object script "${script_id}"
+                    parse_api_obj_for_copying script "${script_id}"
+                    copy_api_object "script" "${script_id}" "$script_name"
                 fi
-            fi
-        done <<< "${excluded_group_array}"
-    fi
+            done
+        fi
 
-    if [[ $group_array ]]; then
-        while read -r group; do
-            if [[ $group ]]; then
-                if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
-                    echo "   [copy_policy] Computer group found: ${group}"
-                    unique_group_list[$u]="${group}"
-                    u=$(($u + 1))
+        # Look for computer groups in the policy (targets and exclusions)
+        echo "   [copy_policy] Checking for computer groups in ${chosen_api_obj_name}"
+
+        group_array=$(
+            xmllint --xpath '//scope/computer_groups/computer_group/name' \
+            "${fetched_policy_file}" 2>/dev/null \
+            | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+        )
+        excluded_group_array=$(
+            xmllint --xpath '//scope/exclusions/computer_groups/computer_group/name' \
+            "${fetched_policy_file}" 2>/dev/null \
+            | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+        )
+
+        # Combine the two into a list of unique groups
+        unique_group_list=()
+        u=0
+
+        if [[ $excluded_group_array ]]; then
+            while read -r group; do
+                if [[ $group ]]; then
+                    if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
+                        echo "   [copy_policy] Excluded Computer group found: ${group}"
+                        unique_group_list[$u]="${group}"
+                        u=$(($u + 1))
+                    fi
                 fi
-            fi
-        done <<< "${group_array}"
+            done <<< "${excluded_group_array}"
+        fi
+
+        if [[ $group_array ]]; then
+            while read -r group; do
+                if [[ $group ]]; then
+                    if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
+                        echo "   [copy_policy] Computer group found: ${group}"
+                        unique_group_list[$u]="${group}"
+                        u=$(($u + 1))
+                    fi
+                fi
+            done <<< "${group_array}"
+        fi
+
+        # transfer the unique list to a new list so that we can add further groups from
+        # embedded groups whilst iterating through the unique list
+        final_group_list=()
+        for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
+            final_group_list[$i]="${unique_group_list[$i]}"
+        done
+
+        echo "   [copy_policy] Total ${#unique_group_list[@]} groups found in policy."
+
+        # Read all the groups to find groups within
+        for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+            echo "   [copy_policy] Fetching '${unique_group_list[$i]}'."
+            fetch_api_object_by_name "computer_group" "${unique_group_list[$i]}"
+            check_groups_in_groups "${unique_group_list[$i]}"
+        done
+
+        # Process all the groups in reverse order, since the embedded groups
+        # will then appear first, which should be safer for avoiding failed group creation
+        for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
+            echo "   [copy_policy] Computer group to process: ${final_group_list[$i]}"
+            check_eas_in_groups "${final_group_list[$i]}"
+            parse_api_object_by_name_for_copying "computer_group" "${final_group_list[$i]}"
+            copy_computer_group "${final_group_list[$i]}"
+        done
     fi
-
-    # transfer the unique list to a new list so that we can add further groups from
-    # embedded groups whilst iterating through the unique list
-    final_group_list=()
-    for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
-        final_group_list[$i]="${unique_group_list[$i]}"
-    done
-
-    echo "   [copy_policy] Total ${#unique_group_list[@]} groups found in policy."
-
-    # Read all the groups to find groups within
-    for (( i=0; i<${#unique_group_list[@]}; i++ )); do
-        echo "   [copy_policy] Fetching '${unique_group_list[$i]}'."
-        fetch_api_object_by_name "computer_group" "${unique_group_list[$i]}"
-        check_groups_in_groups "${unique_group_list[$i]}"
-    done
-
-    # Process all the groups in reverse order, since the embedded groups
-    # will then appear first, which should be safer for avoiding failed group creation
-    for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
-        echo "   [copy_policy] Computer group to process: ${final_group_list[$i]}"
-        check_eas_in_groups "${final_group_list[$i]}"
-        parse_api_object_by_name_for_copying "computer_group" "${final_group_list[$i]}"
-        copy_computer_group "${final_group_list[$i]}"
-    done
 
     # Write the policy to the destinations
     echo "   [copy_policy] Checking if '${chosen_api_obj_name}' exists..."
@@ -1708,13 +1713,21 @@ main() {
     if [[ ! $api_obj_action ]]; then
         # Copy or delete?
         echo
-        read -r -p "Do you wish to [C]opy, [F]orce copy, force [I]con, or [D]elete these $api_object_type? : " action_question
+        read -r -p "Do you wish to [C]opy, [S]afe copy, [F]orce copy, force [I]con, or [D]elete these $api_object_type? : " action_question
 
         case "$action_question" in
             C|c)
+                skip_dependencies="no"
+                api_obj_action="copy"
+            ;;
+            S|s)
+                echo "   [main] Safe mode selected - no object dependencies will be checked or copied"
+                skip_dependencies="yes"
                 api_obj_action="copy"
             ;;
             F|f)
+                echo "   [main] Force mode selected - protected items will be force-copied!"
+                skip_dependencies="no"
                 if [[ $api_xml_object == "computer_group" ]]; then
                     force_update_groups="$chosen_api_obj_name"
                     api_obj_action="copy"
@@ -1724,6 +1737,7 @@ main() {
                 fi
             ;;
             I|i)
+                echo "   [main] Force icon mode selected - an existing icon with the same name will be replaced"
                 if [[ $api_xml_object == "policy" ]]; then
                     force_icon_update="yes"
                     api_obj_action="copy"
