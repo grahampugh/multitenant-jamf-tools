@@ -35,6 +35,9 @@ policy_testing_category="Untested"
 # Reset group action before reading command line flags
 api_obj_action=""
 
+# reduce the curl tries
+max_tries_override=4
+
 # -------------------------------------------------------------------------
 # Functions
 # -------------------------------------------------------------------------
@@ -196,7 +199,19 @@ check_eas_in_groups() {
                         extension_attribute_name="${criterion}"
                         fetch_api_object_by_name "computer_extension_attribute" "$extension_attribute_name"
                         parse_api_object_by_name_for_copying "computer_extension_attribute" "$extension_attribute_name"
-                        copy_api_object_by_name "computer_extension_attribute" "$extension_attribute_name"
+                        echo
+                        printf '%s' "WARNING! This will update computer_extension_attribute $extension_attribute_name. Are you sure? (Y/N) : "
+                        read -r are_you_sure_computer_extension_attribute < /dev/tty
+                        echo
+                        case "$are_you_sure_computer_extension_attribute" in
+                            Y|y)
+                                echo "   [main] Confirmed, copying $extension_attribute_name"
+                                copy_api_object_by_name "computer_extension_attribute" "$extension_attribute_name"
+                            ;;
+                            *)
+                                echo "   [main] Skipping $extension_attribute_name"
+                            ;;
+                        esac
                     fi
                     if [[ $extension_attribute_found == 0 ]]; then
                         echo "   [check_eas_in_groups] No matching extension attribute '${criterion}' found."
@@ -373,7 +388,18 @@ copy_api_object() {
                 echo "   [copy_api_object] Computer group to process: ${final_group_list[$i]}"
                 check_eas_in_groups "${final_group_list[$i]}"
                 parse_api_object_by_name_for_copying "computer_group" "${final_group_list[$i]}"
-                copy_computer_group "${final_group_list[$i]}"
+                echo
+                printf '%s' "WARNING! This will update computer_group ${final_group_list[$i]}. Are you sure? (Y/N) : "
+                read -r are_you_sure_copy_api_object < /dev/tty
+                case "$are_you_sure_copy_api_object" in
+                    Y|y)
+                        echo "   [main] Confirmed, copying ${final_group_list[$i]}"
+                        copy_computer_group "${final_group_list[$i]}"
+                    ;;
+                    *)
+                        echo "   [main] Skipping ${final_group_list[$i]}"
+                    ;;
+                esac
             done
         fi
     fi
@@ -596,7 +622,18 @@ copy_groups_in_group() {
         echo "   [copy_groups_in_group] Computer group to process: ${final_group_list[$i]}"
         check_eas_in_groups "${final_group_list[$i]}"
         parse_api_object_by_name_for_copying computer_group "${final_group_list[$i]}"
-        copy_computer_group "${final_group_list[$i]}"
+        echo
+        printf '%s' "WARNING! This will update computer_group ${final_group_list[$i]}. Are you sure? (Y/N) : "
+        read -r are_you_sure_copy_groups_in_group < /dev/tty
+        case "$are_you_sure_copy_groups_in_group" in
+            Y|y)
+                echo "   [main] Confirmed, copying ${final_group_list[$i]}"
+                copy_computer_group "${final_group_list[$i]}"
+            ;;
+            *)
+                echo "   [main] Skipping ${final_group_list[$i]}"
+            ;;
+        esac
     done
     echo
 }
@@ -723,7 +760,18 @@ copy_policy() {
                 echo "   [copy_policy] Package to check: $package_name (ID ${package_id})"
                 fetch_api_object "package" "${package_id}"
                 parse_api_obj_for_copying "package" "${package_id}"
-                copy_api_object "package" "${package_id}" "$package_name"
+                echo
+                printf '%s' "WARNING! This will update package $package_name. Are you sure? (Y/N) : "
+                read -r are_you_sure_copy_package < /dev/tty
+                case "$are_you_sure_copy_package" in
+                    Y|y)
+                        echo "   [main] Confirmed, copying $package_name"
+                        copy_api_object "package" "${package_id}" "$package_name"
+                    ;;
+                    *)
+                        echo "   [main] Skipping $package_name"
+                    ;;
+                esac
             fi
         done
 
@@ -764,7 +812,18 @@ copy_policy() {
                     echo "   [copy_policy] Script to check: $script_name (ID ${script_id})"
                     fetch_api_object script "${script_id}"
                     parse_api_obj_for_copying script "${script_id}"
-                    copy_api_object "script" "${script_id}" "$script_name"
+                    echo
+                    printf '%s' "WARNING! This will update script $script_name. Are you sure? (Y/N) : "
+                    read -r are_you_sure_copy_script < /dev/tty
+                    case "$are_you_sure_copy_script" in
+                        Y|y)
+                            echo "   [main] Confirmed, copying $script_name"
+                            copy_api_object "script" "${script_id}" "$script_name"
+                        ;;
+                        *)
+                            echo "   [main] Skipping $script_name"
+                        ;;
+                    esac
                 fi
             done
         fi
@@ -833,7 +892,18 @@ copy_policy() {
             echo "   [copy_policy] Computer group to process: ${final_group_list[$i]}"
             check_eas_in_groups "${final_group_list[$i]}"
             parse_api_object_by_name_for_copying "computer_group" "${final_group_list[$i]}"
-            copy_computer_group "${final_group_list[$i]}"
+            echo
+            printf '%s' "WARNING! This will update computer_group ${final_group_list[$i]}. Are you sure? (Y/N) : "
+            read -r are_you_sure_copy_computer_group < /dev/tty
+            case "$are_you_sure_copy_computer_group" in
+                Y|y)
+                    echo "   [main] Confirmed, copying ${final_group_list[$i]}"
+                    copy_computer_group "${final_group_list[$i]}"
+                ;;
+                *)
+                    echo "   [main] Skipping ${final_group_list[$i]}"
+                ;;
+            esac
         done
     fi
 
@@ -1713,21 +1783,26 @@ main() {
     if [[ ! $api_obj_action ]]; then
         # Copy or delete?
         echo
-        read -r -p "Do you wish to [C]opy, [S]afe copy, [F]orce copy, force [I]con, or [D]elete these $api_object_type? : " action_question
+        echo "Action options:"
+        echo "   C  - [C]opy object including all dependencies - will ask to overwite each dependency"
+        echo "   Cn - [C]opy object including all dependencies - will overwite each dependency without interaction"
+        echo "   Cs - [C]opy main object only - Safe Mode - will not check dependencies"
+        echo "   Ci - [C]opy policy and force-overwrite the icon - will ask to overwite each dependency"
+        echo "   Cf - [C]opy object including all dependencies - will overwite each dependency without interaction AND overwrite protected/excluded items"
+        echo "   D  - [D]delete object only"
+        echo "   D  - [D]delete package object AND mount repo to delete file"
+        read -r -p "Enter a letter from the above options: " action_question
 
         case "$action_question" in
-            C|c)
-                skip_dependencies="no"
-                api_obj_action="copy"
-            ;;
-            S|s)
+            CS|Cs|cs)
                 echo "   [main] Safe mode selected - no object dependencies will be checked or copied"
                 skip_dependencies="yes"
                 api_obj_action="copy"
             ;;
-            F|f)
+            CF|Cf|cf)
                 echo "   [main] Force mode selected - protected items will be force-copied!"
                 skip_dependencies="no"
+                ask_for_dependencies="no"
                 if [[ $api_xml_object == "computer_group" ]]; then
                     force_update_groups="$chosen_api_obj_name"
                     api_obj_action="copy"
@@ -1736,12 +1811,23 @@ main() {
                     api_obj_action="copy"
                 fi
             ;;
-            I|i)
+            CI|Ci|Ci)
                 echo "   [main] Force icon mode selected - an existing icon with the same name will be replaced"
+                ask_for_dependencies="yes"
                 if [[ $api_xml_object == "policy" ]]; then
                     force_icon_update="yes"
                     api_obj_action="copy"
                 fi
+            ;;
+            CN|Cn|cn)
+                skip_dependencies="no"
+                ask_for_dependencies="no"
+                api_obj_action="copy"
+            ;;
+            C|c)
+                skip_dependencies="no"
+                ask_for_dependencies="yes"
+                api_obj_action="copy"
             ;;
             D|d)
                 api_obj_action="delete"

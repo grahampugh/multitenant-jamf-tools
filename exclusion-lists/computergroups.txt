@@ -1,6 +1,4 @@
 (Do Not Overwrite)
-auto-update
-auto-install
-users
-test-users
+All Managed
 Testing
+Excluded

@@ -256,6 +256,103 @@ choose_destination_instances() {
     echo
 }
 
+get_instance_distribution_point() {
+    # find out if there is a file share distribution point in this instance
+    # determine jss_url
+    set_credentials "$jss_instance"
+    jss_url="${jss_instance}"
+
+    # Check for DPs
+    # send request
+    curl_url="$jss_url/JSSResource/distributionpoints"
+    curl_args=("--header")
+    curl_args+=("Accept: application/xml")
+    send_curl_request
+
+    # get the results array, find out if there are more than one
+    dp_count=$(xmllint --xpath "//distribution_points/size/text()" "$curl_output_file" 2>/dev/null)
+    # if 0
+    if [[ $dp_count -eq 0 ]]; then
+        echo "No DP found - assuming JCDS"
+        smb_url=""
+    else
+        dp_names_list=$(xmllint --xpath "//distribution_points/distribution_point/name" "$curl_output_file" 2>/dev/null | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n")
+        # loop through the DPs and check that we have credentials for them - only check the first one for now
+        while read -r dp; do
+            echo "Distribution Point: $dp" # TEMP
+            if [[ $dp_url_filter ]]; then
+                if [[ $dp != *"$dp_url_filter"* ]]; then
+                    echo "Skipping $dp"
+                    continue
+                fi
+            fi
+            # send request
+            curl_url="$jss_url/JSSResource/distributionpoints/name/$dp"
+            curl_args=("--header")
+            curl_args+=("Accept: application/xml")
+            send_curl_request
+            # get settings
+            dp_type=$(xmllint --xpath "//distribution_point/connection_type/text()" "$curl_output_file" 2>/dev/null)
+            if [[ "$dp_type" == "AFP" ]]; then
+                dp_protocol="afp"
+            elif [[ "$dp_type" == "SMB" ]]; then
+                dp_protocol="smb"
+            fi
+            dp_server=$(xmllint --xpath "//distribution_point/ip_address/text()" "$curl_output_file" 2>/dev/null)
+            dp_share=$(xmllint --xpath "//distribution_point/share_name/text()" "$curl_output_file" 2>/dev/null)
+            user_rw=$(xmllint --xpath "//distribution_point/read_write_username/text()" "$curl_output_file" 2>/dev/null)
+            # pass_rw_sha256=$(xmllint --xpath "//distribution_point/read_write_password_sha256/text()" "$curl_output_file" 2>/dev/null)
+            # we are only handling one right now, so exit the loop
+            break
+        done <<< "$dp_names_list"
+        # smb url
+        smb_url="$dp_protocol://$dp_server/$dp_share"
+        echo "SMB_URL: $smb_url" # TEMP
+        echo "SMB_USER: $user_rw" # TEMP
+    # if > 1 # TODO
+    fi
+}
+
+get_instance_distribution_point_new_api() {
+    # find out if there is a file share distribution point in this instance
+    # determine jss_url
+    set_credentials "$jss_instance"
+    jss_url="${jss_instance}"
+
+    # Check for DPs
+    # send request
+    curl_url="$jss_url/v1/distribution-points"
+    curl_args=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+
+    # get the results array, find out if there are more than one
+    dp_count=$(plutil -extract totalCount raw "$curl_output_file")
+    # if 0
+    if [[ $dp_count -eq 0 ]]; then
+        echo "No DP found - assuming JCDS"
+        smb_url=""
+    # if 1
+    elif [[ $dp_count -eq 1 ]]; then
+        dp_server=$(plutil -extract results.0.serverName raw "$curl_output_file")
+        dp_type=$(plutil -extract results.0.fileSharingConnectionType raw "$curl_output_file")
+        if [[ "$dp_type" == "AFP" ]]; then
+            dp_protocol="afp"
+            dp_share=$(plutil -extract results.0.AFPFileShare.shareName raw "$curl_output_file")
+            user_rw=$(plutil -extract results.0.AFPFileShare.readWriteUsername raw "$curl_output_file")
+            pass_rw=$(plutil -extract results.0.AFPFileShare.readWritePassword raw "$curl_output_file")
+        elif [[ "$dp_type" == "SMB" ]]; then
+            dp_protocol="smb"
+            dp_share=$(plutil -extract results.0.SMBFileShare.shareName raw "$curl_output_file")
+            user_rw=$(plutil -extract results.0.SMBFileShare.readWriteUsername raw "$curl_output_file")
+            pass_rw=$(plutil -extract results.0.SMBFileShare.readWritePassword raw "$curl_output_file")
+        fi
+    # if > 1 # TODO
+    fi
+    # smb url
+    smb_url="$dp_protocol://$dp_server/$dp_share"
+}
+
 set_credentials() {
     local jss_url="$1"
     if [[ $verbose -gt 0 ]]; then
