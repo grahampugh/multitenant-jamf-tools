@@ -22,9 +22,9 @@ Usage:
 [no arguments]                - interactive mode
 -r                            - recipe to run (e.g. Firefox.jamf)
 -l                            - recipe-list to run (must be path to a .txt file)
---il FILENAME (without .txt)  - provide an instance list filename
+-il FILENAME (without .txt)   - provide an instance list filename
                                 (must exist in the instance-lists folder)
---i JSS_URL                   - perform action on a single instance
+-i JSS_URL                    - perform action on a single instance
                                 (must exist in the relevant instance list)
 --all                         - perform action on ALL instances in the instance list
 --dp                          - filter DPs on DP name
