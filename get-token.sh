@@ -196,10 +196,25 @@ choose_source_instance() {
     else
         instance_number=""
         echo "Enter the number of source instance from which to download API data,"
+        echo "   or enter a string to select the FIRST matching instance,"
         read -r -p "   or press enter for '(0) $source_default_template_instance' : " instance_number
 
         # Check for the default or non-context
-        if [[ "$instance_number" ]]; then
+        if grep -qe "[A-Za-z]" <<< "$instance_number"; then
+            for instance in "${working_instances_list[@]}"; do
+                if [[ "$instance" == *"${instance_number}."* || "$instance" == *"${instance_number}-"* ]]; then
+                    source_instance="$instance"
+                    for i in "${!working_instances_list[@]}"; do
+                        [[ "${working_instances_list[$i]}" = "${instance}" ]] && source_instance_number=$i
+                    done
+                    break
+                fi
+            done
+            if [[ ! "$source_instance" ]]; then
+                echo "ERROR: could not find matching instance"
+                exit 1
+            fi
+        elif [[ "$instance_number" ]]; then
             source_instance="${working_instances_list[instance_number]}"
             source_instance_number="$instance_number"
         else
@@ -219,13 +234,14 @@ choose_destination_instances() {
     instance_number=""
     if [[ ! $chosen_instance && $all_instances -ne 1 ]]; then
         echo "Enter the number(s) of the destination JSS instance(s),"
-        echo "or enter 'ALL' to propagate to all destination instances"
+        echo "   or enter a string to select the FIRST matching instance,"
+        echo "   or enter 'ALL' to propagate to all destination instances"
         if [[ $source_instance ]]; then
-            echo "or press enter for '($source_instance_number) $source_instance'."
+            echo "   or press enter for '($source_instance_number) $source_instance'."
         else
-            echo "or press enter for '(0) ${working_instances_list[0]}'."
+            echo "   or press enter for '(0) ${working_instances_list[0]}'."
         fi
-        read -r -p "Instance(s) : " instance_number
+        read -r -p "   Instance(s) : " instance_number
         echo
     fi
 
@@ -245,6 +261,17 @@ choose_destination_instances() {
     elif [[ $all_instances -eq 1 || "$instance_number" == "ALL" ]]; then
         instance_choice_array+=("${working_instances_list[@]}")
         do_all_instances="yes"
+    elif grep -qe "[A-Za-z]" <<< "$instance_number"; then
+        for instance in "${working_instances_list[@]}"; do
+            if [[ "$instance" == *"${instance_number}."* || "$instance" == *"${instance_number}-"* ]]; then
+                instance_choice_array+=("$instance")
+                break
+            fi
+        done
+        if [[ ! "$source_instance" ]]; then
+            echo "ERROR: could not find matching instance"
+            exit 1
+        fi
     elif [[ "$instance_number" ]]; then
         for instance in $instance_number; do
             instance_choice_array+=("${working_instances_list[$instance]}")
