@@ -201,8 +201,10 @@ choose_source_instance() {
         # Check for the default or non-context
         if [[ "$instance_number" ]]; then
             source_instance="${working_instances_list[instance_number]}"
+            source_instance_number="$instance_number"
         else
             source_instance="$source_default_template_instance"
+            source_instance_number="0"
         fi
     fi
 
@@ -218,7 +220,11 @@ choose_destination_instances() {
     if [[ ! $chosen_instance && $all_instances -ne 1 ]]; then
         echo "Enter the number(s) of the destination JSS instance(s),"
         echo "or enter 'ALL' to propagate to all destination instances"
-        echo "or press enter for '(0) ${working_instances_list[0]}'."
+        if [[ $source_instance ]]; then
+            echo "or press enter for '($source_instance_number) $source_instance'."
+        else
+            echo "or press enter for '(0) ${working_instances_list[0]}'."
+        fi
         read -r -p "Instance(s) : " instance_number
         echo
     fi
@@ -243,6 +249,8 @@ choose_destination_instances() {
         for instance in $instance_number; do
             instance_choice_array+=("${working_instances_list[$instance]}")
         done
+    elif [[ "$source_instance" ]]; then
+        instance_choice_array+=("${working_instances_list[$source_instance_number]}")
     else
         instance_choice_array+=("${working_instances_list[0]}")
     fi

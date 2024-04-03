@@ -1784,19 +1784,18 @@ main() {
         # Copy or delete?
         echo
         echo "Action options:"
-        echo "   C  - [C]opy object including all dependencies - will ask to overwite each dependency"
-        echo "   Cn - [C]opy object including all dependencies - will overwite each dependency without interaction"
-        echo "   Cs - [C]opy main object only - Safe Mode - will not check dependencies"
-        echo "   Ci - [C]opy policy and force-overwrite the icon - will ask to overwite each dependency"
-        echo "   Cf - [C]opy object including all dependencies - will overwite each dependency without interaction AND overwrite protected/excluded items"
-        echo "   D  - [D]delete object only"
-        echo "   D  - [D]delete package object AND mount repo to delete file"
+        echo "   C  - [C]opy main object only - [S]afe Mode - will not check dependencies"
+        echo "   Cd - [C]opy object including all dependencies - will ask to overwite each dependency"
+        echo "   Cn - [C]opy object including all dependencies - will overwite each dependency without interaction ([N]o confirmations!)"
+        echo "   Ci - [C]opy policy and force-overwrite the [i]con - will ask to overwite each dependency"
+        echo "   Cf - [C]opy object including all dependencies - will [f]orce-overwite each dependency including protected/excluded items without interaction"
+        echo "   D  - [D]elete object only (for packages will mount the repo and ask to delete the file)"
         read -r -p "Enter a letter from the above options: " action_question
 
         case "$action_question" in
-            CS|Cs|cs)
-                echo "   [main] Safe mode selected - no object dependencies will be checked or copied"
-                skip_dependencies="yes"
+            CD|Cd|cd)
+                skip_dependencies="no"
+                ask_for_dependencies="yes"
                 api_obj_action="copy"
             ;;
             CF|Cf|cf)
@@ -1825,8 +1824,8 @@ main() {
                 api_obj_action="copy"
             ;;
             C|c)
-                skip_dependencies="no"
-                ask_for_dependencies="yes"
+                echo "   [main] Safe mode selected - no object dependencies will be checked or copied"
+                skip_dependencies="yes"
                 api_obj_action="copy"
             ;;
             D|d)
@@ -1890,9 +1889,9 @@ main() {
         fi
 
         if [[ $api_obj_action == "copy" ]]; then
-            # grab the object from the template instance
+            # grab the object from the source instance
             echo
-            echo "   [main] Source instance: '$jss_url'"
+            echo "   [main] Source instance: '$source_instance'"
             echo "   [main] Fetching ${api_xml_object} '$chosen_api_obj_name' (id=$chosen_api_obj_id)"
 
             if [[ $api_xml_object == "policy" ]]; then
