@@ -342,8 +342,8 @@ get_instance_distribution_point() {
         done <<< "$dp_names_list"
         # smb url
         smb_url="$dp_protocol://$dp_server/$dp_share"
-        echo "SMB_URL: $smb_url" # TEMP
-        echo "SMB_USER: $user_rw" # TEMP
+        # echo "SMB_URL: $smb_url" # TEMP
+        # echo "SMB_USER: $user_rw" # TEMP
     # if > 1 # TODO
     fi
 }

@@ -1305,6 +1305,18 @@ parse_api_object_by_name_for_copying() {
     echo "   [parse_api_object_by_name_for_copying] Created ${parsed_file}"
 }
 
+strip_scope_from_api_object() {
+    # temporary copy of parsed file
+    local api_xml_object="$1"
+    local chosen_api_obj_name="$2"
+    temp_parsed_file="${parsed_file/-parsed/-temp}"
+    cp "$parsed_file" "$temp_parsed_file"
+
+    # Strip out id, computer objects etc which are instance-specific
+    echo "   [strip_scope_from_api_object] Stripping scope from ${api_xml_object} '${chosen_api_obj_name}'"
+    sed '/<scope>/,/<\/scope>/d' < "${temp_parsed_file}" > "${parsed_file}"
+}
+
 send_slack_notification() {
     local api_xml_object=$1
     local chosen_api_obj_name="$2"
@@ -1784,7 +1796,8 @@ main() {
         # Copy or delete?
         echo
         echo "Action options:"
-        echo "   C  - [C]opy main object only - [S]afe Mode - will not check dependencies"
+        echo "   C  - [C]opy main object only - Safe Mode - will not check dependencies"
+        echo "   Cs - [C]opy main object only - Ultra-[S]afe Mode - strips scope from object completely"
         echo "   Cd - [C]opy object including all dependencies - will ask to overwite each dependency"
         echo "   Cn - [C]opy object including all dependencies - will overwite each dependency without interaction ([N]o confirmations!)"
         echo "   Ci - [C]opy policy and force-overwrite the [i]con - will ask to overwite each dependency"
@@ -1821,6 +1834,12 @@ main() {
             CN|Cn|cn)
                 skip_dependencies="no"
                 ask_for_dependencies="no"
+                api_obj_action="copy"
+            ;;
+            CS|Cs|cs)
+                echo "   [main] Ultra Safe mode selected - no object dependencies will be checked or copied, scope is unaltered"
+                skip_dependencies="yes"
+                strip_scope="yes"
                 api_obj_action="copy"
             ;;
             C|c)
@@ -1948,7 +1967,7 @@ main() {
                 delete )
                     # first delete the pkg metadata object
                     echo "   [main] Deleting ${api_xml_object} '$chosen_api_obj_name_decoded'"
-                    delete_api_object $api_xml_object "$chosen_api_obj_name"
+                    delete_api_object "$api_xml_object" "$chosen_api_obj_name"
 
                     # now delete package from an SMB repo (TODO - delete from S3)
                     if [[ $api_obj_action == "delete" && $api_xml_object == "package" ]]; then
@@ -1957,6 +1976,9 @@ main() {
                     ;;
                 copy )
                     echo "   [main] Copying ${api_xml_object} '$chosen_api_obj_name'"
+                    if [[ $strip_scope == "yes" ]]; then
+                        strip_scope_from_api_object "$api_xml_object" "$chosen_api_obj_name"
+                    fi
                     if [[ $api_xml_object == "policy" ]]; then
                         copy_policy "$chosen_api_obj_name" "$chosen_api_obj_id"
                     elif [[ $api_xml_object == "computer_group" ]]; then
