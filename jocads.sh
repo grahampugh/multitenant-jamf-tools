@@ -432,6 +432,11 @@ copy_api_object() {
         existing_id=$(xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = '$source_name']/id/text()" "$curl_output_file" 2>/dev/null)
     fi
 
+    # change the PayloadOrganization value if selected
+    if [[ ("${api_xml_object}" == "os_x_configuration_profile" || "${api_xml_object}" == "configuration_profile") && $fix_org -eq 1 && $new_org != "" ]]; then
+        set_payload_organisation "$new_org" "$source_name"
+    fi
+
     if [[ $existing_id ]]; then
         echo "   [copy_api_object] Existing ${api_xml_object} named '${source_name}' found; id=${existing_id}. Updating..."
 
@@ -1317,6 +1322,18 @@ strip_scope_from_api_object() {
     sed '/<scope>/,/<\/scope>/d' < "${temp_parsed_file}" > "${parsed_file}"
 }
 
+set_payload_organisation() {
+    # overwrite any existing payload organisation with a fixed value
+    local new_org="$1"
+    local chosen_api_obj_name="$2"
+    temp_parsed_file="${parsed_file/-parsed/-temp}"
+    cp "$parsed_file" "$temp_parsed_file"
+
+    echo "   [set_payload_organisation] Changing payload organisation in '${chosen_api_obj_name}' to '${new_org}'"
+
+    sed "s|PayloadOrganization\&lt\;\/key&gt\;\&lt\;string\&gt\;[A-Za-z ]*\&lt;\/string|PayloadOrganization\&lt;\/key\&gt\;\&lt\;string\&gt\;${new_org}\&lt\;\/string|g" < "${temp_parsed_file}" > "${parsed_file}"
+}
+
 send_slack_notification() {
     local api_xml_object=$1
     local chosen_api_obj_name="$2"
@@ -1388,6 +1405,7 @@ main() {
         echo "API object type options:"
         echo "   A - [A]dvanced Computer Search"
         echo "   C - [C]onfiguration Profile"
+        echo "   F - Configuration Profile - [f]ix Payload Organisation"
         echo "   O - Configuration Profile - specify UUID to rescue [o]rphaned profile"
         echo "   D - Mobile [D]evice Configuration Profile"
         echo "   E - [E]xtension Attribute"
@@ -1429,6 +1447,10 @@ main() {
             O|o)
                 api_xml_object="os_x_configuration_profile"
                 ask_for_uuid=1
+            ;;
+            F|f)
+                api_xml_object="os_x_configuration_profile"
+                fix_org=1
             ;;
             M|m)
                 api_xml_object="mac_application"
@@ -1869,6 +1891,12 @@ main() {
     if [[ $ask_for_uuid == 1 && $api_obj_action == "copy" ]]; then
         echo
         read -r -p "Specify UUID to write to destination [or leave blank to skip] : " entered_uuid
+    fi
+
+    # if user wishes to specify a UUID to inject into a configuration profile, ask for it here
+    if [[ $fix_org == 1 && $api_obj_action == "copy" ]]; then
+        echo
+        read -r -p "Specify value of PayloadOrganization to write to destination [or leave blank to skip] : " new_org
     fi
 
     if [[ $confirmed == "yes" ]]; then
