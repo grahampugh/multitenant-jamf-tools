@@ -116,11 +116,15 @@ get_instance_list() {
                 note=""
             fi
             if [[ "$instance" ]]; then
+                # strip the URL back to remove trailing slashes or parameters
+                instance=$(strip_url "$instance")
+
                 instances_list_inc_ios_instances+=("$instance") 
                 if [[ "$note" != *"iOS"* ]]; then
-                    instances_list+=("$REPLY")
+                    instances_list+=("$instance")
                 fi
             fi
+
         done < "$instance_lists_folder/$instance_list_file.txt"
     else
         echo
@@ -223,12 +227,23 @@ choose_source_instance() {
         fi
     fi
 
-    # strip away a failover address as this is not API-friendly ('%\?*' strips the ? and anything subsequent)
-    source_instance="${source_instance%\?*}"
-
     echo
     echo "   [main] Source instance chosen: $source_instance"
 
+}
+
+strip_url() {
+    # remove any trailing slash and any failover or other supplied URL parameters
+    local url="${1}"
+    while true; do
+        case "$url" in
+            *\?*) url="${url%\?*}" ;;
+            */) url="${url%/}" ;;
+            *) break ;;
+        esac
+    done
+
+    echo "$url"
 }
 
 choose_destination_instances() {
@@ -253,7 +268,7 @@ choose_destination_instances() {
     if [[ $chosen_instance ]]; then
         for instance in "${working_instances_list[@]}"; do
             if [[ "$chosen_instance" == "$instance" ]]; then
-                instance_choice_array+=("${instance%\?*}")
+                instance_choice_array+=("$instance")
                 break
             fi
         done
@@ -262,12 +277,12 @@ choose_destination_instances() {
             exit 1
         fi
     elif [[ $all_instances -eq 1 || "$instance_number" == "ALL" ]]; then
-        instance_choice_array+=("${working_instances_list[@]%\?*}")
+        instance_choice_array+=("${working_instances_list[@]}")
         do_all_instances="yes"
     elif grep -qe "[A-Za-z]" <<< "$instance_number"; then
         for instance in "${working_instances_list[@]}"; do
             if [[ "$instance" == *"${instance_number}."* || "$instance" == *"${instance_number}-"* ]]; then
-                instance_choice_array+=("${instance%\?*}")
+                instance_choice_array+=("${instance}")
                 break
             fi
         done
@@ -277,12 +292,12 @@ choose_destination_instances() {
         fi
     elif [[ "$instance_number" ]]; then
         for instance in $instance_number; do
-            instance_choice_array+=("${working_instances_list[$instance]%\?*}")
+            instance_choice_array+=("${working_instances_list[$instance]}")
         done
     elif [[ "$source_instance" ]]; then
-        instance_choice_array+=("${working_instances_list[$source_instance_number]%\?*}")
+        instance_choice_array+=("${working_instances_list[$source_instance_number]}")
     else
-        instance_choice_array+=("${working_instances_list[0]%\?*}")
+        instance_choice_array+=("${working_instances_list[0]}")
     fi
 
     echo "Instances chosen:"
