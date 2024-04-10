@@ -282,7 +282,7 @@ choose_destination_instances() {
     elif grep -qe "[A-Za-z]" <<< "$instance_number"; then
         for instance in "${working_instances_list[@]}"; do
             if [[ "$instance" == *"${instance_number}."* || "$instance" == *"${instance_number}-"* ]]; then
-                instance_choice_array+=("${instance}")
+                instance_choice_array+=("$instance")
                 break
             fi
         done
