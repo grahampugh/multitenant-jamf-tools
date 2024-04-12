@@ -116,11 +116,15 @@ get_instance_list() {
                 note=""
             fi
             if [[ "$instance" ]]; then
+                # strip the URL back to remove trailing slashes or parameters
+                instance=$(strip_url "$instance")
+
                 instances_list_inc_ios_instances+=("$instance") 
                 if [[ "$note" != *"iOS"* ]]; then
-                    instances_list+=("$REPLY")
+                    instances_list+=("$instance")
                 fi
             fi
+
         done < "$instance_lists_folder/$instance_list_file.txt"
     else
         echo
@@ -226,6 +230,20 @@ choose_source_instance() {
     echo
     echo "   [main] Source instance chosen: $source_instance"
 
+}
+
+strip_url() {
+    # remove any trailing slash and any failover or other supplied URL parameters
+    local url="${1}"
+    while true; do
+        case "$url" in
+            *\?*) url="${url%\?*}" ;;
+            */) url="${url%/}" ;;
+            *) break ;;
+        esac
+    done
+
+    echo "$url"
 }
 
 choose_destination_instances() {
