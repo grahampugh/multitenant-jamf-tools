@@ -93,7 +93,7 @@ run_api_tool(){
 
 # source the get-token.sh file
 # this folder
-tool_directory="../jamf-upload/jamf-api-tool"
+tool_directory="../jamf-api-tool"
 tool="jamf_api_tool.py"
 tmp_prefs="${HOME}/Library/Preferences/jamf-api-tool.plist"
 autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
