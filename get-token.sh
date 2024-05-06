@@ -539,6 +539,7 @@ send_curl_request() {
     while [[ $try -le $max_tries ]]; do
         check_token "$jss_url"
         # any additional curl_args must be defined before this request (even if empty). Normally the header and=/or request will be made there
+        curl_standard_args+=("--location")
         curl_standard_args=("--header")
         curl_standard_args+=("authorization: Bearer $token")
         curl_standard_args+=("--write-out")
@@ -566,7 +567,7 @@ send_curl_request() {
         # echo "    RESPONSE:" # TEMP
         # cat "$curl_output_file" # TEMP
 
-        if [[ "$http_response" == "10"* || "$http_response" == "20"* ]]; then
+        if [[ "$http_response" == "10"* || "$http_response" == "20"* || "$http_response" == "30"* ]]; then
             if [[ $verbose -gt 0 ]]; then
                 echo "Success response ($http_response)"
             fi
