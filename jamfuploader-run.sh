@@ -86,7 +86,7 @@ run_jamfupload() {
     fi
 
     # Run the script and output to stdout
-    echo "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" 
+    # echo "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" # TEMP
     "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" 
 }
 
