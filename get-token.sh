@@ -198,18 +198,18 @@ choose_source_instance() {
     if [[ $source_instance == "template" || $source_instance == "0" ]]; then
         source_instance="$source_default_template_instance"
     else
-        instance_number=""
+        instance_selection=""
         echo "Enter the number of source instance from which to download API data,"
         echo "   or enter a string to select the FIRST matching instance,"
-        read -r -p "   or press enter for '(0) $source_default_template_instance' : " instance_number
+        read -r -p "   or press enter for '(0) $source_default_template_instance' : " instance_selection
 
         # Check for the default or non-context
-        if grep -qe "[A-Za-z]" <<< "$instance_number"; then
+        if grep -qe "[A-Za-z]" <<< "$instance_selection"; then
             for instance in "${working_instances_list[@]}"; do
-                if [[ "$instance" == *"${instance_number}."* || "$instance" == *"${instance_number}-"* ]]; then
+                if [[ "$instance" == *"${instance_selection}."* || "$instance" == *"${instance_selection}-"* ]]; then
                     source_instance="$instance"
                     for i in "${!working_instances_list[@]}"; do
-                        [[ "${working_instances_list[$i]}" = "${instance}" ]] && source_instance_number=$i
+                        [[ "${working_instances_list[$i]}" = "${instance}" ]] && source_instance_selection=$i
                     done
                     break
                 fi
@@ -218,12 +218,12 @@ choose_source_instance() {
                 echo "ERROR: could not find matching instance"
                 exit 1
             fi
-        elif [[ "$instance_number" ]]; then
-            source_instance="${working_instances_list[instance_number]}"
-            source_instance_number="$instance_number"
+        elif [[ "$instance_selection" ]]; then
+            source_instance="${working_instances_list[instance_selection]}"
+            source_instance_selection="$instance_selection"
         else
             source_instance="$source_default_template_instance"
-            source_instance_number="0"
+            source_instance_selection="0"
         fi
     fi
 
@@ -249,17 +249,17 @@ strip_url() {
 choose_destination_instances() {
     choose_instance_list
 
-    instance_number=""
+    instance_selection=""
     if [[ ! $chosen_instance && $all_instances -ne 1 ]]; then
         echo "Enter the number(s) of the destination JSS instance(s),"
         echo "   or enter a string to select the FIRST matching instance,"
         echo "   or enter 'ALL' to propagate to all destination instances"
         if [[ $source_instance ]]; then
-            echo "   or press enter for '($source_instance_number) $source_instance'."
+            echo "   or press enter for '($source_instance_selection) $source_instance'."
         else
             echo "   or press enter for '(0) ${working_instances_list[0]}'."
         fi
-        read -r -p "   Instance(s) : " instance_number
+        read -r -p "   Instance(s) : " instance_selection
         echo
     fi
 
@@ -272,30 +272,38 @@ choose_destination_instances() {
                 break
             fi
         done
-        if [ ${#instance_choice_array[@]} -eq 0 ]; then
+        if [[ ${#instance_choice_array[@]} -eq 0 ]]; then
             echo "Chosen instance $chosen_instance does not exist in the selected instance list. Cannot continue."
             exit 1
         fi
-    elif [[ $all_instances -eq 1 || "$instance_number" == "ALL" ]]; then
+    elif [[ $all_instances -eq 1 || "$instance_selection" == "ALL" ]]; then
         instance_choice_array+=("${working_instances_list[@]}")
         do_all_instances="yes"
-    elif grep -qe "[A-Za-z]" <<< "$instance_number"; then
+    elif grep -qe "[A-Za-z]" <<< "$instance_selection"; then
         for instance in "${working_instances_list[@]}"; do
-            if [[ "$instance" == *"${instance_number}."* || "$instance" == *"${instance_number}-"* ]]; then
+            if [[ "$instance" == *"${instance_selection}."* || "$instance" == *"${instance_selection}-"* ]]; then
                 instance_choice_array+=("$instance")
                 break
             fi
         done
-        if [[ ! "$source_instance" ]]; then
+        if [[ ${#instance_choice_array[@]} -eq 0  ]]; then
             echo "ERROR: could not find matching instance"
             exit 1
         fi
-    elif [[ "$instance_number" ]]; then
-        for instance in $instance_number; do
-            instance_choice_array+=("${working_instances_list[$instance]}")
+    elif [[ "$instance_selection" ]]; then
+        for instance in $instance_selection; do
+            if [[ $instance == *"-"* ]]; then
+                list_first=$(echo "$instance" | cut -d'-' -f1)
+                list_last=$(echo "$instance" | cut -d'-' -f2)
+                for (( i=list_first; i<=list_last; i++ )); do
+                    instance_choice_array+=("${working_instances_list[$i]}")
+                done
+            else
+                instance_choice_array+=("${working_instances_list[$instance]}")
+            fi
         done
     elif [[ "$source_instance" ]]; then
-        instance_choice_array+=("${working_instances_list[$source_instance_number]}")
+        instance_choice_array+=("${working_instances_list[$source_instance_selection]}")
     else
         instance_choice_array+=("${working_instances_list[0]}")
     fi

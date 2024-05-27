@@ -125,6 +125,9 @@ while test $# -gt 0 ; do
         -ai|--all-instances)
             all_instances=1
         ;;
+        --confirm)
+            confirmed="yes"
+            ;;
         -v*)
             args+=("$1")
             ;;
@@ -149,6 +152,25 @@ default_instance_list="prd"
 
 # select the instances that will be changed
 choose_destination_instances
+
+# confirm
+
+if [[ $confirmed == "yes" ]]; then
+    echo "   [main] Action confirmed from command line"
+else
+    echo
+    echo "Please confirm that you would like to perform the following command:"
+    echo "jamf-api-tool.py ${args[*]}"
+    read -r -p "(Y/N) : " are_you_sure
+    case "$are_you_sure" in
+        Y|y)
+            echo "   [main] Confirmed"
+        ;;
+        *)
+            cleanup_and_exit
+        ;;
+    esac
+fi
 
 # get specific instance if entered
 if [[ $chosen_instance ]]; then
