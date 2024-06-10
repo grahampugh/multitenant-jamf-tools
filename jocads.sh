@@ -1074,7 +1074,7 @@ delete_api_object() {
     # determine jss_url
     jss_url="${dest_instance}"
 
-    echo "   [delete_api_object] Deleting $api_object_type '$chosen_api_obj_name_decoded'."
+    echo "   [delete_api_object] Deleting $api_xml_object '$chosen_api_obj_name_decoded'."
 
     # send request
     curl_url="$jss_url/JSSResource/${api_object_type}"
@@ -1082,14 +1082,15 @@ delete_api_object() {
     curl_args+=("Accept: application/xml")
     send_curl_request
 
-    # get id from output
-    existing_id=$(xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = '$chosen_api_obj_name']/id/text()" "$curl_output_file" 2>/dev/null)
+    # get id from output - in case of duplicate items with the same name, we only grab the first
+    existing_id=$(xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = '$chosen_api_obj_name']/id/text()" "$curl_output_file" 2>/dev/null | head -n 1)
 
     if [[ $existing_id ]]; then
         echo "   [delete_api_object] Existing ${api_xml_object} named '${chosen_api_obj_name_decoded}' found; id=${existing_id}. Deleting..."
 
         # send request
         curl_url="$jss_url/JSSResource/${api_object_type}/id/${existing_id}"
+        # echo $curl_url # TEMP
         curl_args=("--request")
         curl_args+=("DELETE")
         curl_args+=("--header")

@@ -167,7 +167,8 @@ else
             echo "   [main] Confirmed"
         ;;
         *)
-            cleanup_and_exit
+            echo "   [main] Cancelled"
+            exit
         ;;
     esac
 fi
