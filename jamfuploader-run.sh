@@ -41,6 +41,13 @@ Usage:
 ## FUNCTIONS ##
 ###############
 
+element_in() {
+  local e match="$1"
+  shift
+  for e; do [[ "$e" == "$match" ]] && return 0; done
+  return 1
+}
+
 run_jamfupload() {
     instance_args=()
     
@@ -55,7 +62,7 @@ run_jamfupload() {
     instance_args+=("$jss_api_password")
 
     # determine the share
-    if [[ "${args[*]}" == *"--pkg"* ]]; then
+    if element_in "pkg" "${args[@]}" || element_in "package" "${args[@]}"; then
         get_instance_distribution_point
         if [[ "$smb_url" ]]; then
             instance_args+=("--smb-url")
