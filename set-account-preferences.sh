@@ -24,6 +24,8 @@ Usage:
                                 (must exist in the instance-lists folder)
 --i JSS_URL                   - perform action on a single instance
                                 (must exist in the relevant instance list)
+--timezone                    - Set timezone (e.g. Europe/London)
+--date-format                 - Set date format (e.g. yyyy/MM/dd)
 --all                         - perform action on ALL instances in the instance list
 -v                            - add verbose curl output
 USAGE
@@ -32,10 +34,18 @@ USAGE
 set_prefs() {
     # set all the values here. 
     # Note that there is a bug with computerPeripheralSearchMethod so that cannot be altered
+
+    if [[ ! $timezone ]]; then
+        timezone="Europe/Berlin"
+    fi
+    if [[ ! $dateformat ]]; then
+        dateformat="yyyy/MM/dd"
+    fi
+
     data='{
   "language" : "en",
-  "dateFormat" : "yyyy/MM/dd",
-  "timezone" : "Europe/Berlin",
+  "dateFormat" : "'$dateformat'",
+  "timezone" : "'$timezone'",
   "disableRelativeDates" : false,
   "disablePageLeaveCheck" : false,
   "disableShortcutsTooltips" : false,
@@ -109,6 +119,14 @@ while [[ "$#" -gt 0 ]]; do
         ;;
         -v|--verbose)
             verbose=1
+        ;;
+        -t|--tz|--timezone)
+            shift
+            timezone="$1"
+        ;;
+        -d|--date-format)
+            shift
+            dateformat="$1"
         ;;
         -h|--help)
             usage
