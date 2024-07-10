@@ -56,7 +56,7 @@ root_check() {
 
 get_slack_webhook() {
     instance_list_file="$1" # slack webhook filename should match the current instance list file
-    slack_webhook_folder="$this_script_dir/slack_webhooks"
+    slack_webhook_folder="$this_script_dir/slack-webhooks"
 
     if [[ -f "$slack_webhook_folder/$instance_list_file.txt" ]]; then
         # generate a standard "complete" list 
@@ -658,6 +658,7 @@ get_api_object_type() {
         advanced_computer_search)   api_object_type="advancedcomputersearches";;
         category)                   api_object_type="categories";;
         configuration_profile)      api_object_type="mobiledeviceconfigurationprofiles";;
+        ebook)                      api_object_type="ebooks";;
         group|user)                 api_object_type="accounts";;
         policy)                     api_object_type="policies";;
         restricted_software_title)  api_object_type="restrictedsoftware";;
@@ -691,6 +692,7 @@ get_api_object_from_type() {
         computergroups)                     api_xml_object="computer_group";;
         distributionpoints)                 api_xml_object="distribution_point";;
         dockitems)                          api_xml_object="dock_item";;
+        ebooks)                             api_object_type="ebook";;
         groups)                             api_xml_object="group";;
         ldapservers)                        api_xml_object="ldap_server";;
         macapplications)                    api_xml_object="mac_application";;

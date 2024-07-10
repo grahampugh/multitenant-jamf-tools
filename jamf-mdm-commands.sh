@@ -14,6 +14,8 @@ DOC
 # shellcheck source-path=SCRIPTDIR source=get-token.sh
 source "get-token.sh"
 
+# reduce the curl tries
+max_tries_override=2
 
 usage() {
     echo "
@@ -50,8 +52,8 @@ are_you_sure() {
 
 generate_computer_list() {
     # The Jamf Pro API returns a list of all computers.
-
-    jss_url="$chosen_instance"
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
     endpoint="api/preview/computers"
     url_filter="?page=0&page-size=1000&sort=id"
     curl_url="$jss_url/$endpoint/$url_filter"
@@ -150,6 +152,8 @@ redeploy_mdm() {
         echo
 
         # redeploy MDM profile
+        set_credentials "$jss_instance"
+        jss_url="$jss_instance"
         endpoint="api/v1/jamf-management-framework/redeploy"
         curl_url="$jss_url/$endpoint/$computer_id"
         curl_args=("--request")
@@ -158,6 +162,52 @@ redeploy_mdm() {
         curl_args+=("Accept: application/json")
         send_curl_request
     done
+}
+
+eacas() {
+    # to send erase all contents and settings commands, we need to find out the computer id
+    generate_computer_list
+
+    # are we sure?
+    are_you_sure
+
+    # passcode
+    passcode="000000"
+
+    # now loop through the list and perform the action
+    for computer in "${computer_choice[@]}"; do
+        management_id="${management_ids[$computer]}"
+        computer_id="${computer_ids[$computer]}"
+        computer_name="${computer_names[$computer]}"
+        echo
+        echo "Computer chosen: id: $computer_id  name: $computer_name  management id: $management_id"
+        echo
+
+        # send MDM command
+        endpoint="api/v2/mdm/commands"
+        curl_url="$jss_url/$endpoint"
+        curl_args=("--request")
+        curl_args+=("POST")
+        curl_args+=("--header")
+        curl_args+=("Content-Type: application/json")
+        curl_args+=("--data-raw")
+        curl_args+=(
+            '{
+                "clientData": [
+                    {
+                        "managementId": "'"$management_id"'"
+                    }
+                ],
+                "commandData": {
+                    "commandType": "ERASE_DEVICE",
+                    "pin": "000000",
+                    "obliterationBehavior": "DoNotObliterate"
+                }
+            }'
+        )
+        send_curl_request
+    done
+
 }
 
 set_recovery_lock() {
@@ -218,7 +268,7 @@ set_recovery_lock() {
         fi
 
         # now issue the recovery lock
-        endpoint="api/preview/mdm/commands"
+        endpoint="api/v2/mdm/commands"
         curl_url="$jss_url/$endpoint"
         curl_args=("--request")
         curl_args+=("POST")
@@ -267,6 +317,9 @@ while test $# -gt 0 ; do
             shift
             serial="$1"
             ;;
+        --erase|--eacas)
+            mdm_command="eacas"
+            ;;
         --redeploy|--redeploy-mdm)
             mdm_command="redeploy"
             ;;
@@ -291,74 +344,37 @@ while test $# -gt 0 ; do
     shift
 done
 
-# Set default server
-default_server_list="prd"
+# ------------------------------------------------------------------------------------
+# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
+# ------------------------------------------------------------------------------------
 
-# set server list
-if [[ ! $server_list ]]; then
-    read -r -p "Enter the server type (prd/tst) (or enter for $default_server_list) : " server_list
-    echo
-fi
-if [[ $server_list == *"tst"* ]]; then
-    server_list="tst"
-elif [[ $server_list == *"prd"* ]]; then
-    server_list="prd"
+# Set default instance list
+default_instance_list="prd"
+
+# select the instances that will be changed
+choose_destination_instances
+
+# get specific instance if entered
+if [[ $chosen_instance ]]; then
+    jss_instance="$chosen_instance"
 else
-    server_list="$default_server_list"
+    jss_instance="${instance_choice_array[0]}"
 fi
-
-# Set the source server
-set_server "$server_list"
-# get the instance list and print it out
-get_instance_list "$server_list"
-# set default template instance
-default_template_instance="${instances_list_inc_ios_instances[0]}"
-
-# print out the instance list
-echo "Instance list:"
-item=0
-for instance in "${instances_list_inc_ios_instances[@]}"; do
-    printf '   %-7s %-30s\n' "($item)" "$instance"
-    ((item++))
-done
-echo
-
-# Ask which instance we need to process, check if it exists and go from there
-
-if [[ ! $chosen_instance ]]; then
-    instance_number=""
-    echo
-    read -r -p  "Enter the number of the JSS instance : " instance_number
-fi
-
-echo "Instance number: $instance_number"  # TEST
-
-# Check for the default or non-context
-if [[ $instance_number -gt 0 ]]; then
-    chosen_instance="${instances_list_inc_ios_instances[$instance_number]}"
-elif  [[ $instance_number -eq 0 ]]; then
-    chosen_instance="$default_template_instance"
-else
-    echo "ERROR: no instance chosen."
-    echo
-    exit 1
-fi
-
-echo
-echo "   [main] Chosen instance: $chosen_instance"
-
 
 if [[ ! $mdm_command ]]; then
     echo
-    printf 'Select from [M] Redeploy MDM profile, or [R] Set Recovery Lock : '
+    printf 'Select from [E] Erase, [M] Redeploy MDM profile, [R] Set Recovery Lock : '
     read -r action_question
 
     case "$action_question" in
-        M|m)
-            mdm_command="redeploy"
+        E|e)
+            mdm_command="eacas"
             ;;
         R|r)
             mdm_command="recovery"
+            ;;
+        M|m)
+            mdm_command="redeploy"
             ;;
         *)
             echo
@@ -370,10 +386,12 @@ fi
 
 echo
 
-set_credentials "${chosen_instance}"
-
 # the following section depends on the chosen MDM command
 case "$mdm_command" in
+    eacas)
+        echo "   [main] Sending MDM erase command"
+        eacas
+        ;;
     redeploy)
         echo "   [main] Redeploying MDM profile"
         redeploy_mdm
