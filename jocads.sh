@@ -1373,7 +1373,7 @@ send_slack_notification() {
     get_slack_webhook "$instance_list_file"
 
     if [[ $slack_webhook_url ]]; then
-        slack_text="{'username': '$jss_url', 'text': '${api_xml_object} ${api_obj_action} action: Response: $http_response\n*${chosen_api_obj_name}*'}"
+        slack_text="{'username': '$jss_url', 'text': '*API ${api_xml_object} ${api_obj_action} action*\nName: *${chosen_api_obj_name}*\nInstance: $jss_url\nHTTP Response: $http_response'}"
         
         response=$(
             curl -s -o /dev/null -S -i -X POST -H "Content-Type: application/json" \

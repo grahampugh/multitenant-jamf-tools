@@ -66,12 +66,12 @@ get_slack_webhook() {
             if [[ "$slack_webhook_url" ]]; then
                 webhook_found=1
                 echo "   [get_slack_webhook] Slack webhook found."
+                break
             fi
         done < "$slack_webhook_folder/$instance_list_file.txt"
     fi
     if [[ $webhook_found -eq 0 ]]; then
-        echo
-        echo "No Slack webhook for $instance_list_file found."
+        echo "   [get_slack_webhook] No Slack webhook for $instance_list_file found."
     fi
 }
 
