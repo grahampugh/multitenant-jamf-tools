@@ -692,7 +692,7 @@ get_api_object_from_type() {
         computergroups)                     api_xml_object="computer_group";;
         distributionpoints)                 api_xml_object="distribution_point";;
         dockitems)                          api_xml_object="dock_item";;
-        ebooks)                             api_object_type="ebook";;
+        ebooks)                             api_xml_object="ebook";;
         groups)                             api_xml_object="group";;
         ldapservers)                        api_xml_object="ldap_server";;
         macapplications)                    api_xml_object="mac_application";;
