@@ -1435,6 +1435,7 @@ main() {
         echo
         echo "API object type options:"
         echo "   A - [A]dvanced Computer Search"
+        echo "   B - Advanced Mo[b]ile Device Search"
         echo "   C - [C]onfiguration Profile"
         echo "   F - Configuration Profile - [f]ix Payload Organisation"
         echo "   O - Configuration Profile - specify UUID to rescue [o]rphaned profile"
@@ -1455,6 +1456,9 @@ main() {
         case "$api_object_type_request" in
             A|a)
                 api_xml_object="advanced_computer_search"
+            ;;
+            B|b)
+                api_xml_object="advanced_mobile_device_search"
             ;;
             G|g)
                 api_xml_object="computer_group"
