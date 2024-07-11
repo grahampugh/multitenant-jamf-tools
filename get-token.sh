@@ -659,11 +659,11 @@ get_api_object_type() {
         advanced_mobile_device_search)   api_object_type="advancedmobiledevicesearches";;
         category)                        api_object_type="categories";;
         configuration_profile)           api_object_type="mobiledeviceconfigurationprofiles";;
-        ebook)                           api_object_type="ebooks";;
         group|user)                      api_object_type="accounts";;
         policy)                          api_object_type="policies";;
         restricted_software_title)       api_object_type="restrictedsoftware";;
         *)                               api_object_type=$( echo "${api_xml_object}s" | sed 's|_||g' );;
+
     esac
     echo "$api_object_type"
 }
@@ -694,8 +694,6 @@ get_api_object_from_type() {
         computergroups)                     api_xml_object="computer_group";;
         distributionpoints)                 api_xml_object="distribution_point";;
         dockitems)                          api_xml_object="dock_item";;
-        ebooks)                             api_object_type="ebook";;
-        groups)                             api_xml_object="group";;
         ldapservers)                        api_xml_object="ldap_server";;
         macapplications)                    api_xml_object="mac_application";;
         mobiledeviceapplications)           api_xml_object="mobile_device_application";;
@@ -706,7 +704,6 @@ get_api_object_from_type() {
         policies)                           api_xml_object="policy";;
         restrictedsoftware)                 api_xml_object="restricted_software_title";;
         smtpserver)                         api_xml_object="smtp_server";;
-        users)                              api_xml_object="user";;
         *)                                  api_xml_object=$(sed 's|s$||' <<< "$api_object_type") ;; 
     esac
     echo "$api_xml_object"
