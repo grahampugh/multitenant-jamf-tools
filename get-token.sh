@@ -655,14 +655,15 @@ get_api_object_type() {
     local api_xml_object=$1
 
     case "$api_xml_object" in
-        advanced_computer_search)   api_object_type="advancedcomputersearches";;
-        category)                   api_object_type="categories";;
-        configuration_profile)      api_object_type="mobiledeviceconfigurationprofiles";;
-        ebook)                      api_object_type="ebooks";;
-        group|user)                 api_object_type="accounts";;
-        policy)                     api_object_type="policies";;
-        restricted_software_title)  api_object_type="restrictedsoftware";;
-        *)                          api_object_type=$( echo "${api_xml_object}s" | sed 's|_||g' );;
+        advanced_computer_search)        api_object_type="advancedcomputersearches";;
+        advanced_mobile_device_search)   api_object_type="advancedmobiledevicesearches";;
+        category)                        api_object_type="categories";;
+        configuration_profile)           api_object_type="mobiledeviceconfigurationprofiles";;
+        ebook)                           api_object_type="ebooks";;
+        group|user)                      api_object_type="accounts";;
+        policy)                          api_object_type="policies";;
+        restricted_software_title)       api_object_type="restrictedsoftware";;
+        *)                               api_object_type=$( echo "${api_xml_object}s" | sed 's|_||g' );;
     esac
     echo "$api_object_type"
 }
@@ -671,11 +672,12 @@ get_plural_from_api_xml_object() {
     local api_xml_object=$1
 
     case "$api_xml_object" in
-        advanced_computer_search)   api_xml_object_plural="advanced_computer_searches";;
-        category)                   api_xml_object_plural="categories";;
-        policy)                     api_xml_object_plural="policies";;
-        restricted_software_title)  api_xml_object_plural="restricted_software";;
-        *)                          api_xml_object_plural="${api_xml_object}s"
+        advanced_computer_search)        api_xml_object_plural="advanced_computer_searches";;
+        advanced_mobile_device_search)   api_xml_object_plural="advanced_mobile_device_searches";;
+        category)                        api_xml_object_plural="categories";;
+        policy)                          api_xml_object_plural="policies";;
+        restricted_software_title)       api_xml_object_plural="restricted_software";;
+        *)                               api_xml_object_plural="${api_xml_object}s"
     esac
     echo "$api_xml_object_plural"
 }
