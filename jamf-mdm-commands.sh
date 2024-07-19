@@ -47,7 +47,6 @@ are_you_sure() {
             exit 
             ;;
     esac
-    echo
 }
 
 generate_computer_list() {
