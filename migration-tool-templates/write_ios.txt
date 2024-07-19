@@ -1,0 +1,5 @@
+## JSS-Config-In-A-Box category sync chooser - write to destination
+## COMMENT OUT LINES THAT YOU DO NOT WISH TO SYNC TO DESTINATION INSTANCES
+ldapservers
+# accounts
+smtpserver

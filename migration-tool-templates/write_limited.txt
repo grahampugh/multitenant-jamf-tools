@@ -1,0 +1,13 @@
+## JSS-Config-In-A-Box category sync chooser - clear policies, packages, categories & smart groups, departments, computers, advancedcomputersearches
+## COMMENT OUT LINES THAT YOU DO NOT WISH TO SYNC TO DESTINATION INSTANCES
+categories
+computerextensionattributes
+computergroups
+computergroups
+computergroups
+computergroups
+scripts
+policies
+restrictedsoftware
+osxconfigurationprofiles
+advancedcomputersearches

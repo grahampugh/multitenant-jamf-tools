@@ -1,0 +1,62 @@
+## JSS-Config-In-A-Box category sync chooser - write to destination
+## COMMENT OUT LINES THAT YOU DO NOT WISH TO SYNC TO DESTINATION INSTANCES
+# sites
+categories
+# ldapservers
+# accounts
+packages
+computerextensionattributes
+computergroups
+computergroups
+computergroups
+computergroups
+# buildings
+# departments
+# directorybindings
+# removablemacaddresses
+# netbootservers
+# distributionpoints
+# softwareupdateservers
+# networksegments
+# healthcarelistener
+# ibeacons
+# infrastructuremanager
+# peripherals
+# peripheraltypes
+# smtpserver
+# activationcode
+computerinventorycollection
+# vppaccounts
+# vppassignments
+# vppinvitations
+# webhooks
+# diskencryptionconfigurations
+# ebooks
+dockitems
+# printers
+# licensedsoftware
+scripts
+restrictedsoftware
+osxconfigurationprofiles
+# macapplications
+# managedpreferenceprofiles
+policies
+advancedcomputersearches
+# patches
+# patchexternalsources
+# patchinternalsources
+# patchpolicies
+mobiledeviceextensionattributes
+mobiledevicegroups
+mobiledevicegroups
+mobiledevicegroups
+# mobiledeviceapplications
+mobiledeviceconfigurationprofiles
+# mobiledeviceenrollmentprofiles
+# mobiledeviceprovisioningprofiles
+# classes
+advancedmobiledevicesearches
+userextensionattributes
+usergroups
+users
+advancedusersearches

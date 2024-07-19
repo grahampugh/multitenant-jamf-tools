@@ -206,15 +206,15 @@ check_eas_in_groups() {
                             echo
                             case "$are_you_sure_computer_extension_attribute" in
                                 Y|y)
-                                    echo "   [main] Confirmed, copying $extension_attribute_name"
+                                    echo "   [check_eas_in_groups] Confirmed, copying $extension_attribute_name"
                                     copy_api_object_by_name "computer_extension_attribute" "$extension_attribute_name"
                                 ;;
                                 *)
-                                    echo "   [main] Skipping $extension_attribute_name"
+                                    echo "   [check_eas_in_groups] Skipping $extension_attribute_name"
                                 ;;
                             esac
                         else
-                            echo "   [main] Force-copy mode, copying $extension_attribute_name"
+                            echo "   [check_eas_in_groups] Force-copy mode, copying $extension_attribute_name"
                             copy_api_object_by_name "computer_extension_attribute" "$extension_attribute_name"
                         fi
                     fi
@@ -226,6 +226,79 @@ check_eas_in_groups() {
         done <<< "${criterion_array}"
     else
         echo "   [check_eas_in_groups] No extension attributes found in this group."
+    fi
+}
+
+check_eas_in_mobile_device_groups() {
+    local group_name="$1"
+
+    group_file="${xml_folder}/mobile_device_group-${group_name}-fetched.xml"
+
+    # Set the source server
+    set_credentials "${source_instance}"
+    # determine jss_url
+    jss_url="${source_instance}"
+
+    # grab a list of all the extension attributes so we can search against them
+    # send request
+    curl_url="$jss_url/JSSResource/mobiledeviceextensionattributes"
+    curl_args=("--header")
+    curl_args+=("Accept: application/xml")
+    send_curl_request
+
+    # get a list of EAs
+    extension_attributes_list=$(xmllint --xpath '//mobile_device_extension_attributes/mobile_device_extension_attribute/name' "$curl_output_file" 2>/dev/null | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n")
+
+    # We need to ensure extension attributes referenced within mobile device groups are created first
+    echo "   [check_eas_in_mobile_device_groups] Checking for extension attributes in criteria of '$group_name'"
+
+    criterion_array=$(
+        xmllint --xpath '//mobile_device_group/criteria/criterion/name' \
+        "${group_file}" 2>/dev/null \
+        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+    )
+
+    if [[ $criterion_array ]]; then
+        while read -r criterion; do
+            extension_attribute_found=0
+            if [[ $criterion ]]; then
+                echo "   [check_eas_in_mobile_device_groups] Checking '${criterion}' is an EA."
+                # exclude known criteria that are not EAs
+                if [[ "$criterion" != "Building" && "$criterion" != "Department" && "$criterion" != "Username" && "$criterion" != "Number of Available Updates" && "$criterion" != "Device Ownership Type" && "$criterion" != "Enrollment Method: PreStage enrollment" && "$criterion" != "Mobile Device Group" && "$criterion" != "Display Name" ]]; then
+                    echo "   [check_eas_in_mobile_device_groups] Extension attribute '${criterion}' found in criteria."
+                    if contains_element "${criterion}" "${extension_attributes_list}"; then
+                        echo "   [check_eas_in_mobile_device_groups] Extension attribute '${criterion}' matches existing."
+                        extension_attribute_found=1
+                        extension_attribute_name="${criterion}"
+                        fetch_api_object_by_name "mobile_device_extension_attribute" "$extension_attribute_name"
+                        parse_api_object_by_name_for_copying "mobile_device_extension_attribute" "$extension_attribute_name"
+                        echo
+                        if [[ $ask_for_dependencies == "yes" ]]; then
+                            printf '%s' "WARNING! This will update mobile_device_extension_attribute $extension_attribute_name. Are you sure? (Y/N) : "
+                            read -r are_you_sure_mobile_device_extension_attribute < /dev/tty
+                            echo
+                            case "$are_you_sure_mobile_device_extension_attribute" in
+                                Y|y)
+                                    echo "   [check_eas_in_mobile_device_groups] Confirmed, copying $extension_attribute_name"
+                                    copy_api_object_by_name "mobile_device_extension_attribute" "$extension_attribute_name"
+                                ;;
+                                *)
+                                    echo "   [check_eas_in_mobile_device_groups] Skipping $extension_attribute_name"
+                                ;;
+                            esac
+                        else
+                            echo "   [check_eas_in_mobile_device_groups] Force-copy mode, copying $extension_attribute_name"
+                            copy_api_object_by_name "mobile_device_extension_attribute" "$extension_attribute_name"
+                        fi
+                    fi
+                    if [[ $extension_attribute_found == 0 ]]; then
+                        echo "   [check_eas_in_mobile_device_groups] No matching extension attribute '${criterion}' found."
+                    fi
+                fi
+            fi
+        done <<< "${criterion_array}"
+    else
+        echo "   [check_eas_in_mobile_device_groups] No extension attributes found in this group."
     fi
 }
 
@@ -256,6 +329,36 @@ check_groups_in_groups() {
         done <<< "${embedded_group_array}"
     else
         echo "   [check_groups_in_groups] No embedded computer group found."
+    fi
+}
+
+check_groups_in_mobile_device_groups() {
+    local group_name="$1"
+
+    # We need to ensure mobile device groups referenced within mobile device groups are created first
+    echo "   [check_groups_in_mobile_device_groups] Checking for mobile device groups in criteria of '$group_name'"
+
+    embedded_group_array=$(
+        xmllint --xpath '//mobile_device_group/criteria/criterion[name = "Mobile Device Group"]/value' \
+        "${xml_folder}/mobile_device_group-${group_name}-fetched.xml" 2>/dev/null \
+        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+    )
+
+    f=${#final_group_list[@]}
+
+    if [[ $embedded_group_array ]]; then
+        while read -r group; do
+            if [[ $group ]]; then
+                if [[ "${final_group_list[*]}" != *"${group}"* ]]; then
+                    echo "   [check_groups_in_mobile_device_groups] Fetching: ${group}"
+                    fetch_api_object_by_name mobile_device_group "${group}"
+                    final_group_list[$f]="${group}"
+                    f=$(($f + 1))
+                fi
+            fi
+        done <<< "${embedded_group_array}"
+    else
+        echo "   [check_groups_in_mobile_device_groups] No embedded mobile device group found."
     fi
 }
 
@@ -378,7 +481,7 @@ copy_api_object() {
                 final_group_list[$i]="${unique_group_list[$i]}"
             done
 
-            echo "   [copy_api_object] Total ${#unique_group_list[@]} groups found in policy."
+            echo "   [copy_api_object] Total ${#unique_group_list[@]} groups found."
 
             # Read all the groups to find groups within
             for (( i=0; i<${#unique_group_list[@]}; i++ )); do
@@ -409,6 +512,104 @@ copy_api_object() {
                 else
                     echo "   [main] Force-copy mode, copying ${final_group_list[$i]}"
                     copy_computer_group "${final_group_list[$i]}"
+                fi
+            done
+        elif [[ "${api_xml_object}" == "configuration_profile" || "${api_xml_object}" == "mobile_device_application" ]]; then
+            # Look for categories and create them if necessary
+            echo "   [copy_api_object] Checking the category in '${chosen_api_obj_name}'"
+            category_name=$( 
+                xmllint --xpath '//general/category/name/text()' "${parsed_file}" 2>/dev/null 
+            )
+            category_name_decoded="${category_name/&amp;/&}"
+            if [[ $category_name_decoded == "" ]]; then
+                echo "   [copy_api_object] No category found in this ${api_xml_object}! If this is a mistake, the policy copy will fail."
+                echo "   [copy_api_object] Fetched XML: ${parsed_file}"
+                exit 1
+            else
+                echo "   [copy_api_object] Category to check: ${category_name_decoded}"
+                create_category "$category_name"
+            fi
+
+            # Look for mobile device groups in the object (targets and exclusions)
+            echo "   [copy_api_object] Checking for mobile device groups in ${chosen_api_obj_name}"
+
+            group_array=$(
+                xmllint --xpath '//scope/mobile_devices/mobile_device/name' \
+                "${parsed_file}" 2>/dev/null \
+                | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+            )
+            excluded_group_array=$(
+                xmllint --xpath  '//scope/exclusions/mobile_device_groups/mobile_device_group/name' \
+                "${parsed_file}" 2>/dev/null \
+                | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+            )
+
+            # Combine the two into a list of unique groups
+            unique_group_list=()
+            u=0
+
+            if [[ $excluded_group_array ]]; then
+                while read -r group; do
+                    if [[ $group ]]; then
+                        if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
+                            echo "   [copy_api_object] Excluded Mobile device group found: ${group}"
+                            unique_group_list[$u]="${group}"
+                            u=$(($u + 1))
+                        fi
+                    fi
+                done <<< "${excluded_group_array}"
+            fi
+
+            if [[ $group_array ]]; then
+                while read -r group; do
+                    if [[ $group ]]; then
+                        if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
+                            echo "   [copy_api_object] Mobile device group found: ${group}"
+                            unique_group_list[$u]="${group}"
+                            u=$(($u + 1))
+                        fi
+                    fi
+                done <<< "${group_array}"
+            fi
+
+            # transfer the unique list to a new list so that we can add further groups from
+            # embedded groups whilst iterating through the unique list
+            final_group_list=()
+            for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
+                final_group_list[$i]="${unique_group_list[$i]}"
+            done
+
+            echo "   [copy_api_object] Total ${#unique_group_list[@]} groups found."
+
+            # Read all the groups to find groups within
+            for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+                echo "   [copy_api_object] Fetching '${unique_group_list[$i]}'."
+                fetch_api_object_by_name "mobile_device_group" "${unique_group_list[$i]}"
+                check_groups_in_mobile_device_groups "${unique_group_list[$i]}"
+            done
+
+            # Process all the groups in reverse order, since the embedded groups
+            # will then appear first, which should be safer for avoiding failed group creation
+            for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
+                echo "   [copy_api_object] Mobile device group to process: ${final_group_list[$i]}"
+                check_eas_in_mobile_device_groups "${final_group_list[$i]}"
+                parse_api_object_by_name_for_copying "mobile_device_group" "${final_group_list[$i]}"
+                echo
+                if [[ $ask_for_dependencies == "yes" ]]; then
+                    printf '%s' "WARNING! This will update mobile_device_group ${final_group_list[$i]}. Are you sure? (Y/N) : "
+                    read -r are_you_sure_copy_api_object < /dev/tty
+                    case "$are_you_sure_copy_api_object" in
+                        Y|y)
+                            echo "   [main] Confirmed, copying ${final_group_list[$i]}"
+                            copy_mobile_device_group "${final_group_list[$i]}"
+                        ;;
+                        *)
+                            echo "   [main] Skipping ${final_group_list[$i]}"
+                        ;;
+                    esac
+                else
+                    echo "   [main] Force-copy mode, copying ${final_group_list[$i]}"
+                    copy_mobile_device_group "${final_group_list[$i]}"
                 fi
             done
         fi
@@ -658,6 +859,80 @@ copy_groups_in_group() {
     echo
 }
 
+copy_groups_in_mobile_device_group() {
+    local chosen_group_name="$1"
+
+    local fetched_group_file="${xml_folder}/mobile_device_group-${chosen_group_name}-fetched.xml"
+
+    # Look for computer groups as criteria in the group
+    echo "   [copy_groups_in_mobile_device_group] Checking for mobile device groups in '${chosen_group_name}'"
+
+    group_array=$(
+        xmllint --xpath \
+        '//mobile_device_group/criteria/criterion[name = "Computer Group"]/value' \
+        "$fetched_group_file" 2>/dev/null \
+        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+    )
+
+    # Create list of unique groups
+    unique_group_list=()
+    u=0
+
+    if [[ $group_array ]]; then
+        while read -r group; do
+            if [[ $group ]]; then
+                if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
+                    echo "   [copy_groups_in_mobile_device_group] Mobile device group found: '${group}'"
+                    unique_group_list[$u]="${group}"
+                    u=$(($u + 1))
+                fi
+            fi
+        done <<< "${group_array}"
+    fi
+
+    # transfer the unique list to a new list so that we can add further groups from
+    # embedded groups whilst iterating through the unique list
+    final_group_list=()
+    for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+        final_group_list[$i]="${unique_group_list[$i]}"
+    done
+
+    echo "   [copy_groups_in_mobile_device_group] Total ${#unique_group_list[@]} groups found in group."
+
+    # Read all the groups to find groups within
+    for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+        echo "   [copy_groups_in_mobile_device_group] Fetching '${unique_group_list[$i]}'."
+        fetch_api_object_by_name mobile_device_group "${unique_group_list[$i]}"
+        check_groups_in_mobile_device_groups "${unique_group_list[$i]}"
+    done
+
+    # Process all the groups in reverse order, since the embedded groups
+    # will then appear first, which should be safer for avoiding failed group creation
+    for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
+        echo "   [copy_groups_in_mobile_device_group] Mobile device group to process: ${final_group_list[$i]}"
+        check_eas_in_mobile_device_groups "${final_group_list[$i]}"
+        parse_api_object_by_name_for_copying mobile_device_group "${final_group_list[$i]}"
+        echo
+        if [[ $ask_for_dependencies == "yes" ]]; then
+            printf '%s' "WARNING! This will update mobile_device_group ${final_group_list[$i]}. Are you sure? (Y/N) : "
+            read -r are_you_sure_copy_groups_in_mobile_device_group < /dev/tty
+            case "$are_you_sure_copy_groups_in_mobile_device_group" in
+                Y|y)
+                    echo "   [main] Confirmed, copying ${final_group_list[$i]}"
+                    copy_mobile_device_group "${final_group_list[$i]}"
+                ;;
+                *)
+                    echo "   [main] Skipping ${final_group_list[$i]}"
+                ;;
+            esac
+        else
+            echo "   [main] Force-copy mode, copying ${final_group_list[$i]}"
+            copy_mobile_device_group "${final_group_list[$i]}"
+        fi
+    done
+    echo
+}
+
 get_exclusion_list() {
     exclusion_list_type="$1"  # policies or computergroups
 
@@ -747,6 +1022,77 @@ copy_computer_group() {
     fi
     echo
 }
+
+copy_mobile_device_group() {
+    local group_name="$1"
+
+    # look for existing entry and update it rather than create a new one if it exists
+    source_name="$( 
+                    xmllint --xpath \
+                    '/mobile_device_group/name/text()' \
+                    "${xml_folder}/mobile_device_group-${group_name}-fetched.xml" 2>/dev/null 
+                )"
+    # source_name_url_encoded=$( encode_name "${source_name}" )
+
+    # Set the dest server
+    set_credentials "$dest_instance"
+    # determine jss_url
+    jss_url="$dest_instance"
+
+    # send request
+    curl_url="$jss_url/JSSResource/mobiledevicegroups"
+    curl_args=("--header")
+    curl_args+=("Accept: application/xml")
+    send_curl_request
+
+    # get id from output
+    existing_id=$(xmllint --xpath "//mobile_device_groups/mobile_device_group[name = '$source_name']/id/text()" "$curl_output_file" 2>/dev/null)
+
+    if [[ $existing_id ]]; then
+        # Some extra checking for groups we don't want to replace
+        exclude_group="no"
+        get_exclusion_list "mobiledevicegroups"
+        for exclusion in "${exclusion_list[@]}"; do
+            if [[ $group_name == *"$exclusion"* ]]; then
+                exclude_group="yes"
+            fi
+        done
+
+        if [[ $exclude_group == "no" || ($exclude_group == "yes" && $force_update_groups == "ALL") || ($group_name == *" $force_update_groups" && $force_update_groups != "ALL") ]]; then
+            # Other primary groups do need to be updated
+            [[ ($exclude_group == "yes" && $force_update_groups == "ALL") || ($group_name == *" $force_update_groups" && $force_update_groups != "ALL") ]] && echo "   [copy_mobile_device_group] $group_name matches 'force_update_groups' criteria ('$force_update_groups')"
+
+            echo "   [copy_mobile_device_group] '$source_name' already exists (ID=$existing_id); updating..."
+
+            # send request
+            curl_url="$jss_url/JSSResource/mobiledevicegroups/id/$existing_id"
+            curl_args=("--request")
+            curl_args+=("PUT")
+            curl_args+=("--header")
+            curl_args+=("Content-Type: application/xml")
+            curl_args+=("--data-binary")
+            curl_args+=(@"${xml_folder}/mobile_device_group-${group_name}-parsed.xml")
+            send_curl_request
+        else
+            # We don't want to replace any of the user-serviceable groups)
+            echo "   [copy_mobile_device_group] '$source_name' already exists (ID=$existing_id) and is in the exclusion list; skipping..."
+        fi
+    else
+        echo "   [copy_mobile_device_group] No existing '$source_name' group found; creating..."
+
+        # send request
+        curl_url="$jss_url/JSSResource/mobiledevicegroups/id/0"
+        curl_args=("--request")
+        curl_args+=("POST")
+        curl_args+=("--header")
+        curl_args+=("Content-Type: application/xml")
+        curl_args+=("--data-binary")
+        curl_args+=(@"${xml_folder}/mobile_device_group-${group_name}-parsed.xml")
+        send_curl_request
+    fi
+    echo
+}
+
 
 copy_policy() {
     local chosen_api_obj_name="$1"
@@ -1442,6 +1788,7 @@ main() {
         echo "   D - Mobile [D]evice Configuration Profile"
         echo "   E - [E]xtension Attribute"
         echo "   G - Computer [G]roup"
+        echo "   H - Mobile Device Group"
         echo "   I - [i]OS App Store App"
         echo "   K - Doc[k] Item"
         echo "   L or leave blank for Po[L]icy"
@@ -1462,6 +1809,9 @@ main() {
             ;;
             G|g)
                 api_xml_object="computer_group"
+            ;;
+            H|h)
+                api_xml_object="mobile_device_group"
             ;;
             S|s)
                 api_xml_object="script"
@@ -1988,6 +2338,10 @@ main() {
                 fetch_api_object_by_name "computer_group" "$chosen_api_obj_name"
                 parse_api_object_by_name_for_copying "computer_group" "$chosen_api_obj_name"
 
+            elif [[ ${api_xml_object} == "mobile_device_group" ]]; then
+                # Mobile device groups require getting the object by name
+                fetch_api_object_by_name "mobile_device_group" "$chosen_api_obj_name"
+                parse_api_object_by_name_for_copying "mobile_device_group" "$chosen_api_obj_name"
             else
                 fetch_api_object "${api_xml_object}" "$chosen_api_obj_id"
                 parse_api_obj_for_copying "${api_xml_object}" "$chosen_api_obj_id"
@@ -2051,6 +2405,12 @@ main() {
                             copy_groups_in_group "$chosen_api_obj_name"
                         fi
                         copy_computer_group "$chosen_api_obj_name"
+                    elif [[ $api_xml_object == "mobile_device_group" ]]; then
+                        if [[ $skip_dependencies == "no" ]]; then
+                            check_eas_in_mobile_device_groups "$chosen_api_obj_name"
+                            copy_groups_in_mobile_device_group "$chosen_api_obj_name"
+                        fi
+                        copy_mobile_device_group "$chosen_api_obj_name"
                     else
                         copy_api_object "$api_xml_object" "$chosen_api_obj_id" "$chosen_api_obj_name"
                     fi
