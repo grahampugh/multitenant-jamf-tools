@@ -11,16 +11,13 @@ source "get-token.sh"
 # set instance list type
 instance_list_type="mac"
 
-# path to jamf-upload-sh
-jamf_upload_path="../jamf-upload/jamf-upload.sh"
-
 ###########
 ## USAGE ##
 ###########
 
 usage() {
     echo "
-Usage:
+jamfuploader-run.sh usage:
 ./set_credentials.sh          - set the Keychain credentials
 
 [no arguments]                - interactive mode
@@ -107,6 +104,21 @@ run_jamfupload() {
 tool_directory="../jamf-api-tool"
 tool="jamf_api_tool.py"
 
+if [[ ! -f "$jamf_upload_path" ]]; then
+    # default path to jamf-upload-sh
+    jamf_upload_path="$HOME/Library/AutoPkg/RecipeRepos/com.github.grahampugh.jamf-upload/jamf-upload.sh"
+fi
+# ensure the path exists, revert to defaults otherwise
+if [[ ! -f "$jamf_upload_path" ]]; then
+    jamf_upload_path="../jamf-upload/jamf-upload.sh"
+fi
+# fail if no valid path found
+if [[ ! -f "$jamf_upload_path" ]]; then
+    echo 'ERROR: jamf-upload.sh not found. Please either run `autopkg repo-add grahampugh/jamf-upload` or clone the grahampugh/jamf-upload repo to the parent folder of this repo'
+    exit 1
+fi
+
+
 ###############
 ## ARGUMENTS ##
 ###############
@@ -134,10 +146,21 @@ while test $# -gt 0 ; do
         -ai|--all-instances)
             all_instances=1
         ;;
+        -j)
+            jamf_upload_path="../jamf-upload/jamf-upload.sh"
+        ;;
         -v*)
             args+=("$1")
             ;;
         -h|--help)
+            echo "Outputting the help sheet for jamf-upload.sh"
+            echo
+            echo "==========================================="
+            echo
+            "$jamf_upload_path" --help
+            echo
+            echo "==========================================="
+            echo
             usage
             exit 0
             ;;
