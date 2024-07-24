@@ -2205,10 +2205,10 @@ main() {
         echo "Action options:"
         echo "   C  - [C]opy main object only - Safe Mode - will not check dependencies"
         echo "   Cs - [C]opy main object only - Ultra-[S]afe Mode - strips scope from object completely"
-        echo "   Cd - [C]opy object including all dependencies - will ask to overwite each dependency"
-        echo "   Cn - [C]opy object including all dependencies - will overwite each dependency without interaction ([N]o confirmations!)"
-        echo "   Ci - [C]opy policy and force-overwrite the [i]con - will ask to overwite each dependency"
-        echo "   Cf - [C]opy object including all dependencies - will [f]orce-overwite each dependency including protected/excluded items without interaction"
+        echo "   Cd - [C]opy object including all dependencies - will ask to overwrite each dependency"
+        echo "   Cn - [C]opy object including all dependencies - will overwrite each dependency without interaction ([N]o confirmations!)"
+        echo "   Ci - [C]opy policy and force-overwrite the [i]con - will ask to overwrite each dependency"
+        echo "   Cf - [C]opy object including all dependencies - will [f]orce-overwrite each dependency including protected/excluded items without interaction"
         echo "   D  - [D]elete object only (for packages will mount the repo and ask to delete the file)"
         read -r -p "Enter a letter from the above options: " action_question
 
