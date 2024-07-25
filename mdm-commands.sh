@@ -22,41 +22,6 @@ max_tries_override=2
 # --------------------------------------------------------------------
 
 
-usage() {
-    echo "
-Usage: mdm-commands.sh --si JSS_URL --user USERNAME --pass PASSWORD --id ID
-Options:
-    --erase         Erase the device
-    --redeploy      Redeploy the MDM profile
-    --recovery      Set the recovery lock password - supplied with:
-                    --recovery-lock-password PASSWORD
-    --id            Predefine an ID (from Jamf) to search for
-    --serial        Predefine a computer's Serial Number to search for. Can be a CSV list,
-                    e.g. ABCD123456,ABDE234567,XWSA123456
-    --group         Predefine computers to those in a specified group
-
-https:// is optional, it will be added if absent.
-
-SERVERURL, ID, USERNAME, PASSWORD and the option will be asked for if not supplied.
-Recovery lock password will be random unless set with --recovery-lock-password.
-You can clear the recovery lock password with --clear-recovery-lock-password
-"
-}
-
-are_you_sure() {
-    echo
-    read -r -p "Are you sure you want to perform the action? (Y/N) : " sure
-    case "$sure" in
-        Y|y)
-            return
-            ;;
-        *)
-            echo "Action cancelled, quitting"
-            exit 
-            ;;
-    esac
-}
-
 encode_name() {
     group_name_encoded="$( echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
 }
@@ -72,13 +37,13 @@ get_computers_in_group() {
     send_curl_request
 
     if [[ $http_response -eq 404 ]]; then
-        echo "    [get_computers_in_group] Smart group '$group_name' does not exist on this server"
+        echo "   [get_computers_in_group] Smart group '$group_name' does not exist on this server"
         computers=0
     else
         # now get all the computer IDs
         computers_count=$(/usr/bin/plutil -extract computer_group.computers raw "$curl_output_file" 2>/dev/null)
         if [[ $computers_count -gt 0 ]]; then
-            echo "    [get_computers_in_group] Restricting list to members of the group '$group_name'"
+            echo "   [get_computers_in_group] Restricting list to members of the group '$group_name'"
             computer_names_in_group=()
             computer_ids_in_group=()
             i=0
@@ -91,7 +56,7 @@ get_computers_in_group() {
                 ((i++))
             done
         else
-            echo "    [get_computers_in_group] Group '$group_name' contains no computers, so showing all computers"
+            echo "   [get_computers_in_group] Group '$group_name' contains no computers, so showing all computers"
         fi
 
     fi
@@ -160,7 +125,7 @@ generate_computer_list() {
                 fi
             done
         else
-            printf '%-5s %-16s %s\n' "($id_in_list)" "$serial_in_list" "$computer_name_in_list"
+            printf '%-5s %-9s %-16s %s\n' "($i)" "[id=$id_in_list]" "$serial_in_list" "$computer_name_in_list"
         fi
         ((i++))
     done
@@ -198,7 +163,7 @@ redeploy_mdm() {
         computer_id="${computer_ids[$computer]}"
         computer_name="${computer_names[$computer]}"
         echo
-        echo "    [redeploy_mdm] Processing Computer: id: $computer_id  name: $computer_name"
+        echo "   [redeploy_mdm] Processing Computer: id: $computer_id  name: $computer_name"
         echo
 
         # redeploy MDM profile
@@ -226,7 +191,7 @@ eacas() {
         computer_id="${computer_ids[$computer]}"
         computer_name="${computer_names[$computer]}"
         echo
-        echo "    [eacas] Processing Computer: id: $computer_id  name: $computer_name  management id: $management_id"
+        echo "   [eacas] Processing Computer: id: $computer_id  name: $computer_name  management id: $management_id"
         echo
 
         # send MDM command
@@ -265,7 +230,7 @@ set_recovery_lock() {
         computer_id="${computer_ids[$computer]}"
         computer_name="${computer_names[$computer]}"
         echo
-        echo "    [set_recovery_lock] Computer chosen: id: $computer_id  name: $computer_name  management id: $management_id"
+        echo "   [set_recovery_lock] Computer chosen: id: $computer_id  name: $computer_name  management id: $management_id"
 
         echo
         # get a random password ready
@@ -304,9 +269,9 @@ set_recovery_lock() {
         fi
 
         if [[ ! $recovery_lock_password || "$recovery_lock_password" == "NA" ]]; then
-            echo "    [set_recovery_lock] Recovery lock will be removed..."
+            echo "   [set_recovery_lock] Recovery lock will be removed..."
         else
-            echo "    [set_recovery_lock] Recovery password: $recovery_lock_password"
+            echo "   [set_recovery_lock] Recovery password: $recovery_lock_password"
         fi
 
         # now issue the recovery lock
@@ -334,6 +299,59 @@ set_recovery_lock() {
         send_curl_request
     done
 }
+
+usage() {
+    echo "
+./mdm-commands.sh options
+
+./set_credentials.sh            - set the Keychain credentials
+
+[no arguments]                  - interactive mode
+-il FILENAME (without .txt)     - provide an instance list filename
+                                  (must exist in the instance-lists folder)
+-i JSS_URL                      - perform action on a single instance
+                                  (must exist in the relevant instance list)
+
+MDM command type:
+
+--erase                         - Erase the device
+--redeploy                      - Redeploy the MDM profile
+--recovery                      - Set the recovery lock password
+                                  Recovery lock password will be random unless set
+                                  with --recovery-lock-password.
+
+Options for the --recovery type:
+
+--random-lock-password          - Create a random recovery lock password (this is the default)
+--recovery-lock-password        - Define a recovery lock password
+--clear-recovery-lock-password  - Clear the recovery lock password
+
+Define the target clients:
+
+--id                            - Predefine an ID (from Jamf) to search for
+--serial                        - Predefine a computer's Serial Number to search for. 
+                                  Can be a CSV list,
+                                  e.g. ABCD123456,ABDE234567,XWSA123456
+--group                         - Predefine computers to those in a specified group
+
+You can clear the recovery lock password with --clear-recovery-lock-password
+"
+}
+
+are_you_sure() {
+    echo
+    read -r -p "Are you sure you want to perform the action? (Y/N) : " sure
+    case "$sure" in
+        Y|y)
+            return
+            ;;
+        *)
+            echo "   [are_you_sure] Action cancelled, quitting"
+            exit 
+            ;;
+    esac
+}
+
 
 # --------------------------------------------------------------------
 # Main Body
@@ -433,11 +451,9 @@ if [[ ! $mdm_command ]]; then
     esac
 fi
 
-echo
-
-echo
 # if a group name was supplied at the command line, compile the list of computers from that group
 if [[ $group_name ]]; then
+    echo
     get_computers_in_group
 fi
 
