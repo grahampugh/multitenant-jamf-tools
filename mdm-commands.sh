@@ -17,15 +17,23 @@ source "get-token.sh"
 # reduce the curl tries
 max_tries_override=2
 
+# --------------------------------------------------------------------
+# Functions
+# --------------------------------------------------------------------
+
+
 usage() {
     echo "
-Usage: jamf-mdm-commands.sh --si JSS_URL --user USERNAME --pass PASSWORD --id ID
+Usage: mdm-commands.sh --si JSS_URL --user USERNAME --pass PASSWORD --id ID
 Options:
+    --erase         Erase the device
     --redeploy      Redeploy the MDM profile
     --recovery      Set the recovery lock password - supplied with:
                     --recovery-lock-password PASSWORD
     --id            Predefine an ID (from Jamf) to search for
-    --serial        Predefine a computer's Serial Number to search for. Can be a csv list.
+    --serial        Predefine a computer's Serial Number to search for. Can be a CSV list,
+                    e.g. ABCD123456,ABDE234567,XWSA123456
+    --group         Predefine computers to those in a specified group
 
 https:// is optional, it will be added if absent.
 
@@ -49,6 +57,47 @@ are_you_sure() {
     esac
 }
 
+encode_name() {
+    group_name_encoded="$( echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
+}
+
+get_computers_in_group() {
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+
+    # send request to get each version
+    curl_url="$jss_url/JSSResource/computergroups/name/${group_name_encoded}"
+    curl_args=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+
+    if [[ $http_response -eq 404 ]]; then
+        echo "    [get_computers_in_group] Smart group '$group_name' does not exist on this server"
+        computers=0
+    else
+        # now get all the computer IDs
+        computers_count=$(/usr/bin/plutil -extract computer_group.computers raw "$curl_output_file" 2>/dev/null)
+        if [[ $computers_count -gt 0 ]]; then
+            echo "    [get_computers_in_group] Restricting list to members of the group '$group_name'"
+            computer_names_in_group=()
+            computer_ids_in_group=()
+            i=0
+            while [[ $i -lt $computers_count ]]; do
+                computer_id_in_group=$(/usr/bin/plutil -extract computer_group.computers.$i.id raw "$curl_output_file" 2>/dev/null)
+                computer_name_in_group=$(/usr/bin/plutil -extract computer_group.computers.$i.name raw "$curl_output_file" 2>/dev/null)
+                # echo "$computer_name_in_group ($computer_id_in_group)"
+                computer_names_in_group+=("$computer_name_in_group")
+                computer_ids_in_group+=("$computer_id_in_group")
+                ((i++))
+            done
+        else
+            echo "    [get_computers_in_group] Group '$group_name' contains no computers, so showing all computers"
+        fi
+
+    fi
+}
+
+
 generate_computer_list() {
     # The Jamf Pro API returns a list of all computers.
     set_credentials "$jss_instance"
@@ -62,10 +111,8 @@ generate_computer_list() {
     curl_args+=("Accept: application/json")
     send_curl_request
 
-    # print out a list of ids and names
-    results=$( ljt /results < "$curl_output_file" )
     # how big should the loop be?
-    loopsize=$( grep -c '"id"' <<< "$results" )
+    loopsize=$(/usr/bin/plutil -extract results raw "$curl_output_file")
 
     # now loop through
     i=0
@@ -76,10 +123,11 @@ generate_computer_list() {
     computer_choice=()
     echo
     while [[ $i -lt $loopsize ]]; do
-        id_in_list=$( ljt /$i/id <<< "$results" )
-        computer_name_in_list=$( ljt /$i/name <<< "$results" )
-        management_id_in_list=$( ljt /$i/managementId <<< "$results" )
-        serial_in_list=$( ljt /$i/serialNumber <<< "$results" )
+        id_in_list=$(/usr/bin/plutil -extract results.$i.id raw "$curl_output_file")
+        computer_name_in_list=$(/usr/bin/plutil -extract results.$i.name raw "$curl_output_file")
+        management_id_in_list=$(/usr/bin/plutil -extract results.$i.managementId raw "$curl_output_file")
+        serial_in_list=$(/usr/bin/plutil -extract results.$i.serialNumber raw "$curl_output_file")
+
         computer_ids+=("$id_in_list")
         computer_names+=("$computer_name_in_list")
         management_ids+=("$management_id_in_list")
@@ -97,22 +145,29 @@ generate_computer_list() {
                     if [[ "$serial_in_list" == "$serial_in_csv" ]]; then
                         computer_choice+=("$i")
                     fi
-                    (( j++ ))
+                    ((j++))
                 done
             else
                 if [[ "$serial_in_list" == "$serial" ]]; then
                     computer_choice+=("$i")
                 fi
             fi
+        elif [[ ${#computer_ids_in_group[@]} -gt 0 ]]; then
+            for idx in "${computer_ids_in_group[@]}"; do
+                if [[ $idx == "$id_in_list" ]]; then
+                    computer_choice+=("$i")
+                    break
+                fi
+            done
         else
-            printf '%-5s %-16s %s\n' "($i)" "$serial_in_list" "$computer_name_in_list"
+            printf '%-5s %-16s %s\n' "($id_in_list)" "$serial_in_list" "$computer_name_in_list"
         fi
-        i=$((i+1))
+        ((i++))
     done
 
     if [ ${#computer_choice[@]} -eq 0 ]; then
         echo
-        read -r -p "Enter the number(s) of the computer(s) above : " computer_input
+        read -r -p "Enter the ID(s) of the computer(s) above : " computer_input
         # computers chosen
         for computer in $computer_input; do
             computer_choice+=("$computer")
@@ -136,18 +191,14 @@ generate_computer_list() {
 }
 
 redeploy_mdm() {
-    # to redeploy the mdm, we need to find out the computer id
-    generate_computer_list
-
-    # are we sure?
-    are_you_sure
+    # This function will redeploy the MDM profile to the selected devices
 
     # now loop through the list and perform the action
     for computer in "${computer_choice[@]}"; do
         computer_id="${computer_ids[$computer]}"
         computer_name="${computer_names[$computer]}"
         echo
-        echo "Processing Computer: id: $computer_id  name: $computer_name"
+        echo "    [redeploy_mdm] Processing Computer: id: $computer_id  name: $computer_name"
         echo
 
         # redeploy MDM profile
@@ -164,11 +215,7 @@ redeploy_mdm() {
 }
 
 eacas() {
-    # to send erase all contents and settings commands, we need to find out the computer id
-    generate_computer_list
-
-    # are we sure?
-    are_you_sure
+    # This function will erase the selected devices
 
     # passcode
     passcode="000000"
@@ -179,7 +226,7 @@ eacas() {
         computer_id="${computer_ids[$computer]}"
         computer_name="${computer_names[$computer]}"
         echo
-        echo "Computer chosen: id: $computer_id  name: $computer_name  management id: $management_id"
+        echo "    [eacas] Processing Computer: id: $computer_id  name: $computer_name  management id: $management_id"
         echo
 
         # send MDM command
@@ -210,11 +257,7 @@ eacas() {
 }
 
 set_recovery_lock() {
-    # to set the recovery lock, we need to find out the management id
-    generate_computer_list
-
-    # are we sure?
-    are_you_sure
+    # This function will set or clear the recovery lock to the selected devices
 
     # now loop through the list and perform the action
     for computer in "${computer_choice[@]}"; do
@@ -222,7 +265,7 @@ set_recovery_lock() {
         computer_id="${computer_ids[$computer]}"
         computer_name="${computer_names[$computer]}"
         echo
-        echo "Computer chosen: id: $computer_id  name: $computer_name  management id: $management_id"
+        echo "    [set_recovery_lock] Computer chosen: id: $computer_id  name: $computer_name  management id: $management_id"
 
         echo
         # get a random password ready
@@ -261,9 +304,9 @@ set_recovery_lock() {
         fi
 
         if [[ ! $recovery_lock_password || "$recovery_lock_password" == "NA" ]]; then
-            echo "Recovery lock will be removed..."
+            echo "    [set_recovery_lock] Recovery lock will be removed..."
         else
-            echo "Recovery password: $recovery_lock_password"
+            echo "    [set_recovery_lock] Recovery password: $recovery_lock_password"
         fi
 
         # now issue the recovery lock
@@ -292,8 +335,10 @@ set_recovery_lock() {
     done
 }
 
+# --------------------------------------------------------------------
+# Main Body
+# --------------------------------------------------------------------
 
-## Main Body
 mdm_command=""
 recovery_lock_password=""
 
@@ -315,6 +360,11 @@ while test $# -gt 0 ; do
         -s|--serial)
             shift
             serial="$1"
+            ;;
+        -g|--group)
+            shift
+            group_name="$1"
+            encode_name "$group_name"
             ;;
         --erase|--eacas)
             mdm_command="eacas"
@@ -384,6 +434,19 @@ if [[ ! $mdm_command ]]; then
 fi
 
 echo
+
+echo
+# if a group name was supplied at the command line, compile the list of computers from that group
+if [[ $group_name ]]; then
+    get_computers_in_group
+fi
+
+# to send MDM commands, we need to find out the computer id
+generate_computer_list
+
+# are we sure to proceed?
+are_you_sure
+
 
 # the following section depends on the chosen MDM command
 case "$mdm_command" in
