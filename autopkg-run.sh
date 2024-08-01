@@ -28,6 +28,7 @@ Usage:
                                 (must exist in the relevant instance list)
 --all                         - perform action on ALL instances in the instance list
 --dp                          - filter DPs on DP name
+-e                            - Force policy to enabled (--key POLICY_ENABLED=True)
 -v[vv]                        - add verbose output
 USAGE
 }
@@ -90,9 +91,15 @@ run_autopkg() {
         autopkg_run_options+=("jcds2_mode=True")
     fi
 
+    # option to replace pkg
     if [[ $replace_pkg -eq 1 ]]; then
         autopkg_run_options+=("--key")
         autopkg_run_options+=("replace_pkg=True")
+    fi
+
+    if [[ $policy_enabled -eq 1 ]]; then
+        autopkg_run_options+=("--key")
+        autopkg_run_options+=("POLICY_ENABLED=True")
     fi
 
     # verbosity
@@ -164,6 +171,9 @@ while [[ "$#" -gt 0 ]]; do
         ;;
         -a|--all)
             all_instances=1
+        ;;
+        -e|--enabled)
+            policy_enabled=1
         ;;
         -v)
             verbose=1

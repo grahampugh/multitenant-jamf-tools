@@ -132,6 +132,14 @@ while test $# -gt 0 ; do
             args+=("$1")
             ;;
         -h|--help)
+            echo "Outputting the help sheet for jamf-api-tool.py"
+            echo
+            echo "==========================================="
+            echo
+            /Library/AutoPkg/Python3/Python.framework/Versions/Current/bin/python3 "$tool_directory/$tool" --help
+            echo
+            echo "==========================================="
+            echo
             usage
             exit 0
             ;;
