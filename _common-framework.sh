@@ -368,6 +368,7 @@ get_instance_distribution_point() {
         done <<< "$dp_names_list"
         # smb url
         smb_url="$dp_protocol://$dp_server/$dp_share"
+        smb_uri="$dp_server/$dp_share"
         # echo "SMB_URL: $smb_url" # TEMP
         # echo "SMB_USER: $user_rw" # TEMP
     # if > 1 # TODO
@@ -412,6 +413,27 @@ get_instance_distribution_point_new_api() {
     fi
     # smb url
     smb_url="$dp_protocol://$dp_server/$dp_share"
+    smb_uri="$dp_server/$dp_share"
+}
+
+get_smb_credentials() {
+    # we need the new endpoints for the password. For now use the keychain
+    if [[ "$dp_server" ]]; then
+        echo "   [get_smb_credentials] Checking credentials for '$dp_server'."
+        # check for existing service entry in login keychain
+        dp_check=$(/usr/bin/security find-generic-password -s "$dp_server" 2>/dev/null)
+        if [[ $dp_check ]]; then
+            # echo "   [get_smb_credentials] Checking keychain entry for $dp_check" # TEMP
+            # echo "   [get_smb_credentials] Checking $smb_url" # TEMP
+            smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
+            smb_pass=$(/usr/bin/security find-generic-password -s "$dp_server" -w -g 2>/dev/null)
+            smb_pass=${smb_pass//\!/} # exclamation points are ignored and mess up the SMB command so we remove them
+            # echo "   [get_smb_credentials] User: $smb_user - Pass: $smb_pass" # TEMP
+        fi
+    else
+        echo "ERROR: DP not determined. Cannot continue"
+        exit 1
+    fi
 }
 
 set_credentials() {

@@ -1436,7 +1436,6 @@ delete_api_object() {
 
         # send request
         curl_url="$jss_url/JSSResource/${api_object_type}/id/${existing_id}"
-        # echo $curl_url # TEMP
         curl_args=("--request")
         curl_args+=("DELETE")
         curl_args+=("--header")
@@ -1455,43 +1454,13 @@ delete_pkg() {
     local pkg_name="$1"
 
     # Check that a DP actually exists
-    # determine jss_url
-    set_credentials "$source_instance"
-    jss_url="${source_instance}"
-    # send request
-    curl_url="$jss_url/JSSResource/distributionpoints"
-    curl_args=("--header")
-    curl_args+=("Accept: application/xml")
-    send_curl_request
+    jss_instance="${source_instance}"
+    get_instance_distribution_point
 
-    # get a list of DPs
-    dp_names_list=$(xmllint --xpath "//distribution_points/distribution_point/name" "$curl_output_file" 2>/dev/null | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n")
+    if [[ $smb_url ]]; then
+        # get the smb credentials from the keychain
+        get_smb_credentials
 
-    # loop through the DPs and check that we have credentials for them - only check the first one for now
-    dp_found=0
-    while read -r dp; do
-        if [[ $dp ]]; then
-            echo "   [check_for_smb_repo] Checking credentials for '$dp'."
-            # check for existing service entry in login keychain
-            dp_check=$(/usr/bin/security find-generic-password -s "$dp" 2>/dev/null)
-            if [[ $dp_check ]]; then
-                # echo "   [check_for_smb_repo] Checking keychain entry for $dp_check" # TEMP
-                smb_url=$(/usr/bin/grep "0x00000007" <<< "$dp_check" 2>&1 | /usr/bin/cut -d \" -f 2 |/usr/bin/cut -d " " -f 1)
-                if [[ $smb_url ]]; then
-                    # echo "   [check_for_smb_repo] Checking $smb_url" # TEMP
-                    smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
-                    smb_pass=$(/usr/bin/security find-generic-password -s "$dp" -w -g 2>/dev/null)
-                    if [[ $smb_url == *"(readwrite)"* && $smb_user && $smb_pass ]]; then
-                        echo "Username and password for $dp found in keychain - URL=$smb_url"
-                        dp_found=1
-                        break
-                    fi
-                fi
-            fi
-        fi
-    done <<< "$dp_names_list"
-
-    if [[ $dp_found ]]; then
         echo
         echo "   [main] Checking for ${chosen_api_obj_name_decoded} on ${smb_url}..."
         # mount the SMB server if not already mounted
@@ -1623,8 +1592,8 @@ fetch_icon() {
 }
 
 mount_smb_share() {
-    smb_share=$(cut -d"/" -f2 <<< "$smb_url")
-    smb_mountpoint="/Volumes/$smb_share-$source_instance_list"
+    # smb_share=$(cut -d"/" -f2 <<< "$smb_url")
+    smb_mountpoint="/Volumes/$dp_share-$source_instance_list"
     if mount | grep "on ${smb_mountpoint} " > /dev/null; then
         echo "   [mount_smb_share] ${smb_mountpoint} is mounted."
         return
@@ -1635,7 +1604,11 @@ mount_smb_share() {
         sudo mkdir -p "${smb_mountpoint}"
         sudo chown "${USER}":admin "${smb_mountpoint}"
 
-        mount -t smbfs "//${smb_user}:${smb_pass}@${smb_url}" "${smb_mountpoint}"
+        if ! sudo mount -t smbfs "//${smb_user}:${smb_pass}@${smb_uri}" "${smb_mountpoint}"; then
+            echo "   [mount_smb_share] ERROR: ${smb_url} could not be mounted...aborting."
+            sudo rm -rf "${smb_mountpoint}"
+            exit 1
+        fi
     fi
 }
 
@@ -1734,8 +1707,7 @@ send_slack_notification() {
 unmount_smb_share() {
     echo
     echo
-    smb_share=$(cut -d"/" -f4 <<< "$smb_url")
-    smb_mountpoint="/Volumes/$smb_share-$source_instance_list"
+    smb_mountpoint="/Volumes/$dp_share-$source_instance_list"
     if mount | grep "on ${smb_mountpoint} " > /dev/null; then
         echo "   [unmount_smb_share] ${smb_mountpoint} is mounted."
         sudo umount "${smb_mountpoint}"
@@ -2383,14 +2355,14 @@ main() {
 
             case $api_obj_action in
                 delete )
-                    # first delete the pkg metadata object
-                    echo "   [main] Deleting ${api_xml_object} '$chosen_api_obj_name_decoded'"
-                    delete_api_object "$api_xml_object" "$chosen_api_obj_name"
-
-                    # now delete package from an SMB repo (TODO - delete from S3)
+                    # if deleting a package from an SMB repo, first remove the package itself (TODO - delete from S3)
                     if [[ $api_obj_action == "delete" && $api_xml_object == "package" ]]; then
                         delete_pkg "${chosen_api_obj_name}"
                     fi
+                    # now delete the API object
+                    echo "   [main] Deleting ${api_xml_object} '$chosen_api_obj_name_decoded'"
+                    delete_api_object "$api_xml_object" "$chosen_api_obj_name"
+
                     ;;
                 copy )
                     echo "   [main] Copying ${api_xml_object} '$chosen_api_obj_name'"

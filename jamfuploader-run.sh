@@ -62,26 +62,11 @@ run_jamfupload() {
     if element_in "pkg" "${args[@]}" || element_in "package" "${args[@]}"; then
         get_instance_distribution_point
         if [[ "$smb_url" ]]; then
+            # get the smb credentials from the keychain
+            get_smb_credentials
+
             instance_args+=("--smb-url")
             instance_args+=("$smb_url")
-            # we need the new endpoints for the password. For now use the keychain
-            if [[ "$dp" ]]; then
-                echo "   [check_for_smb_repo] Checking credentials for '$dp'."
-                # check for existing service entry in login keychain
-                dp_check=$(/usr/bin/security find-generic-password -s "$dp" 2>/dev/null)
-                if [[ $dp_check ]]; then
-                    # echo "   [check_for_smb_repo] Checking keychain entry for $dp_check" # TEMP
-                    smb_url=$(/usr/bin/grep "0x00000007" <<< "$dp_check" 2>&1 | /usr/bin/cut -d \" -f 2 |/usr/bin/cut -d " " -f 1)
-                    if [[ $smb_url ]]; then
-                        # echo "   [check_for_smb_repo] Checking $smb_url" # TEMP
-                        smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
-                        smb_pass=$(/usr/bin/security find-generic-password -s "$dp" -w -g 2>/dev/null)
-                    fi
-                fi
-            else
-                echo "ERROR: DP not determined. Cannot continue"
-                exit 1
-            fi
             instance_args+=("--smb-user")
             instance_args+=("$smb_user")
             instance_args+=("--smb-pass")
