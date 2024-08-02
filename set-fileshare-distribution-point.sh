@@ -5,9 +5,9 @@ Script for setting the Fileshare Distribution Point on all instances.
 Requires a template XML file
 DOC
 
-# source the get-token.sh file
-# shellcheck source-path=SCRIPTDIR source=get-token.sh
-source "get-token.sh"
+# source the _common-framework.sh file
+# shellcheck source-path=SCRIPTDIR source=_common-framework.sh
+source "_common-framework.sh"
 
 usage() {
     cat <<'USAGE'

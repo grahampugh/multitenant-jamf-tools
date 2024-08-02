@@ -4,9 +4,9 @@
 A wrapper script for running the jamf-upload.sh script
 DOC
 
-# source the get-token.sh file
+# source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "get-token.sh"
+source "_common-framework.sh"
 
 # set instance list type
 instance_list_type="mac"
@@ -99,7 +99,7 @@ run_jamfupload() {
 ## DEFAULTS ##
 ##############
 
-# source the get-token.sh file
+# source the _common-framework.sh file
 # this folder
 tool_directory="../jamf-api-tool"
 tool="jamf_api_tool.py"

@@ -10,9 +10,9 @@ Actions:
 - Posts the MDM command request
 DOC
 
-# source the get-token.sh file
-# shellcheck source-path=SCRIPTDIR source=get-token.sh
-source "get-token.sh"
+# source the _common-framework.sh file
+# shellcheck source-path=SCRIPTDIR source=_common-framework.sh
+source "_common-framework.sh"
 
 # reduce the curl tries
 max_tries_override=2

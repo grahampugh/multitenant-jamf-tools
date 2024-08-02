@@ -5,9 +5,9 @@ Script for counting applications installed on computers in all instances
 This interrogates the inventory, not smart groups
 DOC
 
-# source the get-token.sh file
+# source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "get-token.sh"
+source "_common-framework.sh"
 
 # set instance list type
 instance_list_type="mac"

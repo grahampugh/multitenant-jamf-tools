@@ -4,9 +4,9 @@
 Script for running an autopkg recipe or recipe list on all instances
 DOC
 
-# source the get-token.sh file
+# source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "get-token.sh"
+source "_common-framework.sh"
 
 # reduce the curl tries
 max_tries_override=2

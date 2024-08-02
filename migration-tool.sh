@@ -18,9 +18,9 @@
 # Source the file for obtaining the token and setting the server
 # -------------------------------------------------------------------------
 
-# source the get-token.sh file
-# shellcheck source-path=SCRIPTDIR source=get-token.sh
-source "get-token.sh"
+# source the _common-framework.sh file
+# shellcheck source-path=SCRIPTDIR source=_common-framework.sh
+source "_common-framework.sh"
 
 if [[ ! -d "${this_script_dir}" ]]; then
     echo "ERROR: path to repo ambiguous. Aborting."

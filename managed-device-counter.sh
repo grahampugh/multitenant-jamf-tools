@@ -5,9 +5,9 @@ Script for counting devices on all instances
 Adapted from Anver Husseini (AnyKeyIT) by Graham Pugh
 DOC
 
-# source the get-token.sh file
+# source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "get-token.sh"
+source "_common-framework.sh"
 
 usage() {
     cat <<'USAGE'

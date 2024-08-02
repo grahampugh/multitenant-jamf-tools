@@ -461,6 +461,24 @@ get_new_token() {
     fi
 }
 
+api_client_get_new_cleint() {
+    # request the token
+    curl --location --silent \
+        --request POST \
+        --header "authorization: Basic $b64_credentials" \
+        --url "${jss_url}/api/v1/auth/token" \
+        --header 'Accept: application/json' \
+        --cookie-jar "$cookie_jar" \
+        -o "$token_file"
+    echo "${jss_url}" > "$server_check_file"
+    echo "$jss_api_user" > "$user_check_file"
+
+    if [[ $verbose -gt 0 ]]; then
+        echo "Token for $jss_api_user on ${jss_url} written to $token_file"
+    fi
+}
+
+
 check_token() {
     # is there a token file
     if [[ -f "$token_file" ]]; then

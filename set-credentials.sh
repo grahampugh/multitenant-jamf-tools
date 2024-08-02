@@ -10,9 +10,9 @@ Script to add the required credentials into your login keychain to allow repeate
 5. Check the credentials are working using the API
 DOC
 
-# source the get-token.sh file
+# source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "get-token.sh"
+source "_common-framework.sh"
 
 # reduce the curl tries
 max_tries_override=2
