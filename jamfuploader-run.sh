@@ -4,7 +4,7 @@
 A wrapper script for running the jamf-upload.sh script
 DOC
 
-# source the _common-framework.sh file
+# source _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
 source "_common-framework.sh"
 
@@ -45,6 +45,28 @@ element_in() {
   return 1
 }
 
+send_slack_notification() {
+    local jss_url="$1"
+    local args="$2"
+
+    if get_slack_webhook "$instance_list_file"; then
+        if [[ $slack_webhook_url ]]; then
+            slack_text="{'username': '$jss_url', 'text': '*jamfuploader_run action*\nInstance: $jss_url\nArguments: $args'}"
+        
+            response=$(
+                curl -s -o /dev/null -S -i -X POST -H "Content-Type: application/json" \
+                --write-out '%{http_code}' \
+                --data "$slack_text" \
+                "$slack_webhook_url"
+            )
+            echo "   [send_slack_notification] Sent Slack notification (response: $response)"
+        fi
+    else
+        echo "   [send_slack_notification] Not sending slack notification as no webhook found"
+    fi
+}
+
+
 run_jamfupload() {
     instance_args=()
     
@@ -77,17 +99,15 @@ run_jamfupload() {
     # Run the script and output to stdout
     # echo "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" # TEMP
     "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" 
+
+    # Send Slack notification
+    send_slack_notification "$jss_instance" "${args[*]}"
 }
 
 
 ##############
 ## DEFAULTS ##
 ##############
-
-# source the _common-framework.sh file
-# this folder
-tool_directory="../jamf-api-tool"
-tool="jamf_api_tool.py"
 
 if [[ ! -f "$jamf_upload_path" ]]; then
     # default path to jamf-upload-sh
@@ -99,7 +119,7 @@ if [[ ! -f "$jamf_upload_path" ]]; then
 fi
 # fail if no valid path found
 if [[ ! -f "$jamf_upload_path" ]]; then
-    echo 'ERROR: jamf-upload.sh not found. Please either run `autopkg repo-add grahampugh/jamf-upload` or clone the grahampugh/jamf-upload repo to the parent folder of this repo'
+    echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"
     exit 1
 fi
 
@@ -122,7 +142,7 @@ while test $# -gt 0 ; do
         ;;
         -s|--share)
             shift
-            smb_share="$1"
+            smb_url="$1"
         ;;
         -d|--dp)
             shift

@@ -72,6 +72,7 @@ get_slack_webhook() {
     fi
     if [[ $webhook_found -eq 0 ]]; then
         echo "   [get_slack_webhook] No Slack webhook for $instance_list_file found."
+        return 1
     fi
 }
 
