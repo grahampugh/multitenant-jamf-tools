@@ -44,43 +44,39 @@ max_tries_override=4
 
 usage() {
     cat <<'USAGE'
-Usage:
-./set_credentials.sh          - set the Keychain credentials
-
-[no arguments]                - interactive mode
---il FILENAME (without .txt)  - provide an instance list filename
-                                (must exist in the instance-lists folder)
---i JSS_URL                   - perform action on a single instance
-                                (must exist in the relevant instance list)
---all                         - perform action on ALL instances in the instance list
--v                            - add verbose curl output
-USAGE
-
-    cat <<'USAGE'
 -----------------------
   Jamf Object Copier
 -----------------------
-Usage: ./jamf-object-copier.sh <options>
+Usage: ./jocads.sh <options>
+
+NOTE: ./set_credentials.sh      Set the Keychain credentials
 
 -h, --help                      Shows this help screen.
---source='<URL>'                Specify the template instance. Optional.
---dest='<URL>'                  Specify an instance. Required.
+
+[no arguments]                  Interactive mode
+
+
+--source '<URL>'                Specify the template instance. Optional.
+--dest '<URL>'                  Specify an instance. Required.
                                 If dest flag is set to 'ALL', copies to or deletes from all instances.
---source-list='prd/tst'         Specify a server. This overrides the default server (prd). Optional.
---dest-list='<SERVERNAME>'"
+--source-list 'prd/tst'         Specify a server. This overrides the default server (prd). Optional.
+--dest-list '<SERVERNAME>'"
                                 Specify a server. This overrides the default server (prd). Optional.
-            echo
+--all                           Perform action on ALL instances in the instance list
 -d, --delete                    Delete an item.
 -c, --copy                      Copy an item.
 
 Object types. Must be exactly as in the JSS:
---policy='<POLICY-NAME>'        Specify a policy name.
---group='<GROUP-NAME>'          Specify a group name.
---script='<SCRIPT-NAME>'        Specify a script name.
---category='<CATEGORY-NAME>'    Specify a category name.
---ea='<EA-NAME>'                Specify an extension attribute name.
---package='<PACKAGE-NAME>'      Specify a package name.
---masapp='<APPSTOREAPP-NAME>'   Specify a Mac App Store app name.
+--policy '<POLICY-NAME>'        Specify a policy name.
+--group '<GROUP-NAME>'          Specify a group name.
+--script '<SCRIPT-NAME>'        Specify a script name.
+--category '<CATEGORY-NAME>'    Specify a category name.
+--ea '<EA-NAME>'                Specify an extension attribute name.
+--masapp '<APPSTOREAPP-NAME>'   Specify a Mac App Store app name.
+--package '<PACKAGE-NAME>'      Specify a package name.
+
+--dp '<FILTER>'                 Filter the choice of distribution point URL, 
+                                e.g. 'myorg' to only select a URL containing 'myorg'
 
 --clean                         Clean up working files after use.
 -v                              Add verbose curl output
@@ -2580,6 +2576,17 @@ while [[ "$#" -gt 0 ]]; do
         --confirm)
             echo "   [main] CLI: Action: auto-confirm copy or delete, for non-interactive use."
             confirmed="yes"
+        ;;
+
+        --dp)
+            shift
+            dp_url_filter="$1"
+            echo "   [main] CLI: Distrivution Point filter applied: $dp_url_filter"
+        ;;
+
+        --dp=*)
+            dp_url_filter="${key#*=}"
+            echo "   [main] CLI: Distrivution Point filter applied: $dp_url_filter"
         ;;
 
         -v|--verbose)
