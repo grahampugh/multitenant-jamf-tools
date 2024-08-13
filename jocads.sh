@@ -1601,7 +1601,7 @@ mount_smb_share() {
         sudo chown "${USER}":admin "${smb_mountpoint}"
 
         if ! sudo mount -t smbfs "//${smb_user}:${smb_pass}@${smb_uri}" "${smb_mountpoint}"; then
-            echo "   [mount_smb_share] ERROR: ${smb_url} could not be mounted...aborting."
+            echo "   [mount_smb_share] ERROR: ${smb_url} could not be mounted with ${smb_user}...aborting."
             sudo rm -rf "${smb_mountpoint}"
             exit 1
         fi
