@@ -1705,10 +1705,13 @@ unmount_smb_share() {
     echo
     smb_mountpoint="/Volumes/$dp_share-$source_instance_list"
     if mount | grep "on ${smb_mountpoint} " > /dev/null; then
-        echo "   [unmount_smb_share] ${smb_mountpoint} is mounted."
-        sudo umount "${smb_mountpoint}"
+        if sudo umount "${smb_mountpoint}"; then
+            echo "   [unmount_smb_share] ${smb_mountpoint} successfully unmounted."
+        else
+            echo "   [unmount_smb_share] ERROR: ${smb_mountpoint} was not successfully unmounted."
+        fi
     else
-        echo "   [unmount_smb_share] ${smb_url} is not mounted..."
+        echo "   [unmount_smb_share] ${smb_url} is not mounted."
     fi
 }
 
