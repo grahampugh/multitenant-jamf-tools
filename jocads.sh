@@ -318,8 +318,8 @@ check_groups_in_groups() {
                 if [[ "${final_group_list[*]}" != *"${group}"* ]]; then
                     echo "   [check_groups_in_groups] Fetching: ${group}"
                     fetch_api_object_by_name computer_group "${group}"
-                    final_group_list[$f]="${group}"
-                    f=$(($f + 1))
+                    final_group_list[f]="${group}"
+                    f=$((f + 1))
                 fi
             fi
         done <<< "${embedded_group_array}"
@@ -348,8 +348,8 @@ check_groups_in_mobile_device_groups() {
                 if [[ "${final_group_list[*]}" != *"${group}"* ]]; then
                     echo "   [check_groups_in_mobile_device_groups] Fetching: ${group}"
                     fetch_api_object_by_name mobile_device_group "${group}"
-                    final_group_list[$f]="${group}"
-                    f=$(($f + 1))
+                    final_group_list[f]="${group}"
+                    f=$((f + 1))
                 fi
             fi
         done <<< "${embedded_group_array}"
@@ -418,7 +418,7 @@ copy_api_object() {
             category_name=$( 
                 xmllint --xpath '//general/category/name/text()' "${parsed_file}" 2>/dev/null 
             )
-            category_name_decoded="${category_name/&amp;/&}"
+            category_name_decoded="${category_name//&amp;/&}"
             if [[ $category_name_decoded == "" ]]; then
                 echo "   [copy_api_object] No category found in this ${api_xml_object}! If this is a mistake, the policy copy will fail."
                 echo "   [copy_api_object] Fetched XML: ${parsed_file}"
@@ -451,8 +451,8 @@ copy_api_object() {
                     if [[ $group ]]; then
                         if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
                             echo "   [copy_api_object] Excluded Computer group found: ${group}"
-                            unique_group_list[$u]="${group}"
-                            u=$(($u + 1))
+                            unique_group_list[u]="${group}"
+                            u=$((u + 1))
                         fi
                     fi
                 done <<< "${excluded_group_array}"
@@ -463,8 +463,8 @@ copy_api_object() {
                     if [[ $group ]]; then
                         if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
                             echo "   [copy_api_object] Computer group found: ${group}"
-                            unique_group_list[$u]="${group}"
-                            u=$(($u + 1))
+                            unique_group_list[u]="${group}"
+                            u=$((u + 1))
                         fi
                     fi
                 done <<< "${group_array}"
@@ -474,7 +474,7 @@ copy_api_object() {
             # embedded groups whilst iterating through the unique list
             final_group_list=()
             for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
-                final_group_list[$i]="${unique_group_list[$i]}"
+                final_group_list[i]="${unique_group_list[$i]}"
             done
 
             echo "   [copy_api_object] Total ${#unique_group_list[@]} groups found."
@@ -516,7 +516,7 @@ copy_api_object() {
             category_name=$( 
                 xmllint --xpath '//general/category/name/text()' "${parsed_file}" 2>/dev/null 
             )
-            category_name_decoded="${category_name/&amp;/&}"
+            category_name_decoded="${category_name//&amp;/&}"
             if [[ $category_name_decoded == "" ]]; then
                 echo "   [copy_api_object] No category found in this ${api_xml_object}! If this is a mistake, the policy copy will fail."
                 echo "   [copy_api_object] Fetched XML: ${parsed_file}"
@@ -549,8 +549,8 @@ copy_api_object() {
                     if [[ $group ]]; then
                         if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
                             echo "   [copy_api_object] Excluded Mobile device group found: ${group}"
-                            unique_group_list[$u]="${group}"
-                            u=$(($u + 1))
+                            unique_group_list[u]="${group}"
+                            u=$((u + 1))
                         fi
                     fi
                 done <<< "${excluded_group_array}"
@@ -561,8 +561,8 @@ copy_api_object() {
                     if [[ $group ]]; then
                         if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
                             echo "   [copy_api_object] Mobile device group found: ${group}"
-                            unique_group_list[$u]="${group}"
-                            u=$(($u + 1))
+                            unique_group_list[u]="${group}"
+                            u=$((u + 1))
                         fi
                     fi
                 done <<< "${group_array}"
@@ -572,7 +572,7 @@ copy_api_object() {
             # embedded groups whilst iterating through the unique list
             final_group_list=()
             for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
-                final_group_list[$i]="${unique_group_list[$i]}"
+                final_group_list[i]="${unique_group_list[$i]}"
             done
 
             echo "   [copy_api_object] Total ${#unique_group_list[@]} groups found."
@@ -617,7 +617,8 @@ copy_api_object() {
     api_object_type="${api_object_type_temp}"
 
     # look for existing entry and update it rather than create a new one if it exists
-    source_name="$( grep "<name>" "${parsed_file}" | head -n 1 | xargs | sed 's/<[^>]*>//g' )"
+    source_name_escaped="$( grep "<name>" "${parsed_file}" | head -n 1 | xargs | sed 's/<[^>]*>//g' )"
+    source_name="${source_name_escaped//\&amp;/&}"
 
     # Set the dest server
     set_credentials "$dest_instance"
@@ -666,7 +667,7 @@ copy_api_object() {
             echo "   [copy_api_object] UUID in $dest_instance: ${existing_uuid}"
 
             # now substitute this existing uuid into the parsed file, or change to the entered uuid
-            substituted_parsed_file="$(dirname "$parsed_file")/$server_type-$(basename "$dest_instance")-$(basename "$parsed_file")"
+            substituted_parsed_file="$(dirname "$parsed_file")/$(basename "$dest_instance")-$(basename "$parsed_file")"
             if [[ $ask_for_uuid = 1 && $entered_uuid != "" ]]; then
                 echo "   [copy_api_object] Entered UUID will be injected: ${entered_uuid}"
                 sed 's/'"${parsed_uuid}"'/'"${entered_uuid}"'/g' "${parsed_file}" > "${substituted_parsed_file}"
@@ -730,7 +731,7 @@ copy_api_object_by_name() {
 
     local parsed_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_name}-parsed.xml"
 
-    api_object_type=$( get_api_object_type $api_xml_object )
+    api_object_type=$( get_api_object_type "$api_xml_object" )
 
     echo "   [copy_api_object_by_name] Copying ${api_xml_object} object '${chosen_api_obj_name}'"
 
@@ -805,8 +806,8 @@ copy_groups_in_group() {
             if [[ $group ]]; then
                 if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
                     echo "   [copy_groups_in_group] Computer group found: '${group}'"
-                    unique_group_list[$u]="${group}"
-                    u=$(($u + 1))
+                    unique_group_list[u]="${group}"
+                    u=$((u + 1))
                 fi
             fi
         done <<< "${group_array}"
@@ -816,7 +817,7 @@ copy_groups_in_group() {
     # embedded groups whilst iterating through the unique list
     final_group_list=()
     for (( i=0; i<${#unique_group_list[@]}; i++ )); do
-        final_group_list[$i]="${unique_group_list[$i]}"
+        final_group_list[i]="${unique_group_list[$i]}"
     done
 
     echo "   [copy_groups_in_group] Total ${#unique_group_list[@]} groups found in group."
@@ -865,7 +866,7 @@ copy_groups_in_mobile_device_group() {
 
     group_array=$(
         xmllint --xpath \
-        '//mobile_device_group/criteria/criterion[name = "Computer Group"]/value' \
+        '//mobile_device_group/criteria/criterion[name = "Mobile Device Group"]/value' \
         "$fetched_group_file" 2>/dev/null \
         | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
     )
@@ -879,8 +880,8 @@ copy_groups_in_mobile_device_group() {
             if [[ $group ]]; then
                 if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
                     echo "   [copy_groups_in_mobile_device_group] Mobile device group found: '${group}'"
-                    unique_group_list[$u]="${group}"
-                    u=$(($u + 1))
+                    unique_group_list[u]="${group}"
+                    u=$((u + 1))
                 fi
             fi
         done <<< "${group_array}"
@@ -890,7 +891,7 @@ copy_groups_in_mobile_device_group() {
     # embedded groups whilst iterating through the unique list
     final_group_list=()
     for (( i=0; i<${#unique_group_list[@]}; i++ )); do
-        final_group_list[$i]="${unique_group_list[$i]}"
+        final_group_list[i]="${unique_group_list[$i]}"
     done
 
     echo "   [copy_groups_in_mobile_device_group] Total ${#unique_group_list[@]} groups found in group."
@@ -1166,7 +1167,7 @@ copy_policy() {
         )
 
         if [[ $script_count -gt 0 ]]; then
-            for (( n=1; n<=${script_count}; n++ )); do
+            for (( n=1; n<=script_count; n++ )); do
                 script_id=$( 
                     xmllint --xpath "//scripts/script[$n]/id/text()" \
                     "${fetched_policy_file}" 2>/dev/null 
@@ -1223,8 +1224,8 @@ copy_policy() {
                 if [[ $group ]]; then
                     if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
                         echo "   [copy_policy] Excluded Computer group found: ${group}"
-                        unique_group_list[$u]="${group}"
-                        u=$(($u + 1))
+                        unique_group_list[u]="${group}"
+                        u=$((u + 1))
                     fi
                 fi
             done <<< "${excluded_group_array}"
@@ -1235,8 +1236,8 @@ copy_policy() {
                 if [[ $group ]]; then
                     if [[ "${unique_group_list[*]}" != *"${group}"* ]]; then
                         echo "   [copy_policy] Computer group found: ${group}"
-                        unique_group_list[$u]="${group}"
-                        u=$(($u + 1))
+                        unique_group_list[u]="${group}"
+                        u=$((u + 1))
                     fi
                 fi
             done <<< "${group_array}"
@@ -1246,7 +1247,7 @@ copy_policy() {
         # embedded groups whilst iterating through the unique list
         final_group_list=()
         for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
-            final_group_list[$i]="${unique_group_list[$i]}"
+            final_group_list[i]="${unique_group_list[$i]}"
         done
 
         echo "   [copy_policy] Total ${#unique_group_list[@]} groups found in policy."
@@ -1354,7 +1355,7 @@ create_category() {
     local category_name="$1"
 
     # We need to create a category if it doesn't already exist
-    category_name_decoded="$( echo "${category_name}" | sed -e 's|&amp;|\&|g' )"
+    category_name_decoded="${category_name//&amp;/&}"
     echo "   [create_category] Checking category '${category_name_decoded}'"
 
     # Set the dest server
@@ -1525,7 +1526,7 @@ fetch_api_object_by_name() {
     local api_xml_object="$1"
     local chosen_api_obj_name="$2"
 
-    api_object_type=$( get_api_object_type $api_xml_object )
+    api_object_type=$( get_api_object_type "$api_xml_object" )
 
     chosen_api_obj_name_url_encoded=$(encode_name "$chosen_api_obj_name")
 
@@ -1612,7 +1613,7 @@ parse_api_obj_for_copying() {
     local api_xml_object="$1"
     local chosen_api_obj_id=$2
 
-    api_object_type=$( get_api_object_type $api_xml_object )
+    api_object_type=$( get_api_object_type "$api_xml_object" )
 
     fetched_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_id}-fetched.xml"
     parsed_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_id}-parsed.xml"
@@ -1637,7 +1638,7 @@ parse_api_object_by_name_for_copying() {
     local api_xml_object="$1"
     local chosen_api_obj_name="$2"
 
-    api_object_type=$( get_api_object_type $api_xml_object )
+    api_object_type=$( get_api_object_type "$api_xml_object" )
 
     fetched_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_name}-fetched.xml"
     parsed_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_name}-parsed.xml"
@@ -1910,10 +1911,10 @@ main() {
 
         while IFS='' read -r line; do
             if [[ ${line} == *"<id>"* ]]; then
-                category_ids[$category_count]=$(echo "${line}" | awk -F '<id>|</id>' '{ print $2; exit; }')
+                category_ids[category_count]=$(echo "${line}" | awk -F '<id>|</id>' '{ print $2; exit; }')
             fi
             if [[ ${line} == *"<name>"* ]]; then
-                category_names[$category_count]=$(echo "${line}" | awk -F '<name>|</name>' '{ print $2; exit; }')
+                category_names[category_count]=$(echo "${line}" | awk -F '<name>|</name>' '{ print $2; exit; }')
                 category_count=$((category_count+1))
             fi
         done < "$formatted_list"
@@ -1926,7 +1927,7 @@ main() {
             echo
 
             for (( loop=0; loop<${#category_ids[@]}; loop++ )); do
-                listed_category_name_xml_decoded=$( echo "${category_names[$loop]}" | sed -e 's|&amp;|\&|g' )
+                listed_category_name_xml_decoded="${category_names[$loop]//&amp;/&}"
                 printf '   %-7s %-30s\n' "($loop)" "${listed_category_name_xml_decoded}"
                 if [[ "${listed_category_name_xml_decoded}" == "${policy_testing_category}" ]]; then
                     policy_testing_category_in_list=$loop
@@ -2031,10 +2032,10 @@ main() {
 
     while IFS='' read -r line; do
         if [[ ${line} == *"<id>"* ]]; then
-            api_obj_ids[$api_obj_count]=$(echo "${line}" | awk -F '<id>|</id>' '{ print $2; exit; }')
+            api_obj_ids[api_obj_count]=$(echo "${line}" | awk -F '<id>|</id>' '{ print $2; exit; }')
         fi
         if [[ ${line} == *"<name>"* ]]; then
-            api_obj_names[$api_obj_count]=$(echo "${line}" | awk -F '<name>|</name>' '{ print $2; exit; }')
+            api_obj_names[api_obj_count]=$(echo "${line}" | awk -F '<name>|</name>' '{ print $2; exit; }')
             api_obj_count=$((api_obj_count+1))
         fi
     done < "$formatted_list"
@@ -2063,7 +2064,7 @@ main() {
                 chosen_api_obj_id="${api_obj_ids[$loop]}"
                 chosen_api_obj_name="${api_obj_names[$loop]}"
                 matches=$((matches+1))
-                api_obj_name_xml_decoded=$( echo "${api_obj_names[$loop]}" | sed -e 's|&amp;|\&|g' )
+                api_obj_name_xml_decoded="${api_obj_names[$loop]//&amp;/&}"
                 if [[ "${api_obj_names[$loop]}" == "$inputted_api_obj_name" ]]; then
                     exact_match_exists=1
                     exact_match_item="${loop}"
@@ -2117,7 +2118,7 @@ main() {
         list_of_all=()
 
         for (( loop=0; loop<${#api_obj_ids[@]}; loop++ )); do
-            api_obj_name_xml_decoded=$( echo "${api_obj_names[$loop]}" | sed -e 's|&amp;|\&|g' )
+            api_obj_name_xml_decoded="${api_obj_names[$loop]//&amp;/&}"
             printf '   %-7s %-30s\n' "($loop)" "$api_obj_name_xml_decoded"
             list_of_all+=("$loop")
         done
