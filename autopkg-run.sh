@@ -109,6 +109,19 @@ run_autopkg() {
         *) autopkg_verbosity="-v";;
     esac
 
+    # report to Slack
+    if get_slack_webhook "$instance_list_file"; then
+        if [[ $slack_webhook_url ]]; then
+            autopkg_run_options+=(
+                "--key"
+                "slack_webhook_url=${slack_webhook_url}"
+                "--post"
+                "com.github.grahampugh.jamf-upload.processors/JamfUploaderSlacker"
+            )
+        fi
+    fi
+
+
     if [[ $recipe_list ]]; then
         "$autopkg_binary" run "$autopkg_verbosity" --recipe-list "$recipe_list" "${autopkg_run_options[@]}"
     elif  [[ $recipe ]]; then
@@ -118,30 +131,6 @@ run_autopkg() {
         exit 1
     fi
 }
-
-send_slack_notification() {
-    local jss_url="$1"
-    local recipe="$2"
-
-    if get_slack_webhook "$instance_list_file"; then
-        if [[ $slack_webhook_url ]]; then
-            slack_text="{'username': '$jss_url', 'text': '*autopkg_run action*\nInstance: $jss_url\nRecipe: $recipe'}"
-        
-            response=$(
-                curl -s -o /dev/null -S -i -X POST -H "Content-Type: application/json" \
-                --write-out '%{http_code}' \
-                --data "$slack_text" \
-                "$slack_webhook_url"
-            )
-            echo "   [send_slack_notification] Sent Slack notification (response: $response)"
-        fi
-    else
-        echo "   [send_slack_notification] Not sending slack notification as no webhook found"
-    fi
-}
-
-
-
 
 if [[ ! -d "${this_script_dir}" ]]; then
     echo "ERROR: path to repo ambiguous. Aborting."
