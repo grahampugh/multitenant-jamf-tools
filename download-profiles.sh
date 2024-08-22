@@ -1,7 +1,7 @@
 #!/bin/bash
 
 : <<'DOC'
-Script for downloading EA objects on all instances
+Script for downloading profile objects on all instances
 DOC
 
 # source the _common-framework.sh file
@@ -9,15 +9,15 @@ DOC
 source "_common-framework.sh"
 
 # reduce the curl tries
-max_tries_override=2
+max_tries_override=1
 
 # set instance list type
 instance_list_type="ios"
 
 # Check and create the JSS xml folder and archive folders if missing.
-xml_folder_default="/Users/Shared/Jamf/EA-Downloads"
+xml_folder_default="/Users/Shared/Jamf/Profiles-Downloads"
 xml_folder="$xml_folder_default"
-mkdir -p "${xml_folder}"
+mkdir -p "${xml_folder}/Payloads"
 
 
 usage() {
@@ -30,7 +30,7 @@ Usage:
                                 (must exist in the instance-lists folder)
 --i JSS_URL                   - perform action on a single instance
                                 (must exist in the relevant instance list)
---name EA_NAME                - Extension Attribute Name
+--name PROFILE_NAME           - Profile Name
 --all                         - perform action on ALL instances in the instance list
 -v                            - add verbose curl output
 USAGE
@@ -40,6 +40,11 @@ encode_name() {
     # encode space, '&amp;', percent
     name_url_encoded="$( echo "$1" | sed -e 's|\%|%25|g' | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
     echo "$name_url_encoded"
+}
+
+extract_payload() {
+    payload=$(xmllint --xpath '//general/payloads/text()' "${xml_folder}/${url_in_filename}-${api_xml_object}-${chosen_api_obj_name}-fetched.xml" 2>/dev/null)
+    payload_unescaped=$(sed 's|&lt;|<|g' <<< "$payload" | sed 's|&gt;|>|g' | sed 's|&amp;|&|g')
 }
 
 fetch_api_object_by_name() {
@@ -66,8 +71,16 @@ fetch_api_object_by_name() {
     curl_args+=("Accept: application/xml")
     send_curl_request
 
-    # save formatted fetch file
-    xmllint --format "$curl_output_file" > "${xml_folder}/${url_in_filename}-${api_xml_object}-${chosen_api_obj_name}-fetched.xml"
+    if [[ $http_response -lt 300 ]]; then
+        # save formatted fetch file
+        xmllint --format "$curl_output_file" > "${xml_folder}/${url_in_filename}-${api_xml_object}-${chosen_api_obj_name}-fetched.xml"
+
+        extract_payload
+
+        if [[ "$payload_unescaped" ]]; then
+            plutil -convert xml1 - -o "${xml_folder}/Payloads/${url_in_filename}-${api_xml_object}.plist" 2>/dev/null <<< "$payload_unescaped"
+        fi
+    fi
 }
 
 if [[ ! -d "${this_script_dir}" ]]; then
@@ -95,7 +108,7 @@ while [[ "$#" -gt 0 ]]; do
         ;;
         --name)
             shift
-            ea_name="$1"
+            object_name="$1"
         ;;
         -a|--all)
             all_instances=1
@@ -118,8 +131,8 @@ echo
 # ------------------------------------------------------------------------------------
 
 # set ldap user
-if [[ ! $ea_name ]]; then
-    read -r -p "Enter Extension Attribute Name : " ea_name
+if [[ ! $object_name ]]; then
+    read -r -p "Enter Profile Name : " object_name
 fi
 
 # Set default instance list
@@ -135,7 +148,7 @@ if [[ $chosen_instance ]]; then
 else
     for instance in "${instance_choice_array[@]}"; do
         jss_instance="$instance"
-        fetch_api_object_by_name computer_extension_attribute "$ea_name"
+        fetch_api_object_by_name os_x_configuration_profile "$object_name"
     done
 fi
 

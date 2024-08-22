@@ -2,4 +2,4 @@
 # note that if forking this repo to your own org, you may wish to remove these from .gitignore
 prd.txt
 tst.txt
-tmp.txt
+tmp*.txt
