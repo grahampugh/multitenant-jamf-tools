@@ -10,9 +10,9 @@
 # https://github.com/igeekjsc/JSSAPIScripts/blob/master/jssMigrationUtility.bash
 #
 # Adapted for new purposes by Graham Pugh @ ETH Zurich.
-
-# If you wish to store your confidential config in a separate file, specify it at the end of this script to overwrite the values below
-# - search for "config_override_file".
+# 
+# Adapted again for integration in the multitenant-jamf-tools repo by Graham Pugh @ JAMF.
+# NOTE: unlike some of the other multitenant-jamf-tools, this script can only apply changes to one destination instance per run.
 
 # -------------------------------------------------------------------------
 # Source the file for obtaining the token and setting the server
