@@ -1,0 +1,31 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<%API_OBJECT_TYPE%>
+    <scope>
+        <all_computers>false</all_computers>
+        <all_jss_users>false</all_jss_users>
+        <computers/>
+        <buildings/>
+        <departments/>
+        <computer_groups/>
+        <jss_users/>
+        <jss_user_groups/>
+        <limitations>
+            <users/>
+            <user_groups/>
+            <network_segments/>
+            <ibeacons/>
+        </limitations>
+        <exclusions>
+            <computers/>
+            <buildings/>
+            <departments/>
+            <computer_groups/>
+            <users/>
+            <user_groups/>
+            <network_segments/>
+            <ibeacons/>
+            <jss_users/>
+            <jss_user_groups/>
+        </exclusions>
+    </scope>
+</%API_OBJECT_TYPE%>

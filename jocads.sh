@@ -691,6 +691,21 @@ copy_api_object() {
             if [[ $api_object_type == "accounts" ]]; then
                 curl_url="$jss_url/JSSResource/${api_object_type}/${api_xml_object}id/${existing_id}"
             else
+                # remove scope using template file if remove_scope_only is specified
+                if [[ $remove_scope_only == "yes" ]]; then
+                    remove_scope "$api_xml_object" "$chosen_api_obj_name"
+                fi
+
+                # disable policy if disable_only is specified
+                if [[ $disable_only == "yes" ]]; then
+                    disable_api_object "$api_xml_object" "$chosen_api_obj_name"
+                fi
+
+                # enable policy if disable_only is specified
+                if [[ $enable_only == "yes" ]]; then
+                    enable_api_object "$api_xml_object" "$chosen_api_obj_name"
+                fi
+
                 curl_url="$jss_url/JSSResource/${api_object_type}/id/${existing_id}"
             fi
             curl_args=("--request")
@@ -707,19 +722,29 @@ copy_api_object() {
         else
             echo "   [copy_api_object] No existing ${api_xml_object} named '${source_name}' found; creating..."
 
-            # send request (accounts are different to everything else)
-            if [[ $api_object_type == "accounts" ]]; then
-                curl_url="$jss_url/JSSResource/${api_object_type}/${api_xml_object}id/0"
+            if [[ $remove_scope_only == "yes" ]]; then
+                echo "   [copy_api_object_by_name] '${chosen_api_obj_name}' not present; cannot remove scope..."
+            elif [[ $disable_only == "yes" ]]; then
+                echo "   [copy_api_object_by_name] '${chosen_api_obj_name}' not present; cannot disable..."
+            elif [[ $enable_only == "yes" ]]; then
+                echo "   [copy_api_object_by_name] '${chosen_api_obj_name}' not present; cannot enable..."
             else
-                curl_url="$jss_url/JSSResource/${api_object_type}/id/0"
+                echo "   [copy_api_object_by_name] No existing ${api_xml_object} named '${source_name}' found; creating..."
+
+                # send request (accounts are different to everything else)
+                if [[ $api_object_type == "accounts" ]]; then
+                    curl_url="$jss_url/JSSResource/${api_object_type}/${api_xml_object}id/0"
+                else
+                    curl_url="$jss_url/JSSResource/${api_object_type}/id/0"
+                fi
+                curl_args=("--request")
+                curl_args+=("POST")
+                curl_args+=("--header")
+                curl_args+=("Content-Type: application/xml")
+                curl_args+=("--upload-file")
+                curl_args+=("${parsed_file}")
+                send_curl_request
             fi
-            curl_args=("--request")
-            curl_args+=("POST")
-            curl_args+=("--header")
-            curl_args+=("Content-Type: application/xml")
-            curl_args+=("--upload-file")
-            curl_args+=("${parsed_file}")
-            send_curl_request
         fi
     fi
     echo
@@ -757,6 +782,21 @@ copy_api_object_by_name() {
     if [[ $existing_id ]]; then
         echo "   [copy_api_object_by_name] Existing ${api_xml_object} named '${source_name}' found; id=${existing_id}. Updating..."
 
+        # remove scope using template file if remove_scope_only is specified
+        if [[ $remove_scope_only == "yes" ]]; then
+            remove_scope "$api_xml_object" "$chosen_api_obj_name"
+        fi
+
+        # disable policy if disable_only is specified
+        if [[ $disable_only == "yes" ]]; then
+            disable_api_object "$api_xml_object" "$chosen_api_obj_name"
+        fi
+
+        # enable policy if disable_only is specified
+        if [[ $enable_only == "yes" ]]; then
+            enable_api_object "$api_xml_object" "$chosen_api_obj_name"
+        fi
+
         # send request
         curl_url="$jss_url/JSSResource/${api_object_type}/id/${existing_id}"
         curl_args=("--request")
@@ -767,17 +807,25 @@ copy_api_object_by_name() {
         curl_args+=(@"${parsed_file}")
         send_curl_request
     else
-        echo "   [copy_api_object_by_name] No existing ${api_xml_object} named '${source_name}' found; creating..."
+        if [[ $remove_scope_only == "yes" ]]; then
+            echo "   [copy_api_object_by_name] '${chosen_api_obj_name}' not present; cannot remove scope..."
+        elif [[ $disable_only == "yes" ]]; then
+            echo "   [copy_api_object_by_name] '${chosen_api_obj_name}' not present; cannot disable..."
+        elif [[ $enable_only == "yes" ]]; then
+            echo "   [copy_api_object_by_name] '${chosen_api_obj_name}' not present; cannot enable..."
+        else
+            echo "   [copy_api_object_by_name] No existing ${api_xml_object} named '${source_name}' found; creating..."
 
-        # send request
-        curl_url="$jss_url/JSSResource/${api_object_type}/id/0"
-        curl_args=("--request")
-        curl_args+=("POST")
-        curl_args+=("--header")
-        curl_args+=("Content-Type: application/xml")
-        curl_args+=("--data-binary")
-        curl_args+=(@"${parsed_file}")
-        send_curl_request
+            # send request
+            curl_url="$jss_url/JSSResource/${api_object_type}/id/0"
+            curl_args=("--request")
+            curl_args+=("POST")
+            curl_args+=("--header")
+            curl_args+=("Content-Type: application/xml")
+            curl_args+=("--data-binary")
+            curl_args+=(@"${parsed_file}")
+            send_curl_request
+        fi
     fi
     echo
 }
@@ -1318,6 +1366,22 @@ copy_policy() {
 
             echo "   [copy_policy] '$chosen_api_obj_name' already exists (ID=$existing_id); updating..."
 
+            # remove scope using template file if remove_scope_only is specified
+            if [[ $remove_scope_only == "yes" ]]; then
+                remove_scope "$api_xml_object" "$chosen_api_obj_name"
+            fi
+
+            # disable policy if disable_only is specified
+            if [[ $disable_only == "yes" ]]; then
+                disable_api_object "$api_xml_object" "$chosen_api_obj_name"
+            fi
+
+            # enable policy if disable_only is specified
+            if [[ $enable_only == "yes" ]]; then
+                echo "TEMP!!!" # TEMP
+                enable_api_object "$api_xml_object" "$chosen_api_obj_name"
+            fi
+
             # send request
             curl_url="$jss_url/JSSResource/policies/id/$existing_id"
             curl_args=("--request")
@@ -1332,23 +1396,33 @@ copy_policy() {
             echo "   [copy_policy] '$source_name' already exists (ID=$existing_id) and is in the exclusion list; skipping..."
         fi
     else
-        # This policy not found on the destination with the name we want to use, so post a new one.
-        echo "   [copy_policy] '${chosen_api_obj_name}' not present; creating..."
+        # This policy not found on the destination with the name we want to use, so post a new one (but not if we specified remove scope or disable policy as these should only apply to existing policies).
+        if [[ $remove_scope_only == "yes" ]]; then
+            echo "   [copy_policy] '${chosen_api_obj_name}' not present; cannot remove scope..."
+        elif [[ $disable_only == "yes" ]]; then
+            echo "   [copy_policy] '${chosen_api_obj_name}' not present; cannot disable..."
+        elif [[ $enable_only == "yes" ]]; then
+            echo "   [copy_policy] '${chosen_api_obj_name}' not present; cannot enable..."
+        else
+            echo "   [copy_policy] '${chosen_api_obj_name}' not present; creating..."
 
-        # send request
-        curl_url="$jss_url/JSSResource/policies/id/0"
-        curl_args=("--request")
-        curl_args+=("POST")
-        curl_args+=("--header")
-        curl_args+=("Content-Type: application/xml")
-        curl_args+=("--data-binary")
-        curl_args+=(@"${parsed_policy_file}")
-        send_curl_request
+            # send request
+            curl_url="$jss_url/JSSResource/policies/id/0"
+            curl_args=("--request")
+            curl_args+=("POST")
+            curl_args+=("--header")
+            curl_args+=("Content-Type: application/xml")
+            curl_args+=("--data-binary")
+            curl_args+=(@"${parsed_policy_file}")
+            send_curl_request
+        fi
     fi
 
     # Now check the icon and upload if necessary
-    add_icon_to_copied_policy "$chosen_api_obj_name" "$jss_url" "${jss_credentials}"
-    echo
+    if [[ $remove_scope_only != "yes" && $disable_only != "yes" && $enable_only != "yes" ]]; then
+        add_icon_to_copied_policy "$chosen_api_obj_name" "$jss_url" "${jss_credentials}"
+        echo
+    fi
 }
 
 create_category() {
@@ -1380,17 +1454,14 @@ create_category() {
         # First we must write the script contents into the Script Template
         category_name_for_sed=$(convert_name_for_sed "$category_name")
 
-        category_template='<?xml version="1.0" encoding="UTF-8"?>
-<category>
-    <name>%CATEGORY_NAME%</name>
-    <priority>%PRIORITY%</priority>
-</category>'
+        # Example CategoryTemplate.xml in the templates folder
+        category_template="$this_script_dir/templates/CategoryTemplate.xml"
 
         while read -r line || [[ -n "$line" ]]; do
             echo "$line" \
             | sed -e 's|%CATEGORY_NAME%|'"${category_name_for_sed}"'|' \
             | sed -e 's|%PRIORITY%|9|'
-        done <<< "$category_template" > "${xml_folder}/CategoryTemplate-Parsed.xml"
+        done < "$category_template" > "${xml_folder}/CategoryTemplate-Parsed.xml"
 
         # send request
         curl_url="$jss_url/JSSResource/categories/id/0"
@@ -1513,6 +1584,9 @@ fetch_api_object() {
         curl_url="$jss_url/JSSResource/${api_object_type}/${api_xml_object}id/${chosen_api_obj_id}"
     else
         curl_url="$jss_url/JSSResource/${api_object_type}/id/${chosen_api_obj_id}"
+        if [[ ($disable_only == "yes" || $enable_only == "yes") && $api_xml_object != "computer_extension_attribute" && $api_xml_object != "mobile_device_extension_attribute" ]]; then
+            curl_url+="/subset/general"
+        fi
     fi
     curl_args=("--header")
     curl_args+=("Accept: application/xml")
@@ -1541,6 +1615,9 @@ fetch_api_object_by_name() {
 
     # send request
     curl_url="$jss_url/JSSResource/$api_object_type/name/${chosen_api_obj_name_url_encoded}"
+    if [[ ($disable_only == "yes" || $enable_only == "yes") && $api_xml_object != "computer_extension_attribute" && $api_xml_object != "mobile_device_extension_attribute" ]]; then
+        curl_url+="/subset/general"
+    fi
     curl_args=("--header")
     curl_args+=("Accept: application/xml")
     send_curl_request
@@ -1667,6 +1744,48 @@ strip_scope_from_api_object() {
     # Strip out id, computer objects etc which are instance-specific
     echo "   [strip_scope_from_api_object] Stripping scope from ${api_xml_object} '${chosen_api_obj_name}'"
     sed '/<scope>/,/<\/scope>/d' < "${temp_parsed_file}" > "${parsed_file}"
+}
+
+disable_api_object() {
+    # temporary copy of parsed file
+    local api_xml_object="$1"
+    local chosen_api_obj_name="$2"
+    temp_parsed_file="${parsed_file/-parsed/-temp}"
+    cp "$parsed_file" "$temp_parsed_file"
+
+    # disable
+    echo "   [disable_api_object] Disabling ${api_xml_object} '${chosen_api_obj_name}'"
+    sed 's|<enabled>true</enabled>|<enabled>false</enabled>|' < "${temp_parsed_file}" > "${parsed_file}"
+}
+
+enable_api_object() {
+    # temporary copy of parsed file
+    local api_xml_object="$1"
+    local chosen_api_obj_name="$2"
+    temp_parsed_file="${parsed_file/-parsed/-temp}"
+    cp "$parsed_file" "$temp_parsed_file"
+
+    # enable
+    echo "   [enable_api_object] Enabling ${api_xml_object} '${chosen_api_obj_name}'"
+    sed 's|<enabled>false</enabled>|<enabled>true</enabled>|' < "${temp_parsed_file}" > "${parsed_file}"
+}
+
+remove_scope() {
+    local api_xml_object="$1"
+    local chosen_api_obj_name="$2"
+
+    echo "   [copy_policy] Remove-scope-only option chosen. Removing scope of '$chosen_api_obj_name'"
+    # Example EmptyScopeTemplate.xml in the templates folder
+    empty_scope_template="$this_script_dir/templates/EmptyScopeTemplate.xml"
+    # check for a private version
+    if [[ -f "$this_script_dir/templates/Private-EmptyScopeTemplate.xml" ]]; then
+        empty_scope_template="$this_script_dir/templates/Private-EmptyScopeTemplate.xml"
+    fi
+
+    while read -r line || [[ -n "$line" ]]; do
+        # shellcheck disable=SC2001
+        sed 's|%API_OBJECT_TYPE%|'"$api_xml_object"'|' <<< "$line"
+    done < "$empty_scope_template" > "${parsed_policy_file}"
 }
 
 set_payload_organisation() {
@@ -2181,6 +2300,9 @@ main() {
         echo "   Cn - [C]opy object including all dependencies - will overwrite each dependency without interaction ([N]o confirmations!)"
         echo "   Ci - [C]opy policy and force-overwrite the [i]con - will ask to overwrite each dependency"
         echo "   Cf - [C]opy object including all dependencies - will [f]orce-overwrite each dependency including protected/excluded items without interaction"
+        echo "   R  - [R]emove scope only"
+        echo "   X  - Disable object only (policy, extension attribute, mac app, iOS app)"
+        echo "   E  - [E]nable object only (policy, extension attribute, mac app, iOS app)"
         echo "   D  - [D]elete object only (for packages will mount the repo and ask to delete the file)"
         read -r -p "Enter a letter from the above options: " action_question
 
@@ -2202,7 +2324,7 @@ main() {
                     api_obj_action="copy"
                 fi
             ;;
-            CI|Ci|Ci)
+            CI|Ci|ci)
                 echo "   [main] Force icon mode selected - an existing icon with the same name will be replaced"
                 ask_for_dependencies="yes"
                 if [[ $api_xml_object == "policy" ]]; then
@@ -2227,6 +2349,21 @@ main() {
                 skip_dependencies="yes"
                 api_obj_action="copy"
             ;;
+            R|r)
+                api_obj_action="copy"
+                remove_scope_only="yes"
+                skip_dependencies="yes"
+            ;;
+            X|x)
+                api_obj_action="copy"
+                disable_only="yes"
+                skip_dependencies="yes"
+            ;;
+            E|e)
+                api_obj_action="copy"
+                enable_only="yes"
+                skip_dependencies="yes"
+            ;;
             D|d)
                 api_obj_action="delete"
             ;;
@@ -2245,13 +2382,31 @@ main() {
     echo
     echo "   [main] Action selected: ${api_obj_action}"
 
+    # removing scope only applies to certain objects # TODO - add all options
+    if [[ $remove_scope_only == "yes" ]]; then
+        if [[ $api_xml_object != "policy" && $api_xml_object != "mac_application" && $api_xml_object != "os_x_configuration_profile" && $api_xml_object != "configuration_profile" && $api_xml_object != "restricted_software" ]]; then
+            echo
+            echo "   [main] $api_xml_object cannot be chosen for the remove scope option."
+            cleanup_and_exit
+        fi
+    fi
+
+    # disable object only applies to certain objects # TODO - add all options
+    if [[ $disable_only == "yes" || $enable_only == "yes" ]]; then
+        if [[ $api_xml_object != "policy" && $api_xml_object != "mac_application" && $api_xml_object != "computer_extension_attribute" ]]; then
+            echo
+            echo "   [main] $api_xml_object cannot be chosen for the disable/enable object options."
+            cleanup_and_exit
+        fi
+    fi
+
     # if user wishes to specify a UUID to inject into a configuration profile, ask for it here
     if [[ $ask_for_uuid == 1 && $api_obj_action == "copy" ]]; then
         echo
         read -r -p "Specify UUID to write to destination [or leave blank to skip] : " entered_uuid
     fi
 
-    # if user wishes to specify a UUID to inject into a configuration profile, ask for it here
+    # if user wishes to specify an organisation to inject into a configuration profile, ask for it here
     if [[ $fix_org == 1 && $api_obj_action == "copy" ]]; then
         echo
         read -r -p "Specify value of PayloadOrganization to write to destination [or leave blank to skip] : " new_org
@@ -2329,6 +2484,10 @@ main() {
                     dest_instances_array+=("$instance")
                 fi
             done
+            # if disabling, enabling, or remving scope, we go through all instances
+            if [[ $remove_scope_only == "yes" || $disable_only == "yes" || $enable_only == "yes" ]]; then
+                dest_instances_array+=("$source_instance")
+            fi
             # if deleting, we go through all instances
             if [[ $api_obj_action == "delete" ]]; then
                 dest_instances_array+=("$source_instance")
