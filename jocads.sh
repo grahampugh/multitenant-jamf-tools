@@ -1378,7 +1378,6 @@ copy_policy() {
 
             # enable policy if disable_only is specified
             if [[ $enable_only == "yes" ]]; then
-                echo "TEMP!!!" # TEMP
                 enable_api_object "$api_xml_object" "$chosen_api_obj_name"
             fi
 
@@ -1522,7 +1521,7 @@ delete_pkg() {
     local pkg_name="$1"
 
     # Check that a DP actually exists
-    jss_instance="${source_instance}"
+    jss_instance="${dest_instance}"
     get_instance_distribution_point
 
     if [[ $smb_url ]]; then
