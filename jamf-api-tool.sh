@@ -161,37 +161,48 @@ default_instance_list="prd"
 # select the instances that will be changed
 choose_destination_instances
 
-# confirm
+confirm() {
+    if [[ ${args[*]} ]]; then
+        # confirm
 
-if [[ $confirmed == "yes" ]]; then
-    echo "   [main] Action confirmed from command line"
-else
-    echo
-    echo "Please confirm that you would like to perform the following command:"
-    echo "jamf-api-tool.py ${args[*]}"
-    read -r -p "(Y/N) : " are_you_sure
-    case "$are_you_sure" in
-        Y|y)
-            echo "   [main] Confirmed"
-        ;;
-        *)
-            echo "   [main] Cancelled"
-            exit
-        ;;
-    esac
-fi
+        if [[ $confirmed == "yes" ]]; then
+            echo "   [main] Action confirmed from command line"
+        else
+            echo
+            echo "Please confirm that you would like to perform the following command"
+            echo "on instance $jss_instance:"
+            echo "jamf-api-tool.py ${args[*]}"
+            read -r -p "(Y/N) : " are_you_sure
+            case "$are_you_sure" in
+                Y|y)
+                    echo "   [main] Confirmed"
+                ;;
+                *)
+                    echo "   [main] Cancelled"
+                    exit
+                ;;
+            esac
+        fi
+    else
+        echo "   [main] No actions provided"
+        usage
+        exit 1
+    fi
+}
 
 # get specific instance if entered
 if [[ $chosen_instance ]]; then
     jss_instance="$chosen_instance"
+    confirm
     set_credentials "$jss_instance"
-    echo "Running jamf-api-tool on $jss_instance..."
+    echo "Running jamf-api-tool.py ${args[*]} on $jss_instance..."
     run_api_tool
 else
     for instance in "${instance_choice_array[@]}"; do
         jss_instance="$instance"
+        confirm
         set_credentials "$jss_instance"
-        echo "Running jamf-api-tool on $jss_instance..."
+        echo "Running jamf-api-tool.py ${args[*]} on $jss_instance..."
         run_api_tool
     done
 fi
