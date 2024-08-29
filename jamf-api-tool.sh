@@ -51,6 +51,10 @@ run_api_tool(){
     instance_args+=("--pass")
     instance_args+=("$jss_api_password")
 
+    # set the CSV output location
+    instance_args+=("--csv")
+    instance_args+=("$output_dir/${jss_instance//https:\/\//}.csv")
+
     # determine the share
     if [[ "${args[*]}" == *"--packages"* ]]; then
         get_instance_distribution_point
@@ -86,6 +90,35 @@ run_api_tool(){
     /Library/AutoPkg/Python3/Python.framework/Versions/Current/bin/python3 "$tool_directory/$tool" "${args[@]}" "${instance_args[@]}" 
 }
 
+confirm() {
+    if [[ ${args[*]} ]]; then
+        # confirm
+
+        if [[ $confirmed == "yes" ]]; then
+            echo "   [main] Action confirmed from command line"
+        else
+            echo
+            echo "Please confirm that you would like to perform the following command"
+            echo "on instance $jss_instance:"
+            echo "jamf-api-tool.py ${args[*]}"
+            read -r -p "(Y/N) : " are_you_sure
+            case "$are_you_sure" in
+                Y|y)
+                    echo "   [main] Confirmed"
+                ;;
+                *)
+                    echo "   [main] Cancelled"
+                    exit
+                ;;
+            esac
+        fi
+    else
+        echo "   [main] No actions provided"
+        usage
+        exit 1
+    fi
+}
+
 
 ##############
 ## DEFAULTS ##
@@ -97,6 +130,8 @@ tool_directory="../jamf-api-tool"
 tool="jamf_api_tool.py"
 tmp_prefs="${HOME}/Library/Preferences/jamf-api-tool.plist"
 autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
+output_dir="/Users/Shared/Jamf/Jamf-API-Tool"
+
 
 ###############
 ## ARGUMENTS ##
@@ -151,6 +186,9 @@ while test $# -gt 0 ; do
 done
 echo
 
+# make output directory
+/bin/mkdir -p "$output_dir"
+
 # ------------------------------------------------------------------------------------
 # 1. Ask for the instance list, show list, ask to apply to one, multiple or all
 # ------------------------------------------------------------------------------------
@@ -160,35 +198,6 @@ default_instance_list="prd"
 
 # select the instances that will be changed
 choose_destination_instances
-
-confirm() {
-    if [[ ${args[*]} ]]; then
-        # confirm
-
-        if [[ $confirmed == "yes" ]]; then
-            echo "   [main] Action confirmed from command line"
-        else
-            echo
-            echo "Please confirm that you would like to perform the following command"
-            echo "on instance $jss_instance:"
-            echo "jamf-api-tool.py ${args[*]}"
-            read -r -p "(Y/N) : " are_you_sure
-            case "$are_you_sure" in
-                Y|y)
-                    echo "   [main] Confirmed"
-                ;;
-                *)
-                    echo "   [main] Cancelled"
-                    exit
-                ;;
-            esac
-        fi
-    else
-        echo "   [main] No actions provided"
-        usage
-        exit 1
-    fi
-}
 
 # get specific instance if entered
 if [[ $chosen_instance ]]; then
@@ -210,7 +219,3 @@ fi
 echo 
 echo "Finished"
 echo
-
-
-echo 
-
