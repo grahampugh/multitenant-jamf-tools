@@ -1560,7 +1560,7 @@ delete_pkg() {
 
 encode_name() {
     # encode space, '&amp;', percent
-    name_url_encoded="$( echo "$1" | sed -e 's|\%|%25|g' | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
+    name_url_encoded="$( echo "$1" | sed -e 's|\%|%25|g' | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' | sed -e 's|\#|%23|g' )"
     echo "$name_url_encoded"
 }
 
@@ -1605,7 +1605,7 @@ fetch_api_object_by_name() {
 
     # Get the full XML of the selected API object
     echo "   [fetch_api_object_by_name] Fetching $api_xml_object name ${chosen_api_obj_name} from $jss_url"
-    # echo "   [fetch_api_object_by_name] (encoded): ${chosen_api_obj_name_url_encoded}" # TEST
+    echo "   [fetch_api_object_by_name] (encoded): ${chosen_api_obj_name_url_encoded}" # TEST
 
     # Set the source server
     set_credentials "${source_instance}"
@@ -1694,19 +1694,9 @@ parse_api_obj_for_copying() {
     fetched_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_id}-fetched.xml"
     parsed_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_id}-parsed.xml"
 
-    # Strip out id
+    # Strip out unwanted keys
     echo "   [parse_api_obj_for_copying] Parsing ${api_xml_object} ${chosen_api_obj_id}"
-
-    # Strip out id, computer objects etc which are instance-specific
-    grep -v '<id>' < "${fetched_file}" \
-    | sed '/<computers>/,/<\/computers>/d' \
-    | sed '/<limit_to_users>/,/<\/limit_to_users>/d' \
-    | sed '/<users>/,/<\/users>/d' \
-    | sed '/<user_groups>/,/<\/user_groups>/d' \
-    | sed '/<self_service_icon>/,/<\/self_service_icon>/d' \
-    | sed 's/<redeploy_on_update>Newly Assigned<\/redeploy_on_update>/<redeploy_on_update>All<\/redeploy_on_update>/g' \
-    > "${parsed_file}"
-
+    do_parsing "${fetched_file}" "${parsed_file}"
     echo "   [parse_api_obj_for_copying] Created ${parsed_file}"
 }
 
@@ -1719,18 +1709,26 @@ parse_api_object_by_name_for_copying() {
     fetched_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_name}-fetched.xml"
     parsed_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_name}-parsed.xml"
 
+    # Strip out unwanted keys
+    echo "   [parse_api_object_by_name_for_copying] Parsing ${api_xml_object} ${chosen_api_obj_name}"
+    do_parsing "${fetched_file}" "${parsed_file}"
+    echo "   [parse_api_object_by_name_for_copying] Created ${parsed_file}"
+}
+
+do_parsing() {
+    local fetched_file="$1"
+    local parsed_file="$2"
+
     # Strip out id, computer objects etc which are instance-specific
-    echo "   [parse_api_object_by_name_for_copying] Parsing ${api_xml_object} '${chosen_api_obj_name}'"
     grep -v '<id>' < "${fetched_file}" \
-    | sed '/<self_service_icon>/,/<\/self_service_icon>/d' \
     | sed '/<computers>/,/<\/computers>/d' \
+    | sed '/<mobile_devices>/,/<\/mobile_devices>/d' \
     | sed '/<limit_to_users>/,/<\/limit_to_users>/d' \
     | sed '/<users>/,/<\/users>/d' \
     | sed '/<user_groups>/,/<\/user_groups>/d' \
+    | sed '/<self_service_icon>/,/<\/self_service_icon>/d' \
     | sed 's/<redeploy_on_update>Newly Assigned<\/redeploy_on_update>/<redeploy_on_update>All<\/redeploy_on_update>/g' \
     > "${parsed_file}"
-
-    echo "   [parse_api_object_by_name_for_copying] Created ${parsed_file}"
 }
 
 strip_scope_from_api_object() {
