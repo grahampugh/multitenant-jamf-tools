@@ -28,7 +28,8 @@ jamfuploader-run.sh usage:
 -ai | --all-instances         - perform action on ALL instances in the instance list
 --dp                          - filter DPs on DP name
 --prefs <path>                - Inherit AutoPkg prefs file provided by the full path to the file
--v[vvv]                       - Set value of verbosity
+-v[vvv]                       - Set value of verbosity (default is -v)
+-q                            - Quiet mode (verbosity 0)
 --[args]                      - Pass through any arguments for jamf-upload.sh
 
 "
@@ -135,27 +136,30 @@ while test $# -gt 0 ; do
         -il|--instance-list)
             shift
             instance_list_file="$1"
-        ;;
+            ;;
         -i|--instance)
             shift
             chosen_instance="$1"
-        ;;
+            ;;
         -s|--share)
             shift
             smb_url="$1"
-        ;;
+            ;;
         -d|--dp)
             shift
             dp_url_filter="$1"
-        ;;
+            ;;
         -ai|--all-instances)
             all_instances=1
-        ;;
+            ;;
         -j)
             jamf_upload_path="../jamf-upload/jamf-upload.sh"
-        ;;
+            ;;
+        -q)
+            quiet_mode="yes"
+            ;;
         -v*)
-            args+=("$1")
+            verbosity_mode="$1"
             ;;
         -h|--help)
             echo "Outputting the help sheet for jamf-upload.sh"
@@ -176,6 +180,13 @@ while test $# -gt 0 ; do
     shift
 done
 echo
+
+if [[ ! $verbosity_mode && ! $quiet_mode ]]; then
+    # default verbosity
+    args+=("-v")
+elif [[ ! $quiet_mode ]]; then
+    args+=("$verbosity_mode")
+fi
 
 # ------------------------------------------------------------------------------------
 # 1. Ask for the instance list, show list, ask to apply to one, multiple or all
