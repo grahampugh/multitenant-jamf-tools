@@ -1560,7 +1560,7 @@ delete_pkg() {
 
 encode_name() {
     # encode space, '&amp;', percent
-    name_url_encoded="$( echo "$1" | sed -e 's|\%|%25|g' | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' | sed -e 's|\#|%23|g' )"
+    name_url_encoded="$( echo "$1" | sed -e 's|\%|%25|g' | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' | sed -e 's|\#|%23|g' | sed -e 's|\+|%2B|g' )"
     echo "$name_url_encoded"
 }
 
