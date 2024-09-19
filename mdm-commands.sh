@@ -156,7 +156,7 @@ generate_computer_list() {
 }
 
 redeploy_mdm() {
-    # This function will redeploy the MDM profile to the selected devices
+    # This function will redeploy the Management Framework to the selected devices
 
     # now loop through the list and perform the action
     for computer in "${computer_choice[@]}"; do
@@ -166,7 +166,7 @@ redeploy_mdm() {
         echo "   [redeploy_mdm] Processing Computer: id: $computer_id  name: $computer_name"
         echo
 
-        # redeploy MDM profile
+        # redeploy Management Framework
         set_credentials "$jss_instance"
         jss_url="$jss_instance"
         endpoint="api/v1/jamf-management-framework/redeploy"
@@ -315,7 +315,7 @@ usage() {
 MDM command type:
 
 --erase                         - Erase the device
---redeploy                      - Redeploy the MDM profile
+--redeploy                      - Redeploy the Management Framework
 --recovery                      - Set the recovery lock password
                                   Recovery lock password will be random unless set
                                   with --recovery-lock-password.
@@ -387,7 +387,7 @@ while test $# -gt 0 ; do
         --erase|--eacas)
             mdm_command="eacas"
             ;;
-        --redeploy|--redeploy-mdm)
+        --redeploy|--redeploy-framework)
             mdm_command="redeploy"
             ;;
         --recovery|--recovery-lock)
@@ -430,7 +430,7 @@ fi
 
 if [[ ! $mdm_command ]]; then
     echo
-    printf 'Select from [E] Erase, [M] Redeploy MDM profile, [R] Set Recovery Lock : '
+    printf 'Select from [E] Erase, [M] Redeploy Management Framework, [R] Set Recovery Lock : '
     read -r action_question
 
     case "$action_question" in
@@ -471,7 +471,7 @@ case "$mdm_command" in
         eacas
         ;;
     redeploy)
-        echo "   [main] Redeploying MDM profile"
+        echo "   [main] Redeploying Management Framework"
         redeploy_mdm
         ;;
     recovery)
@@ -481,4 +481,3 @@ case "$mdm_command" in
 esac
 
 exit 0
-
