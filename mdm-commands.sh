@@ -300,6 +300,29 @@ set_recovery_lock() {
     done
 }
 
+removemdm() {
+    # This function will remove the MDM profile from the selected devices
+
+    # now loop through the list and perform the action
+    for computer in "${computer_choice[@]}"; do
+        computer_id="${computer_ids[$computer]}"
+        computer_name="${computer_names[$computer]}"
+        echo
+        echo "   [unmanage] Processing Computer: id: $computer_id  name: $computer_name"
+        echo
+
+        # Unmanage device
+        set_credentials "$jss_instance"
+        jss_url="$jss_instance"
+        endpoint="JSSResource/computercommands/command/UnmanageDevice/id"
+        curl_url="$jss_url/$endpoint/$computer_id"
+        curl_args=("--request")
+        curl_args+=("POST")
+        send_curl_request
+    done
+
+}
+
 usage() {
     echo "
 ./mdm-commands.sh options
@@ -319,6 +342,7 @@ MDM command type:
 --recovery                      - Set the recovery lock password
                                   Recovery lock password will be random unless set
                                   with --recovery-lock-password.
+--removemdm                     - Remove the MDM Enrollment Profile (Unmanage)
 
 Options for the --recovery type:
 
@@ -393,6 +417,9 @@ while test $# -gt 0 ; do
         --recovery|--recovery-lock)
             mdm_command="recovery"
             ;;
+        --removemdm|--remove-mdm-profile)
+            mdm_command="removemdm"
+            ;;
         --recovery-lock-password)
             shift
             cli_recovery_lock_password="$1"
@@ -430,7 +457,7 @@ fi
 
 if [[ ! $mdm_command ]]; then
     echo
-    printf 'Select from [E] Erase, [M] Redeploy Management Framework, [R] Set Recovery Lock : '
+    printf 'Select from [E] Erase, [M] Redeploy Management Framework, [R] Set Recovery Lock, [P] Remove MDM Enrollment Profile : '
     read -r action_question
 
     case "$action_question" in
@@ -442,6 +469,9 @@ if [[ ! $mdm_command ]]; then
             ;;
         M|m)
             mdm_command="redeploy"
+            ;;
+        P|p)
+            mdm_command="removemdm"
             ;;
         *)
             echo
@@ -477,6 +507,10 @@ case "$mdm_command" in
     recovery)
         echo "   [main] Setting recovery lock"
         set_recovery_lock
+        ;;
+    removemdm)
+        echo "   [main] Removing MDM Enrollment Profile"
+        removemdm
         ;;
 esac
 
