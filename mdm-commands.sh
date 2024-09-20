@@ -155,7 +155,7 @@ generate_computer_list() {
     done
 }
 
-redeploy_mdm() {
+redeploy_framework() {
     # This function will redeploy the Management Framework to the selected devices
 
     # now loop through the list and perform the action
@@ -163,7 +163,7 @@ redeploy_mdm() {
         computer_id="${computer_ids[$computer]}"
         computer_name="${computer_names[$computer]}"
         echo
-        echo "   [redeploy_mdm] Processing Computer: id: $computer_id  name: $computer_name"
+        echo "   [redeploy_framework] Processing Computer: id: $computer_id  name: $computer_name"
         echo
 
         # redeploy Management Framework
@@ -181,9 +181,6 @@ redeploy_mdm() {
 
 eacas() {
     # This function will erase the selected devices
-
-    # passcode
-    passcode="000000"
 
     # now loop through the list and perform the action
     for computer in "${computer_choice[@]}"; do
@@ -300,7 +297,7 @@ set_recovery_lock() {
     done
 }
 
-removemdm() {
+remove_mdm() {
     # This function will remove the MDM profile from the selected devices
 
     # now loop through the list and perform the action
@@ -308,7 +305,7 @@ removemdm() {
         computer_id="${computer_ids[$computer]}"
         computer_name="${computer_names[$computer]}"
         echo
-        echo "   [unmanage] Processing Computer: id: $computer_id  name: $computer_name"
+        echo "   [remove_mdm] Processing Computer: id: $computer_id  name: $computer_name"
         echo
 
         # Unmanage device
@@ -418,7 +415,7 @@ while test $# -gt 0 ; do
             mdm_command="recovery"
             ;;
         --removemdm|--remove-mdm-profile)
-            mdm_command="removemdm"
+            mdm_command="remove_mdm"
             ;;
         --recovery-lock-password)
             shift
@@ -502,7 +499,7 @@ case "$mdm_command" in
         ;;
     redeploy)
         echo "   [main] Redeploying Management Framework"
-        redeploy_mdm
+        redeploy_framework
         ;;
     recovery)
         echo "   [main] Setting recovery lock"
@@ -510,8 +507,6 @@ case "$mdm_command" in
         ;;
     removemdm)
         echo "   [main] Removing MDM Enrollment Profile"
-        removemdm
+        remove_mdm
         ;;
 esac
-
-exit 0
