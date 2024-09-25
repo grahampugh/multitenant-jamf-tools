@@ -78,7 +78,7 @@ fetch_api_object_by_name() {
         extract_payload
 
         if [[ "$payload_unescaped" ]]; then
-            plutil -convert xml1 - -o "${xml_folder}/Payloads/${url_in_filename}-${api_xml_object}.plist" 2>/dev/null <<< "$payload_unescaped"
+            plutil -convert xml1 - -o "${xml_folder}/Payloads/${url_in_filename}-${api_xml_object}-${chosen_api_obj_name}.plist" 2>/dev/null <<< "$payload_unescaped"
         fi
     fi
 }
