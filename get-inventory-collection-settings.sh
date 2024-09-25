@@ -116,8 +116,13 @@ echo "Context,Software Update" >> "$output_csv"
     echo "--------------------------------------------------------------------------"
 ) >> "$output_file"
 
+# start the count
+includeSoftwareUpdates_count=0
+
 # get specific instance if entered
+instance_count=0
 for instance in "${instance_choice_array[@]}"; do
+    ((instance_count++))
     jss_instance="$instance"
     echo "Getting Inventory Collection settings on $jss_instance..."
     get_inventory_collection
@@ -125,6 +130,10 @@ for instance in "${instance_choice_array[@]}"; do
     includeSoftwareUpdates=$(plutil -extract "computerInventoryCollectionPreferences.includeSoftwareUpdates" raw "$curl_output_file")
     if [[ $includeSoftwareUpdates != "true" && $includeSoftwareUpdates != "false" ]]; then
         includeSoftwareUpdates="-"
+    fi
+
+    if [[ $includeSoftwareUpdates == "true" ]]; then
+        (( includeSoftwareUpdates_count++ ))
     fi
 
     # format for csv
@@ -138,6 +147,8 @@ done
 
 # end for text file
 (
+    echo "--------------------------------------------------------------------------"
+    printf "Total: Contexts: %-28s %+28s\n" "$instance_count" "$includeSoftwareUpdates_count"
     echo "--------------------------------------------------------------------------"
     echo
 ) >> "$output_file"

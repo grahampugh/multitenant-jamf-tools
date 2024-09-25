@@ -1,0 +1,109 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<account>
+    <name>portaluser</name>
+    <directory_user>false</directory_user>
+    <full_name>eu.insights.jamf.com - API account</full_name>
+    <email></email>
+    <email_address></email_address>
+    <enabled>Enabled</enabled>
+    <force_password_change>false</force_password_change>
+    <access_level>Full Access</access_level>
+    <privilege_set>Custom</privilege_set>
+    <privileges>
+        <jss_objects>
+            <privilege>Create Managed Software Updates</privilege>
+            <privilege>Read Mobile Device Extension Attributes</privilege>
+            <privilege>Read Static User Groups</privilege>
+            <privilege>Update Static User Groups</privilege>
+            <privilege>Read iOS Configuration Profiles</privilege>
+            <privilege>Create Computers</privilege>
+            <privilege>Read Computers</privilege>
+            <privilege>Update Computers</privilege>
+            <privilege>Delete Computers</privilege>
+            <privilege>Read Static Mobile Device Groups</privilege>
+            <privilege>Update Static Mobile Device Groups</privilege>
+            <privilege>Create Advanced Mobile Device Searches</privilege>
+            <privilege>Read Advanced Mobile Device Searches</privilege>
+            <privilege>Update Advanced Mobile Device Searches</privilege>
+            <privilege>Delete Advanced Mobile Device Searches</privilege>
+            <privilege>Read Smart User Groups</privilege>
+            <privilege>Read Computer PreStage Enrollments</privilege>
+            <privilege>Update Computer PreStage Enrollments</privilege>
+            <privilege>Read Mac Applications</privilege>
+            <privilege>Read Static Computer Groups</privilege>
+            <privilege>Update Static Computer Groups</privilege>
+            <privilege>Read Device Enrollment Program Instances</privilege>
+            <privilege>Read Computer Extension Attributes</privilege>
+            <privilege>Read Smart Mobile Device Groups</privilege>
+            <privilege>Read Mobile Device PreStage Enrollments</privilege>
+            <privilege>Update Mobile Device PreStage Enrollments</privilege>
+            <privilege>Create Mobile Devices</privilege>
+            <privilege>Read Mobile Devices</privilege>
+            <privilege>Update Mobile Devices</privilege>
+            <privilege>Delete Mobile Devices</privilege>
+            <privilege>Read Mobile Device Applications</privilege>
+            <privilege>Read User Extension Attributes</privilege>
+            <privilege>Create Advanced Computer Searches</privilege>
+            <privilege>Read Advanced Computer Searches</privilege>
+            <privilege>Update Advanced Computer Searches</privilege>
+            <privilege>Delete Advanced Computer Searches</privilege>
+            <privilege>Read Smart Computer Groups</privilege>
+            <privilege>Read Policies</privilege>
+            <privilege>Read User</privilege>
+            <privilege>Update User</privilege>
+        </jss_objects>
+        <jss_settings/>
+        <jss_actions>
+            <privilege>Assign Users to Mobile Devices</privilege>
+            <privilege>Assign Users to Computers</privilege>
+            <privilege>Send Computer Remote Lock Command</privilege>
+            <privilege>Send Computer Remote Wipe Command</privilege>
+            <privilege>Send Computer Unmanage Command</privilege>
+            <privilege>Send Computer Unlock User Account Command</privilege>
+            <privilege>Send Computer Delete User Account Command</privilege>
+            <privilege>Send Computer Set Activation Lock Command</privilege>
+            <privilege>View Disk Encryption Recovery Key</privilege>
+            <privilege>Flush Policy Logs</privilege>
+            <privilege>Send Computer Remote Command to Download and Install OS X Update</privilege>
+            <privilege>Send Computer Bluetooth Command</privilege>
+            <privilege>Send Computer Remote Desktop Command</privilege>
+            <privilege>Send Computer Remote Command to Install Package</privilege>
+            <privilege>Send Set Recovery Lock Command</privilege>
+            <privilege>Send Inventory Requests to Mobile Devices</privilege>
+            <privilege>Send Mobile Device Remote Lock Command</privilege>
+            <privilege>Send Mobile Device Remove Passcode Command</privilege>
+            <privilege>Send Mobile Device Remove Restrictions Password Command</privilege>
+            <privilege>Send Mobile Device Remote Wipe Command</privilege>
+            <privilege>Send Mobile Device Set Activation Lock Command</privilege>
+            <privilege>Unmanage Mobile Devices</privilege>
+            <privilege>Send Mobile Device Managed Settings Command</privilege>
+            <privilege>Send Mobile Device Mirroring Command</privilege>
+            <privilege>Send Mobile Device Set Wallpaper Command</privilege>
+            <privilege>Send Blank Pushes to Mobile Devices</privilege>
+            <privilege>Send Mobile Device Enable Voice Roaming Command</privilege>
+            <privilege>Send Mobile Device Disable Voice Roaming Command</privilege>
+            <privilege>Send Mobile Device Enable Data Roaming Command</privilege>
+            <privilege>Send Mobile Device Disable Data Roaming Command</privilege>
+            <privilege>Send Mobile Device Set Device Name Command</privilege>
+            <privilege>Send Mobile Device Remote Command to Download and Install iOS Update</privilege>
+            <privilege>Send Mobile Device Lost Mode Command</privilege>
+            <privilege>View Mobile Device Lost Mode Location</privilege>
+            <privilege>Send Mobile Device Shared iPad Commands</privilege>
+            <privilege>Send Mobile Device Diagnostics and Usage Reporting and App Analytics Commands</privilege>
+            <privilege>Send Software Update Settings Command</privilege>
+            <privilege>Send Mobile Device Restart Device Command</privilege>
+            <privilege>Send Update Passcode Lock Grace Period Command</privilege>
+            <privilege>Send Mobile Device Shut Down Command</privilege>
+            <privilege>Send Mobile Device Bluetooth Command</privilege>
+            <privilege>Send Mobile Device Personal Hotspot Command</privilege>
+            <privilege>Send Mobile Device Refresh Cellular Plans Command</privilege>
+            <privilege>Send Command to Renew MDM Profile</privilege>
+            <privilege>Flush MDM Commands</privilege>
+            <privilege>Send Mobile Device Shared Device Configuration Commands</privilege>
+            <privilege>View MDM command information in Jamf Pro API</privilege>
+            <privilege>Send Set Timezone Command</privilege>
+            <privilege>Send Enable Bootstrap Token Command</privilege>
+            <privilege>Send Mobile Device Software Update Recommendation Cadence Command</privilege>
+        </jss_actions>
+    </privileges>
+</account>
