@@ -199,6 +199,15 @@ default_instance_list="prd"
 # select the instances that will be changed
 choose_destination_instances
 
+# get Slack webhook
+if get_slack_webhook "$instance_list_file"; then
+    if [[ $slack_webhook_url ]]; then
+        args+=("--slack")
+        args+=("--slack_webhook")
+        args+=("$slack_webhook_url")
+    fi
+fi
+
 # get specific instance if entered
 if [[ $chosen_instance ]]; then
     jss_instance="$chosen_instance"
