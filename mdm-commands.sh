@@ -38,7 +38,7 @@ get_computers_in_group() {
 
     if [[ $http_response -eq 404 ]]; then
         echo "   [get_computers_in_group] Smart group '$group_name' does not exist on this server"
-        computers=0
+        computers_count=0
     else
         # now get all the computer IDs
         computers_count=$(/usr/bin/plutil -extract computer_group.computers raw "$curl_output_file" 2>/dev/null)
@@ -57,6 +57,43 @@ get_computers_in_group() {
             done
         else
             echo "   [get_computers_in_group] Group '$group_name' contains no computers, so showing all computers"
+        fi
+
+    fi
+}
+
+
+get_mobile_devices_in_group() {
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+
+    # send request to get each version
+    curl_url="$jss_url/JSSResource/mobiledevicegroups/name/${group_name_encoded}"
+    curl_args=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+
+    if [[ $http_response -eq 404 ]]; then
+        echo "   [get_mobile_devices_in_group] Smart group '$group_name' does not exist on this server"
+        mobile_device_count=0
+    else
+        # now get all the device IDs
+        mobile_device_count=$(/usr/bin/plutil -extract mobile_device_group.mobile_devices raw "$curl_output_file" 2>/dev/null)
+        if [[ $mobile_device_count -gt 0 ]]; then
+            echo "   [get_mobile_devices_in_group] Restricting list to members of the group '$group_name'"
+            mobile_device_names_in_group=()
+            mobile_device_ids_in_group=()
+            i=0
+            while [[ $i -lt $mobile_device_count ]]; do
+                mobile_device_id_in_group=$(/usr/bin/plutil -extract mobile_device_group.mobile_devices.$i.id raw "$curl_output_file" 2>/dev/null)
+                mobile_device_name_in_group=$(/usr/bin/plutil -extract mobile_device_group.mobile_devices.$i.name raw "$curl_output_file" 2>/dev/null)
+                # echo "$computer_name_in_group ($mobile_device_id_in_group)"
+                mobile_device_names_in_group+=("$mobile_device_name_in_group")
+                mobile_device_ids_in_group+=("$mobile_device_id_in_group")
+                ((i++))
+            done
+        else
+            echo "   [get_mobile_devices_in_group] Group '$group_name' contains no mobile_devices, so showing all mobile_devices"
         fi
 
     fi
@@ -155,6 +192,98 @@ generate_computer_list() {
     done
 }
 
+generate_mobile_device_list() {
+    # The Jamf Pro API returns a list of all computers.
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    endpoint="api/v2/mobile-devices"
+    url_filter="?page=0&page-size=1000&sort=id"
+    curl_url="$jss_url/$endpoint/$url_filter"
+    curl_args=("--request")
+    curl_args+=("GET")
+    curl_args+=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+
+    # how big should the loop be?
+    loopsize=$(/usr/bin/plutil -extract results raw "$curl_output_file")
+
+    # now loop through
+    i=0
+    mobile_device_ids=()
+    mobile_device_names=()
+    management_ids=()
+    serials=()
+    mobile_device_choice=()
+    echo
+    while [[ $i -lt $loopsize ]]; do
+        id_in_list=$(/usr/bin/plutil -extract results.$i.id raw "$curl_output_file")
+        mobile_device_name_in_list=$(/usr/bin/plutil -extract results.$i.name raw "$curl_output_file")
+        management_id_in_list=$(/usr/bin/plutil -extract results.$i.managementId raw "$curl_output_file")
+        serial_in_list=$(/usr/bin/plutil -extract results.$i.serialNumber raw "$curl_output_file")
+
+        mobile_device_ids+=("$id_in_list")
+        mobile_device_names+=("$mobile_device_name_in_list")
+        management_ids+=("$management_id_in_list")
+        serials+=("$serial_in_list")
+        if [[ $id && $id_in_list -eq $id ]]; then
+            mobile_device_choice+=("$i")
+        elif [[ $serial ]]; then
+            # allow for CSV list of serials
+            if [[ $serial =~ "," ]]; then
+                count=$(grep -o "," <<< "$serial" | wc -l)
+                serial_count=$(( count + 1 ))
+                j=1
+                while [[ $j -le $serial_count ]]; do
+                    serial_in_csv=$( cut -d, -f$j <<< "$serial" )
+                    if [[ "$serial_in_list" == "$serial_in_csv" ]]; then
+                        mobile_device_choice+=("$i")
+                    fi
+                    ((j++))
+                done
+            else
+                if [[ "$serial_in_list" == "$serial" ]]; then
+                    mobile_device_choice+=("$i")
+                fi
+            fi
+        elif [[ ${#mobile_device_ids_in_group[@]} -gt 0 ]]; then
+            for idx in "${mobile_device_ids_in_group[@]}"; do
+                if [[ $idx == "$id_in_list" ]]; then
+                    mobile_device_choice+=("$i")
+                    break
+                fi
+            done
+        else
+            printf '%-5s %-9s %-16s %s\n' "($i)" "[id=$id_in_list]" "$serial_in_list" "$mobile_device_name_in_list"
+        fi
+        ((i++))
+    done
+
+    if [ ${#mobile_device_choice[@]} -eq 0 ]; then
+        echo
+        read -r -p "Enter the ID(s) of the mobile_device(s) above : " mobile_device_input
+        # mobile_devices chosen
+        for mobile_device in $mobile_device_input; do
+            mobile_device_choice+=("$mobile_device")
+        done
+    fi
+
+    if [ ${#mobile_device_choice[@]} -eq 0 ]; then
+        echo "No ID or serial supplied"
+        exit 1
+    fi
+
+    # show list of chosen mobile_devices
+    echo 
+    echo "mobile_devices chosen:"
+    for mobile_device in "${mobile_device_choice[@]}"; do
+        mobile_device_id="${mobile_device_ids[$mobile_device]}"
+        mobile_device_name="${mobile_device_names[$mobile_device]}"
+        mobile_device_serial="${serials[$mobile_device]}"
+        printf '%-7s %-16s %s\n' "[id=$mobile_device_id]" "$mobile_device_serial" "$mobile_device_name"
+    done
+}
+
 redeploy_framework() {
     # This function will redeploy the Management Framework to the selected devices
 
@@ -175,6 +304,139 @@ redeploy_framework() {
         curl_args+=("POST")
         curl_args+=("--header")
         curl_args+=("Accept: application/json")
+        send_curl_request
+    done
+}
+
+delete_users() {
+    # This function will delete all users from a device
+    # ask if users should be forced
+    if [[ ! "$force_deletion" ]]; then
+        echo "The following applies to all selected devices:"
+        read -r -p "Select [F] to force user deletion, or anything else to not force deletion : " action_question
+        case "$action_question" in
+            F|f)
+                force_deletion="true"
+                ;;
+            *)
+                force_deletion="false"
+                ;;
+        esac
+        echo
+    fi
+
+    # now loop through the list and perform the action
+    for mobile_device in "${mobile_device_choice[@]}"; do
+        management_id="${management_ids[$mobile_device]}"
+        mobile_device_id="${mobile_device_ids[$mobile_device]}"
+        mobile_device_name="${mobile_device_names[$mobile_device]}"
+        echo
+        echo "   [redeploy_framework] Processing Device: id: $mobile_device_id  name: $mobile_device_name"
+        echo
+
+        # redeploy Management Framework
+        set_credentials "$jss_instance"
+        jss_url="$jss_instance"
+        endpoint="api/v2/mdm/commands"
+        curl_url="$jss_url/$endpoint"
+        curl_args=("--request")
+        curl_args+=("POST")
+        curl_args+=("--header")
+        curl_args+=("Content-Type: application/json")
+        curl_args+=("--data-raw")
+        curl_args+=(
+            '{
+                "clientData": [
+                    {
+                        "managementId": "'"$management_id"'"
+                    }
+                ],
+                "commandData": {
+                    "commandType": "DELETE_USER",
+                    "deleteAllUsers": true,
+                    "forceDeletion": '"$force_deletion"'
+              }
+            }'
+        )
+        send_curl_request
+    done
+}
+
+logout_users() {
+    # This function will logout the user from a device
+
+    # now loop through the list and perform the action
+    for mobile_device in "${mobile_device_choice[@]}"; do
+        management_id="${management_ids[$mobile_device]}"
+        mobile_device_id="${mobile_device_ids[$mobile_device]}"
+        mobile_device_name="${mobile_device_names[$mobile_device]}"
+        echo
+        echo "   [redeploy_framework] Processing Device: id: $mobile_device_id  name: $mobile_device_name"
+        echo
+
+        # redeploy Management Framework
+        set_credentials "$jss_instance"
+        jss_url="$jss_instance"
+        endpoint="api/v2/mdm/commands"
+        curl_url="$jss_url/$endpoint"
+        curl_args=("--request")
+        curl_args+=("POST")
+        curl_args+=("--header")
+        curl_args+=("Content-Type: application/json")
+        curl_args+=("--data-raw")
+        curl_args+=(
+            '{
+                "clientData": [
+                    {
+                        "managementId": "'"$management_id"'"
+                    }
+                ],
+                "commandData": {
+                    "commandType": "LOG_OUT_USER"
+              }
+            }'
+        )
+        send_curl_request
+    done
+}
+
+
+
+restart() {
+    # This function will restart a device
+
+    # now loop through the list and perform the action
+    for mobile_device in "${mobile_device_choice[@]}"; do
+        management_id="${management_ids[$mobile_device]}"
+        mobile_device_id="${mobile_device_ids[$mobile_device]}"
+        mobile_device_name="${mobile_device_names[$mobile_device]}"
+        echo
+        echo "   [redeploy_framework] Processing Device: id: $mobile_device_id  name: $mobile_device_name"
+        echo
+
+        # redeploy Management Framework
+        set_credentials "$jss_instance"
+        jss_url="$jss_instance"
+        endpoint="api/v2/mdm/commands"
+        curl_url="$jss_url/$endpoint"
+        curl_args=("--request")
+        curl_args+=("POST")
+        curl_args+=("--header")
+        curl_args+=("Content-Type: application/json")
+        curl_args+=("--data-raw")
+        curl_args+=(
+            '{
+                "clientData": [
+                    {
+                        "managementId": "'"$management_id"'"
+                    }
+                ],
+                "commandData": {
+                    "commandType": "RESTART_DEVICE",
+                    "notifyUser": false
+              }
+            }'
+        )
         send_curl_request
     done
 }
@@ -237,7 +499,7 @@ set_recovery_lock() {
         random_alpha_only="${random_b64//[^[:alnum:]]}"
         random_20="${random_alpha_only:0:20}"
 
-        # we need to set the recovery loack password if not already set
+        # we need to set the recovery lock password if not already set
         if [[ "$cli_recovery_lock_password" == "RANDOM" ]]; then
             recovery_lock_password="$random_20"
         elif [[ "$cli_recovery_lock_password" == "NA" ]]; then
@@ -338,14 +600,21 @@ MDM command type:
 --redeploy                      - Redeploy the Management Framework
 --recovery                      - Set the recovery lock password
                                   Recovery lock password will be random unless set
-                                  with --recovery-lock-password.
+                                  with --recovery-lock-password
 --removemdm                     - Remove the MDM Enrollment Profile (Unmanage)
+--deleteusers                   - Delete all users from a device (Shared iPad)
+--restart                       - Restart device (mobile devices only)
+--logout                        - Log out user from a device (mobile devices only)
 
 Options for the --recovery type:
 
 --random-lock-password          - Create a random recovery lock password (this is the default)
 --recovery-lock-password        - Define a recovery lock password
 --clear-recovery-lock-password  - Clear the recovery lock password
+
+Options for the --deleteusers type:
+--force                         - Force user deletion
+--noforce                       - Do not force deletion
 
 Define the target clients:
 
@@ -427,6 +696,12 @@ while test $# -gt 0 ; do
         --clear-recovery-lock-password)
             cli_recovery_lock_password="NA"
             ;;
+        --force)
+            force_deletion="true"
+            ;;
+        --noforce)
+            force_deletion="false"
+            ;;
         *)
             usage
             exit
@@ -454,7 +729,15 @@ fi
 
 if [[ ! $mdm_command ]]; then
     echo
-    printf 'Select from [E] Erase, [M] Redeploy Management Framework, [R] Set Recovery Lock, [P] Remove MDM Enrollment Profile : '
+    echo "Select from the following suported MDM commands:"
+    echo "   [E] Erase All Content And Settings"
+    echo "   [M] Redeploy Management Framework"
+    echo "   [R] Set Recovery Lock"
+    echo "   [P] Remove MDM Enrollment Profile"
+    echo "   [D] Delete all users (Shared iPads)"
+    echo "   [B] Restart device (mobile devices)"
+    echo "   [L] Logout user (mobile devices)"
+    printf 'Choose one : '
     read -r action_question
 
     case "$action_question" in
@@ -470,6 +753,15 @@ if [[ ! $mdm_command ]]; then
         P|p)
             mdm_command="removemdm"
             ;;
+        D|d)
+            mdm_command="deleteusers"
+            ;;
+        B|b)
+            mdm_command="restart"
+            ;;
+        L|l)
+            mdm_command="logout"
+            ;;
         *)
             echo
             echo "No valid action chosen!"
@@ -478,14 +770,23 @@ if [[ ! $mdm_command ]]; then
     esac
 fi
 
-# if a group name was supplied at the command line, compile the list of computers from that group
+# if a group name was supplied at the command line, compile the list of computers/mobile devices from that group
 if [[ $group_name ]]; then
     echo
-    get_computers_in_group
+    if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" ]]; then
+        get_mobile_devices_in_group
+    else
+        get_computers_in_group
+    fi
 fi
 
-# to send MDM commands, we need to find out the computer id
-generate_computer_list
+# to send MDM commands, we need to find out the computer/mobile device id
+if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" ]]; then
+    generate_mobile_device_list
+else
+    generate_computer_list
+fi
+
 
 # are we sure to proceed?
 are_you_sure
@@ -508,5 +809,17 @@ case "$mdm_command" in
     removemdm)
         echo "   [main] Removing MDM Enrollment Profile"
         remove_mdm
+        ;;
+    deleteusers)
+        echo "   [main] Deleting All Users"
+        delete_users
+        ;;
+    restart)
+        echo "   [main] Restart Device"
+        restart
+        ;;
+    logout)
+        echo "   [main] Logout User on Device"
+        logout_users
         ;;
 esac
