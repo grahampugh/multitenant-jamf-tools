@@ -400,6 +400,51 @@ logout_users() {
     done
 }
 
+send_settings_command() {
+    # This function will send a settings command
+    # currently limited to `bluetooth`
+    setting="$1"
+    value="$2"
+
+    # now loop through the list and perform the action
+    for mobile_device in "${mobile_device_choice[@]}"; do
+        management_id="${management_ids[$mobile_device]}"
+        mobile_device_id="${mobile_device_ids[$mobile_device]}"
+        mobile_device_name="${mobile_device_names[$mobile_device]}"
+        echo
+        echo "   [redeploy_framework] Processing Device: id: $mobile_device_id  name: $mobile_device_name"
+        echo
+
+        # redeploy Management Framework
+        set_credentials "$jss_instance"
+        jss_url="$jss_instance"
+        endpoint="api/v2/mdm/commands"
+        curl_url="$jss_url/$endpoint"
+        curl_args=("--request")
+        curl_args+=("POST")
+        curl_args+=("--header")
+        curl_args+=("Content-Type: application/json")
+        curl_args+=("--header")
+        curl_args+=("Accept: application/json")
+        curl_args+=("--data-raw")
+        curl_args+=(
+            '{
+                "clientData": [
+                    {
+                        "managementId": "'"$management_id"'"
+                    }
+                ],
+                "commandData": {
+                    "commandType": "SETTINGS",
+                    "'"$setting"'": '"$value"'
+              }
+            }'
+        )
+        echo "${curl_args[*]}" # TEMP
+        send_curl_request
+        cat "$curl_output_file" # TEMP
+    done
+}
 
 
 restart() {
@@ -605,6 +650,8 @@ MDM command type:
 --deleteusers                   - Delete all users from a device (Shared iPad)
 --restart                       - Restart device (mobile devices only)
 --logout                        - Log out user from a device (mobile devices only)
+--bluetooth-off                 - Disable Bluetooth (mobile devices only)
+--bluetooth-on                  - Enable Bluetooth (mobile devices only)
 
 Options for the --recovery type:
 
@@ -677,6 +724,21 @@ while test $# -gt 0 ; do
         --erase|--eacas)
             mdm_command="eacas"
             ;;
+        --logout|--logout-user)
+            mdm_command="logout"
+            ;;
+        --deleteusers|--delete-users)
+            mdm_command="deleteusers"
+            ;;
+        --restart)
+            mdm_command="restart"
+            ;;
+        --bluetooth-off)
+            mdm_command="bluetooth-off"
+            ;;
+        --bluetooth-on)
+            mdm_command="bluetooth-on"
+            ;;
         --redeploy|--redeploy-framework)
             mdm_command="redeploy"
             ;;
@@ -735,8 +797,9 @@ if [[ ! $mdm_command ]]; then
     echo "   [R] Set Recovery Lock"
     echo "   [P] Remove MDM Enrollment Profile"
     echo "   [D] Delete all users (Shared iPads)"
-    echo "   [B] Restart device (mobile devices)"
+    echo "   [S] Restart device (mobile devices)"
     echo "   [L] Logout user (mobile devices)"
+    echo "   [B0] [B1] Disable/Enable Bluetooth (mobile devices)"
     printf 'Choose one : '
     read -r action_question
 
@@ -756,7 +819,13 @@ if [[ ! $mdm_command ]]; then
         D|d)
             mdm_command="deleteusers"
             ;;
-        B|b)
+        B0|b0)
+            mdm_command="bluetooth-off"
+            ;;
+        B1|b1)
+            mdm_command="bluetooth-on"
+            ;;
+        S|s)
             mdm_command="restart"
             ;;
         L|l)
@@ -781,7 +850,7 @@ if [[ $group_name ]]; then
 fi
 
 # to send MDM commands, we need to find out the computer/mobile device id
-if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" ]]; then
+if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" || $mdm_command == "bluetooth"* ]]; then
     generate_mobile_device_list
 else
     generate_computer_list
@@ -821,5 +890,13 @@ case "$mdm_command" in
     logout)
         echo "   [main] Logout User on Device"
         logout_users
+        ;;
+    bluetooth-off)
+        echo "   [main] Disable Bluetooth on Device"
+        send_settings_command "bluetooth" "false"
+        ;;
+    bluetooth-on)
+        echo "   [main] Enable Bluetooth on Device"
+        send_settings_command "bluetooth" "true"
         ;;
 esac

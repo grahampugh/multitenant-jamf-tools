@@ -30,6 +30,7 @@ Usage:
 --dp                          - filter DPs on DP name
 -e                            - Force policy to enabled (--key POLICY_ENABLED=True)
 -v[vv]                        - add verbose output
+--[args]                      - Pass through any arguments for AutoPkg
 USAGE
 }
 
@@ -102,6 +103,11 @@ run_autopkg() {
         autopkg_run_options+=("POLICY_ENABLED=True")
     fi
 
+    # add additional args
+    if [[ ${#args[@]} -gt 0 ]]; then
+        autopkg_run_options+=("${args[@]}")
+    fi
+    
     # verbosity
     case $verbose in
         2) autopkg_verbosity="-vv";;
@@ -152,6 +158,7 @@ fi
 # -------------------------------------------------------------------------
 
 # Command line override for the above settings
+args=()
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
@@ -201,6 +208,9 @@ while [[ "$#" -gt 0 ]]; do
             usage
             exit
         ;;
+        *)
+            args+=("$1")
+            ;;
     esac
     # Shift after checking all the cases to get the next option
     shift

@@ -446,9 +446,14 @@ fetch_icon() {
     local fetchedFile="$1"
 
     # get icon details from fetched xml
-    echo "   [fetch_icon] Getting icon name from $fetchedFile"
-    icon_filename=$( xpath "${fetchedFile}" '//self_service/self_service_icon/filename/text()' 2>/dev/null )
-    icon_url=$( xpath "${fetchedFile}" '//self_service/self_service_icon/uri/text()' 2>/dev/null )
+    icon_filename=$( xmllint --xpath '//self_service/self_service_icon/filename/text()' "${fetchedFile}" 2>/dev/null )
+    # if [[ "$icon_filename" ]]; then
+    #     echo "   [fetch_icon] Icon name found: $icon_filename"
+    # fi
+    icon_url=$( xmllint --xpath '//self_service/self_service_icon/uri/text()' "${fetchedFile}" 2>/dev/null )
+    # if [[ "$icon_url" ]]; then
+    #     echo "   [fetch_icon] Icon URL found: $icon_url"
+    # fi
 
     # download icon to local folder
     if [[ $icon_filename && $icon_url ]]; then
@@ -464,10 +469,9 @@ fetch_icon() {
         send_curl_request
 
         # copy icon to final icon location
-        mkdir -p "$icons_folder"
         cp "$curl_output_file" "$icons_folder/$icon_filename"
     else
-        echo "   [fetch_icon] No icon URL in this policy"
+        echo "   [fetch_icon] No icon in this policy"
     fi
 }
 
@@ -979,6 +983,10 @@ main_menu() {
         touch "$log_file"
     fi
     exec &> >( tee -a "$log_file" >&2 )
+
+    # Create icons folder
+    mkdir -p "$icons_folder"
+
 
     # -------------------------------------------------------------------------
     # Set the source and destination server(s) and instance(s)
