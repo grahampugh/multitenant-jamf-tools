@@ -12,6 +12,9 @@ source "_common-framework.sh"
 # set instance list type
 instance_list_type="mac"
 
+# reduce the curl tries
+max_tries_override=2
+
 # prepare working directory
 workdir="/Users/Shared/Jamf/InstallAppsCount"
 mkdir -p "$workdir"

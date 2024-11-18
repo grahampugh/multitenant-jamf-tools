@@ -6,7 +6,8 @@ DOC
 
 # source _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
 
 # set instance list type
 instance_list_type="mac"
