@@ -1,4 +1,0 @@
-https://myprodserver.jamfcloud.com
-https://myprodserver2.jamfcloud.com
-https://myprodserver3.jamfcloud.com
-

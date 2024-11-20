@@ -1,4 +1,0 @@
-https://mytestserver.jamfcloud.com
-https://mytestserver2.jamfcloud.com
-https://mytestserver3.jamfcloud.com
-
