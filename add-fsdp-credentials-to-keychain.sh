@@ -111,6 +111,8 @@ elif [[ ! $pass_rw ]]; then
 fi
 
 echo
+set +H 
+echo "Password: $pass_rw" # TEMP
 if security add-generic-password -U -s "$display_name" -l "$keychain_name (readwrite)" -a "$user_rw" -w "$pass_rw"; then
     echo "Keychain entry '$keychain_name (readwrite)' added"
 else
