@@ -26,6 +26,31 @@ encode_name() {
     group_name_encoded="$( echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
 }
 
+
+get_group_id_from_name() {
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    if [[ $device_type == "computers" ]]; then
+        api_object_type="computergroups"
+        api_xml_object="computer_group"
+    else
+        api_object_type="mobiledevicegroups"
+        api_xml_object="mobile_device_group"
+    fi
+
+    api_xml_object_plural=$(get_plural_from_api_xml_object "$api_xml_object")
+
+    # send request
+    curl_url="$jss_url/JSSResource/${api_object_type}"
+    curl_args=("--header")
+    curl_args+=("Accept: application/xml")
+    send_curl_request
+
+    # get id from output
+    existing_id=$(xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = '$group_name']/id/text()" "$curl_output_file" 2>/dev/null)
+}
+
+
 get_computers_in_group() {
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
@@ -608,7 +633,7 @@ remove_mdm() {
     # This function will remove the MDM profile from the selected devices
 
     # now loop through the list and perform the action
-    for computer in "${computer_choice[@]}"; do
+    for mobile_device in "${computer_choice[@]}"; do
         computer_id="${computer_ids[$computer]}"
         computer_name="${computer_names[$computer]}"
         echo
@@ -627,6 +652,81 @@ remove_mdm() {
 
 }
 
+flush_mdm() {
+    # This function will flush the MDM commands from the selected devices
+
+    # specify device type
+    if [[ $device_type != "devices" ]]; then
+        device_type="computers"
+    fi
+
+    # specify flush option
+    if [[ ! $status_option ]]; then
+        status_option="Pending%2BFailed"
+    fi
+
+    if [[ $group_name ]]; then
+        # get the ID of the group
+        get_group_id_from_name
+
+        if [[ $existing_id ]]; then
+            echo
+            echo "   [remove_mdm] Processing Group: $group_name"
+            echo
+
+            # perform MDM flush command - endpoint uses api object type (computergroups/mobiledevicegroups)
+            set_credentials "$jss_instance"
+            jss_url="$jss_instance"
+            endpoint="JSSResource/commandflush"
+            curl_url="$jss_url/$endpoint/$api_object_type/id/$existing_id/status/$status_option"
+            curl_args=("--request")
+            curl_args+=("DELETE")
+            send_curl_request
+        else
+            echo "No group with name '$group_name' found."
+            exit
+        fi
+    else
+        if [[ $device_type == "computers" ]]; then
+            # now loop through the list and perform the action
+            for computer in "${computer_choice[@]}"; do
+                computer_id="${computer_ids[$computer]}"
+                computer_name="${computer_names[$computer]}"
+                echo
+                echo "   [remove_mdm] Processing Computer: id: $computer_id  name: $computer_name"
+                echo
+
+                # perform MDM flush command
+                set_credentials "$jss_instance"
+                jss_url="$jss_instance"
+                endpoint="JSSResource/commandflush"
+                curl_url="$jss_url/$endpoint/$device_type/id/$computer_id/status/$status_option"
+                curl_args=("--request")
+                curl_args+=("DELETE")
+                send_curl_request
+            done
+        else
+            # now loop through the list and perform the action
+            for mobile_device in "${mobile_device_choice[@]}"; do
+                mobile_device_id="${mobile_device_ids[$mobile_device]}"
+                mobile_device_name="${mobile_device_names[$mobile_device]}"
+                echo
+                echo "   [remove_mdm] Processing Mobile Device: id: $mobile_device_id  name: $mobile_device_name"
+                echo
+
+                # perform MDM flush command
+                set_credentials "$jss_instance"
+                jss_url="$jss_instance"
+                endpoint="JSSResource/commandflush"
+                curl_url="$jss_url/$endpoint/$device_type/id/$mobile_device_id/status/$status_option"
+                curl_args=("--request")
+                curl_args+=("DELETE")
+                send_curl_request
+            done
+        fi
+    fi
+}
+
 usage() {
     echo "
 ./mdm-commands.sh options
@@ -638,6 +738,7 @@ usage() {
                                   (must exist in the instance-lists folder)
 -i JSS_URL                      - perform action on a single instance
                                   (must exist in the relevant instance list)
+-v                              - add verbose curl output
 
 MDM command type:
 
@@ -662,6 +763,17 @@ Options for the --recovery type:
 Options for the --deleteusers type:
 --force                         - Force user deletion
 --noforce                       - Do not force deletion
+--group                         - Predefine devices to those in a specified group
+
+Options for the --restart and --logout types:
+--group                         - Predefine devices to those in a specified group
+
+Options for the --flushmdm type:
+--pending                       - Flush pending commands only (default is pending+failed)
+--failed                        - Flush failed commands only (default is pending+failed)
+--computers                     - Device type is computers (default)
+--devices                       - Devices type is devices (default is computers)
+--group                         - Flush commands based on a group rather than individual computers or devices
 
 Define the target clients:
 
@@ -669,7 +781,6 @@ Define the target clients:
 --serial                        - Predefine a computer's Serial Number to search for. 
                                   Can be a CSV list,
                                   e.g. ABCD123456,ABDE234567,XWSA123456
---group                         - Predefine computers to those in a specified group
 
 You can clear the recovery lock password with --clear-recovery-lock-password
 "
@@ -748,6 +859,9 @@ while test $# -gt 0 ; do
         --removemdm|--remove-mdm-profile)
             mdm_command="remove_mdm"
             ;;
+        --flushmdm|--flush-mdm)
+            mdm_command="flushmdm"
+            ;;
         --recovery-lock-password)
             shift
             cli_recovery_lock_password="$1"
@@ -764,6 +878,21 @@ while test $# -gt 0 ; do
         --noforce)
             force_deletion="false"
             ;;
+        --computers)
+            device_type="computers"
+            ;;
+        --devices)
+            device_type="devices"
+            ;;
+        --pending)
+            status_option="Pending"
+            ;;
+        --failed)
+            status_option="Failed"
+            ;;
+        -v|--verbose)
+            verbose=1
+        ;;
         *)
             usage
             exit
@@ -789,7 +918,9 @@ else
     jss_instance="${instance_choice_array[0]}"
 fi
 
-if [[ ! $mdm_command ]]; then
+if [[ $mdm_command ]]; then
+    echo "MDM command preselected: $mdm_command"
+else
     echo
     echo "Select from the following suported MDM commands:"
     echo "   [E] Erase All Content And Settings"
@@ -800,6 +931,7 @@ if [[ ! $mdm_command ]]; then
     echo "   [S] Restart device (mobile devices)"
     echo "   [L] Logout user (mobile devices)"
     echo "   [B0] [B1] Disable/Enable Bluetooth (mobile devices)"
+    echo "   [F] Flush MDM commands"
     printf 'Choose one : '
     read -r action_question
 
@@ -831,6 +963,9 @@ if [[ ! $mdm_command ]]; then
         L|l)
             mdm_command="logout"
             ;;
+        F|f)
+            mdm_command="flushmdm"
+            ;;
         *)
             echo
             echo "No valid action chosen!"
@@ -840,7 +975,7 @@ if [[ ! $mdm_command ]]; then
 fi
 
 # if a group name was supplied at the command line, compile the list of computers/mobile devices from that group
-if [[ $group_name ]]; then
+if [[ $group_name && $mdm_command != "flushmdm" ]]; then
     echo
     if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" ]]; then
         get_mobile_devices_in_group
@@ -849,11 +984,16 @@ if [[ $group_name ]]; then
     fi
 fi
 
-# to send MDM commands, we need to find out the computer/mobile device id
-if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" || $mdm_command == "bluetooth"* ]]; then
-    generate_mobile_device_list
+# to send MDM commands, we need to find out the computer/mobile device id, 
+# but not for the flush_dns command if we're giving a group name
+if [[ ($mdm_command == "flushmdm" && ! $group_name) || $mdm_command != "flushmdm" ]]; then
+    if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" || $mdm_command == "bluetooth"* || ($mdm_command == "flushmdm" && $device_type == "devices") ]]; then
+        generate_mobile_device_list
+    else
+        generate_computer_list
+    fi
 else
-    generate_computer_list
+    echo "Using group: $group_name"
 fi
 
 
@@ -884,19 +1024,23 @@ case "$mdm_command" in
         delete_users
         ;;
     restart)
-        echo "   [main] Restart Device"
+        echo "   [main] Restarting Device(s)"
         restart
         ;;
     logout)
-        echo "   [main] Logout User on Device"
+        echo "   [main] Logging Out User on Device(s)"
         logout_users
         ;;
+    flushmdm)
+        echo "   [main] Flushing MDM Commands"
+        flush_mdm
+        ;;
     bluetooth-off)
-        echo "   [main] Disable Bluetooth on Device"
+        echo "   [main] Disabling Bluetooth on Device"
         send_settings_command "bluetooth" "false"
         ;;
     bluetooth-on)
-        echo "   [main] Enable Bluetooth on Device"
+        echo "   [main] Enabling Bluetooth on Device"
         send_settings_command "bluetooth" "true"
         ;;
 esac

@@ -624,6 +624,7 @@ send_curl_request() {
         if [[ "$http_response" == "10"* || "$http_response" == "20"* || "$http_response" == "30"* ]]; then
             if [[ $verbose -gt 0 ]]; then
                 echo "Success response ($http_response)"
+                echo "Output file: $curl_output_file"
             fi
             break
         elif [[ "$http_response" == "400" ]]; then
