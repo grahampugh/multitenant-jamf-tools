@@ -1,0 +1,8 @@
+{
+    "isFlushPolicyHistoryEnabled": true,
+    "isFlushLocationInformationEnabled": true,
+    "isFlushLocationInformationHistoryEnabled": true,
+    "isFlushExtensionAttributesEnabled": true,
+    "isFlushSoftwareUpdatePlansEnabled": true,
+    "flushMDMQueue": "DELETE_EVERYTHING"
+}
