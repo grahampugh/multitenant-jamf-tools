@@ -31,6 +31,9 @@ Usage:
 --i JSS_URL                   - perform action on a single instance
                                 (must exist in the relevant instance list)
 --name EA_NAME                - Extension Attribute Name
+--ios                         - download mobile device extension attributes 
+--computer                    - download computer extension attributes 
+                                (Default is computer extension attributes)
 --all                         - perform action on ALL instances in the instance list
 -v                            - add verbose curl output
 USAGE
@@ -81,6 +84,8 @@ fi
 # Command line options (presets to avoid interaction)
 # -------------------------------------------------------------------------
 
+ea_type="computer"
+
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
     key="$1"
@@ -96,6 +101,14 @@ while [[ "$#" -gt 0 ]]; do
         --name)
             shift
             ea_name="$1"
+        ;;
+        --ios|--device)
+            shift
+            ea_type="device"
+        ;;
+        --computer)
+            shift
+            ea_type="computer"
         ;;
         -a|--all)
             all_instances=1
@@ -131,11 +144,19 @@ choose_destination_instances
 # get specific instance if entered
 if [[ $chosen_instance ]]; then
     jss_instance="$chosen_instance"
-    fetch_api_object_by_name
+    if [[ $ea_type == "device" ]]; then
+        fetch_api_object_by_name mobile_device_extension_attribute "$ea_name"
+    else
+        fetch_api_object_by_name computer_extension_attribute "$ea_name"
+    fi
 else
     for instance in "${instance_choice_array[@]}"; do
         jss_instance="$instance"
+    if [[ $ea_type == "device" ]]; then
+        fetch_api_object_by_name mobile_device_extension_attribute "$ea_name"
+    else
         fetch_api_object_by_name computer_extension_attribute "$ea_name"
+    fi
     done
 fi
 

@@ -29,6 +29,7 @@ Usage:
 --dp                          - filter DPs on DP name
 --prefs <path>                - Inherit AutoPkg prefs file provided by the full path to the file
 -v[vvv]                       - Set value of verbosity
+--confirm                     - Automatically confirm the command (no prompt)
 --[args]                      - Pass through any arguments for jamf_api_tool.py
 
 "
