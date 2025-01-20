@@ -361,7 +361,7 @@ check_groups_in_mobile_device_groups() {
 cleanup_and_exit() {
     # Clean up
     rm -rf "${xml_folder_default}"
-    unmount_smb_share
+    # unmount_smb_share
     echo
     echo "   [cleanup_and_exit] We are done here. Thanks, bye!"
     echo "   [main] script exited successfully at $(date)"
@@ -1517,8 +1517,18 @@ delete_api_object() {
     echo
 }
 
+do_delete_pkg() {
+    local pkg_name="$1"
+    if sudo rm -f "${smb_mountpoint}/Packages/${pkg_name}"; then
+        echo "   [delete_pkg] ${pkg_name} successfuilly deleted"
+    else
+        echo "   [delete_pkg] WARNING! successfully ${pkg_name} was not deleted."
+    fi
+}
+
 delete_pkg() {
     local pkg_name="$1"
+    skip_delete_pkg_obj=0
 
     # Check that a DP actually exists
     jss_instance="${dest_instance}"
@@ -1534,26 +1544,44 @@ delete_pkg() {
         mount_smb_share
 
         # is the package there?
-        if [[ -f "${smb_mountpoint}/Packages/${pkg_name}" ]]; then
+        if sudo find "${smb_mountpoint}/Packages" -name "${pkg_name}" >/dev/null; then
             echo "   [delete_pkg] Package '$pkg_name' found on $smb_url"
             echo
-            read -r -p "Do you want to delete the actual package from the SMB repo (requires inputting admin password)? (Y/N) : " delete_pkg_from_repo
-            case "$delete_pkg_from_repo" in
-                Y|y)
-                    echo "   [delete_pkg] Deleting package '$pkg_name' from $smb_url..."
-                    if rm -f "${smb_mountpoint}/Packages/${pkg_name}"; then
-                        echo "   [delete_pkg] ${pkg_name} successfuilly deleted"
-                    else
-                        echo "   [delete_pkg] WARNING! successfully ${pkg_name} was not deleted."
-                    fi
-                ;;
-                *)
-                    echo "   [delete_pkg] Not deleting - package '$pkg_name' will remain on $smb_url"
-                ;;
-            esac
+            if [[ $confirmed == "yes" ]]; then
+                echo "   [main] Action confirmed from command line"
+                do_delete_pkg "$pkg_name"
+            else
+                read -r -p "Do you want to delete the actual package from the SMB repo (requires inputting admin password)? (Y/N) : " delete_pkg_from_repo
+                case "$delete_pkg_from_repo" in
+                    Y|y)
+                        echo "   [delete_pkg] Deleting package '$pkg_name' from $smb_url..."
+                        do_delete_pkg "$pkg_name"
+                    ;;
+                    *)
+                        echo "   [delete_pkg] Not deleting - package '$pkg_name' will remain on $smb_url"
+                    ;;
+                esac
+            fi
         else
             echo "   [delete_pkg] Package '$pkg_name' does not exist on $smb_url"
+            echo
+            if [[ $confirmed == "yes" ]]; then
+                echo "   [main] Action confirmed from command line"
+            else
+                read -r -p "Do you want to delete the package object anyway? (Y/N) : " delete_pkg_obj_from_jamf
+                case "$delete_pkg_obj_from_jamf" in
+                    Y|y)
+                        echo "   [delete_pkg] Deleting package object '$pkg_name'..."
+                    ;;
+                    *)
+                        echo "   [delete_pkg] Not deleting package object '$pkg_name'"
+                        skip_delete_pkg_obj=1
+                    ;;
+                esac
+            fi
         fi
+        # mount the SMB server if not already mounted
+        unmount_smb_share
     fi
     echo
 }
@@ -1677,7 +1705,9 @@ mount_smb_share() {
         sudo mkdir -p "${smb_mountpoint}"
         sudo chown "${USER}":admin "${smb_mountpoint}"
 
-        if ! sudo mount -t smbfs "//${smb_user}:${smb_pass}@${smb_uri}" "${smb_mountpoint}"; then
+        if sudo mount -t smbfs "//${smb_user}:${smb_pass}@${smb_uri}" "${smb_mountpoint}"; then
+            echo "   [mount_smb_share] ${smb_url} mounted"
+        else
             echo "   [mount_smb_share] ERROR: ${smb_url} could not be mounted with ${smb_user}...aborting."
             sudo rm -rf "${smb_mountpoint}"
             exit 1
@@ -2510,17 +2540,18 @@ main() {
             echo "   [main] Destination URL: $jss_url ($instance_count of ${#dest_instances_array[@]})"
 
             case $api_obj_action in
-                delete )
+                delete)
                     # if deleting a package from an SMB repo, first remove the package itself (TODO - delete from S3)
                     if [[ $api_obj_action == "delete" && $api_xml_object == "package" ]]; then
                         delete_pkg "${chosen_api_obj_name}"
                     fi
                     # now delete the API object
-                    echo "   [main] Deleting ${api_xml_object} '$chosen_api_obj_name_decoded'"
-                    delete_api_object "$api_xml_object" "$chosen_api_obj_name"
-
+                    if [[ $skip_delete_pkg_obj -ne 1 ]]; then
+                        echo "   [main] Deleting ${api_xml_object} '$chosen_api_obj_name_decoded'"
+                        delete_api_object "$api_xml_object" "$chosen_api_obj_name"
+                    fi
                     ;;
-                copy )
+                copy)
                     echo "   [main] Copying ${api_xml_object} '$chosen_api_obj_name'"
                     if [[ $strip_scope == "yes" ]]; then
                         strip_scope_from_api_object "$api_xml_object" "$chosen_api_obj_name"
