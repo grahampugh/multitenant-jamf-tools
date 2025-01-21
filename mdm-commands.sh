@@ -331,6 +331,10 @@ redeploy_framework() {
         curl_args+=("Accept: application/json")
         send_curl_request
     done
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Reploy Framework'}"
+    send_slack_notification "$slack_text"
 }
 
 delete_users() {
@@ -385,6 +389,10 @@ delete_users() {
         )
         send_curl_request
     done
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Delete Users'}"
+    send_slack_notification "$slack_text"
 }
 
 logout_users() {
@@ -423,6 +431,10 @@ logout_users() {
         )
         send_curl_request
     done
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Logout Users'}"
+    send_slack_notification "$slack_text"
 }
 
 send_settings_command() {
@@ -469,6 +481,10 @@ send_settings_command() {
         send_curl_request
         cat "$curl_output_file" # TEMP
     done
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Send Setting: $setting: $value'}"
+    send_slack_notification "$slack_text"
 }
 
 
@@ -509,6 +525,10 @@ restart() {
         )
         send_curl_request
     done
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Restart Devices'}"
+    send_slack_notification "$slack_text"
 }
 
 eacas() {
@@ -548,6 +568,9 @@ eacas() {
         send_curl_request
     done
 
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Remote Wipe'}"
+    send_slack_notification "$slack_text"
 }
 
 set_recovery_lock() {
@@ -627,6 +650,10 @@ set_recovery_lock() {
         )
         send_curl_request
     done
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Set Recovery Lock'}"
+    send_slack_notification "$slack_text"
 }
 
 remove_mdm() {
@@ -650,6 +677,9 @@ remove_mdm() {
         send_curl_request
     done
 
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Remove MDM Profile'}"
+    send_slack_notification "$slack_text"
 }
 
 flush_mdm() {
@@ -725,6 +755,10 @@ flush_mdm() {
             done
         fi
     fi
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Flush MDM Commands'}"
+    send_slack_notification "$slack_text"
 }
 
 usage() {
@@ -751,6 +785,7 @@ MDM command type:
 --deleteusers                   - Delete all users from a device (Shared iPad)
 --restart                       - Restart device (mobile devices only)
 --logout                        - Log out user from a device (mobile devices only)
+--flushmdm                     - Flush MDM commands
 --bluetooth-off                 - Disable Bluetooth (mobile devices only)
 --bluetooth-on                  - Enable Bluetooth (mobile devices only)
 

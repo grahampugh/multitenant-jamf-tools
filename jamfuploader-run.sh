@@ -47,28 +47,6 @@ element_in() {
   return 1
 }
 
-send_slack_notification() {
-    local jss_url="$1"
-    local args="$2"
-
-    if get_slack_webhook "$instance_list_file"; then
-        if [[ $slack_webhook_url ]]; then
-            slack_text="{'username': '$jss_url', 'text': '*jamfuploader_run action*\nInstance: $jss_url\nArguments: $args'}"
-        
-            response=$(
-                curl -s -o /dev/null -S -i -X POST -H "Content-Type: application/json" \
-                --write-out '%{http_code}' \
-                --data "$slack_text" \
-                "$slack_webhook_url"
-            )
-            echo "   [send_slack_notification] Sent Slack notification (response: $response)"
-        fi
-    else
-        echo "   [send_slack_notification] Not sending slack notification as no webhook found"
-    fi
-}
-
-
 run_jamfupload() {
     instance_args=()
     
@@ -103,7 +81,8 @@ run_jamfupload() {
     "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" 
 
     # Send Slack notification
-    send_slack_notification "$jss_instance" "${args[*]}"
+    slack_text="{'username': '$jss_url', 'text': '*jamfuploader_run.sh*\nUser: $jss_api_user\nInstance: $jss_url\nArguments: ${args[*]}'}"
+    send_slack_notification "$slack_text"
 }
 
 

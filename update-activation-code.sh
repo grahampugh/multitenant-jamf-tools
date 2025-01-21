@@ -97,8 +97,10 @@ write_activation_code() {
     curl_args+=("<activation_code><code>$activation_code</code></activation_code>")
     send_curl_request
 
+
     # Send Slack notification
-    send_slack_notification "$jss_instance" "$activation_code"
+    slack_text="{'username': '$jss_url', 'text': '*update-activation-code.sh*\nUser: $jss_api_user\nInstance: $jss_url\nActivation Code: $activation_code'}"
+    send_slack_notification "$slack_text"
 }
 
 if [[ ! -d "${this_script_dir}" ]]; then

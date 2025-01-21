@@ -47,7 +47,7 @@ root_check() {
     else 
         # check that user is an admin
         if ! /usr/sbin/dseditgroup -o checkmember -m "$USER" admin ; then
-            echo "This script is meant to be run as an admin user."
+            echo "This particular action requires a user with admin privileges."
         echo
         exit 5 # Running as a standard user.
         else
@@ -432,13 +432,29 @@ get_smb_credentials() {
             smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
             smb_pass=$(/usr/bin/security find-generic-password -s "$dp_server" -w -g 2>/dev/null)
             # smb_pass=${smb_pass//\!/} # exclamation points are ignored and mess up the SMB command so we remove them
-            echo "   [get_smb_credentials] User: $smb_user - Pass: $smb_pass" # TEMP
-        else
-            echo "   [get_smb_credentials] User: $smb_user - Pass: $smb_pass" # TEMP
+            # echo "   [get_smb_credentials] User: $smb_user - Pass: $smb_pass" # TEMP
+        # else
+        #     echo "   [get_smb_credentials] User: $smb_user - Pass: $smb_pass" # TEMP
         fi
     else
         echo "ERROR: DP not determined. Cannot continue"
         exit 1
+    fi
+}
+
+send_slack_notification() {
+    local slack_text=$1
+
+    get_slack_webhook "$instance_list_file"
+
+    if [[ $slack_webhook_url ]]; then
+        response=$(
+            curl -s -o /dev/null -S -i -X POST -H "Content-Type: application/json" \
+            --write-out '%{http_code}' \
+            --data "$slack_text" \
+            "$slack_webhook_url"
+        )
+        echo "   [send_slack_notification] Sent Slack notification (response: $response)"
     fi
 }
 
@@ -469,7 +485,7 @@ set_credentials() {
     # encode the credentials so we are not sending in plain text
     b64_credentials=$(printf "%s:%s" "$jss_api_user" "$jss_api_password" | iconv -t ISO-8859-1 | base64 -i -)
 
-    # echo "$jss_api_user:$jss_api_password"  # UNCOMMENT-TO-DEBUG
+    echo "$jss_api_user:$jss_api_password"  # UNCOMMENT-TO-DEBUG
 }
 
 get_new_token() {

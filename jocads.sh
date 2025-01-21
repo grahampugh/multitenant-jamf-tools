@@ -1510,7 +1510,8 @@ delete_api_object() {
         send_curl_request
 
         # Send Slack notification
-        send_slack_notification "$api_xml_object" "$chosen_api_obj_name" "$api_obj_action"
+        slack_text="{'username': '$jss_url', 'text': '*jocads.sh*\n*API $api_xml_object delete action*\nUser: $jss_api_user\nObject Name: *$chosen_api_obj_name*\nInstance: $jss_url\nHTTP Response: $http_response'}"
+        send_slack_notification "$slack_text"
     else
         echo "   [delete_api_object] No existing ${api_xml_object} named '${chosen_api_obj_name_decoded}' found; aborting..."
     fi
@@ -1519,7 +1520,7 @@ delete_api_object() {
 
 do_delete_pkg() {
     local pkg_name="$1"
-    if sudo rm -f "${smb_mountpoint}/Packages/${pkg_name}"; then
+    if rm -f "${smb_mountpoint}/Packages/${pkg_name}"; then
         echo "   [delete_pkg] ${pkg_name} successfuilly deleted"
     else
         echo "   [delete_pkg] WARNING! successfully ${pkg_name} was not deleted."
@@ -1544,7 +1545,7 @@ delete_pkg() {
         mount_smb_share
 
         # is the package there?
-        if sudo find "${smb_mountpoint}/Packages" -name "${pkg_name}" >/dev/null; then
+        if find "${smb_mountpoint}/Packages" -name "${pkg_name}" >/dev/null; then
             echo "   [delete_pkg] Package '$pkg_name' found on $smb_url"
             echo
             if [[ $confirmed == "yes" ]]; then
@@ -1693,25 +1694,35 @@ fetch_icon() {
 }
 
 mount_smb_share() {
-    # smb_share=$(cut -d"/" -f2 <<< "$smb_url")
-    smb_mountpoint="/Volumes/$dp_share-$source_instance_list"
-    if mount | grep "on ${smb_mountpoint} " > /dev/null; then
-        echo "   [mount_smb_share] ${smb_mountpoint} is mounted."
-        return
+    # Mount distribution point.
+    # smb_mountpoint="/Volumes/$dp_share-$source_instance_list"
+    smb_mountpoint="/Volumes/$dp_share"
+    if mount | grep "on $smb_mountpoint " > /dev/null; then
+        echo "Warning! $smb_mountpoint is already mounted which may be pointing to an incorrect mount point. Attempting to unmount..."
+        unmount_smb_share
+    fi
+
+    if /usr/bin/osascript -e "mount volume \"${smb_url}\" as user name \"${smb_user}\" with password \"${smb_pass}\""; then
+        echo "   [mount_smb_share] ${smb_url} mounted"
     else
-        echo "   [mount_smb_share] ${smb_url} is not mounted..."
+        echo "   [mount_smb_share] ERROR: ${smb_url} could not be mounted with ${smb_user}...aborting."
+        exit 1
+    fi
+}
 
-        # Make sure the mount point exists
-        sudo mkdir -p "${smb_mountpoint}"
-        sudo chown "${USER}":admin "${smb_mountpoint}"
-
-        if sudo mount -t smbfs "//${smb_user}:${smb_pass}@${smb_uri}" "${smb_mountpoint}"; then
-            echo "   [mount_smb_share] ${smb_url} mounted"
+unmount_smb_share() {
+    # Unmouint distribution point
+    # smb_mountpoint="/Volumes/$dp_share-$source_instance_list"
+    smb_mountpoint="/Volumes/$dp_share"
+    if mount | grep "on $smb_mountpoint " > /dev/null; then
+        if /usr/sbin/diskutil unmount "$smb_mountpoint"; then
+            echo "   [unmount_smb_share] ${smb_mountpoint} successfully unmounted."
         else
-            echo "   [mount_smb_share] ERROR: ${smb_url} could not be mounted with ${smb_user}...aborting."
-            sudo rm -rf "${smb_mountpoint}"
+            echo "   [unmount_smb_share] ERROR: ${smb_mountpoint} was not successfully unmounted."
             exit 1
         fi
+    else
+        echo "   [unmount_smb_share] ${smb_url} is not mounted."
     fi
 }
 
@@ -1825,41 +1836,6 @@ set_payload_organisation() {
     echo "   [set_payload_organisation] Changing payload organisation in '${chosen_api_obj_name}' to '${new_org}'"
 
     sed "s|PayloadOrganization\&lt\;\/key&gt\;\&lt\;string\&gt\;[A-Za-z ]*\&lt;\/string|PayloadOrganization\&lt;\/key\&gt\;\&lt\;string\&gt\;${new_org}\&lt\;\/string|g" < "${temp_parsed_file}" > "${parsed_file}"
-}
-
-send_slack_notification() {
-    local api_xml_object=$1
-    local chosen_api_obj_name="$2"
-    local api_obj_action=$3
-
-    get_slack_webhook "$instance_list_file"
-
-    if [[ $slack_webhook_url ]]; then
-        slack_text="{'username': '$jss_url', 'text': '*API ${api_xml_object} ${api_obj_action} action*\nName: *${chosen_api_obj_name}*\nInstance: $jss_url\nHTTP Response: $http_response'}"
-        
-        response=$(
-            curl -s -o /dev/null -S -i -X POST -H "Content-Type: application/json" \
-            --write-out '%{http_code}' \
-            --data "$slack_text" \
-            "$slack_webhook_url"
-        )
-        echo "   [send_slack_notification] Sent Slack notification (response: $response)"
-    fi
-}
-
-unmount_smb_share() {
-    echo
-    echo
-    smb_mountpoint="/Volumes/$dp_share-$source_instance_list"
-    if mount | grep "on ${smb_mountpoint} " > /dev/null; then
-        if sudo umount "${smb_mountpoint}"; then
-            echo "   [unmount_smb_share] ${smb_mountpoint} successfully unmounted."
-        else
-            echo "   [unmount_smb_share] ERROR: ${smb_mountpoint} was not successfully unmounted."
-        fi
-    else
-        echo "   [unmount_smb_share] ${smb_url} is not mounted."
-    fi
 }
 
 main() {
@@ -2467,14 +2443,6 @@ main() {
         # Create a URL-encoded version of the API object name, we need this later...
         chosen_api_obj_name_url_encoded="$( echo "$chosen_api_obj_name" | sed -e 's|%|%25|g' | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' | sed -e 's|#|%23|g' )"
 
-        # if deleting package from smb repo and set to all instances, we need sudo rights
-        # so check this now in case the user is not an admin
-        if [[ $api_obj_action == "delete" && ${api_xml_object} == "package" && $do_all_instances == "yes" ]]; then
-            echo
-            echo "   [main] sudo is required to remove a package"
-            root_check
-        fi
-
         if [[ $api_obj_action == "copy" ]]; then
             # grab the object from the source instance
             echo
@@ -2574,7 +2542,8 @@ main() {
                         copy_api_object "$api_xml_object" "$chosen_api_obj_id" "$chosen_api_obj_name"
                     fi
                     # Send Slack notification
-                    send_slack_notification "$api_xml_object" "$chosen_api_obj_name" "$api_obj_action"
+                    slack_text="{'username': '$jss_url', 'text': '*jocads.sh*\n*API $api_xml_object copy action*\nUser: $jss_api_user\nObject Name: *$chosen_api_obj_name*\nInstance: $jss_url\nHTTP Response: $http_response'}"
+                    send_slack_notification "$slack_text"
                     ;;
             esac
             ((instance_count++))

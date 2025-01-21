@@ -95,6 +95,10 @@ upload_data() {
         curl_args+=("POST")
     fi
     send_curl_request
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*create-ldap-user.sh*\nUser: $jss_api_user\nInstance: $jss_url\nCreate/Update User $chosen_user'}"
+    send_slack_notification "$slack_text"
 }
 
 if [[ ! -d "${this_script_dir}" ]]; then
