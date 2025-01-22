@@ -485,7 +485,7 @@ set_credentials() {
     # encode the credentials so we are not sending in plain text
     b64_credentials=$(printf "%s:%s" "$jss_api_user" "$jss_api_password" | iconv -t ISO-8859-1 | base64 -i -)
 
-    echo "$jss_api_user:$jss_api_password"  # UNCOMMENT-TO-DEBUG
+    # echo "$jss_api_user:$jss_api_password"  # UNCOMMENT-TO-DEBUG
 }
 
 get_new_token() {
