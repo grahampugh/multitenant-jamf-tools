@@ -81,7 +81,7 @@ run_jamfupload() {
     "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" 
 
     # Send Slack notification
-    slack_text="{'username': '$jss_url', 'text': '*jamfuploader_run.sh*\nUser: $jss_api_user\nInstance: $jss_url\nArguments: ${args[*]}'}"
+    slack_text="{'username': '$jss_instance', 'text': '*jamfuploader_run.sh*\nUser: $jss_api_user\nInstance: $jss_instance\nArguments: ${args[*]}'}"
     send_slack_notification "$slack_text"
 }
 
