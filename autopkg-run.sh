@@ -89,8 +89,8 @@ run_autopkg() {
         defaults delete ~/Library/Preferences/com.github.autopkg.plist SMB_URL
         # defaults delete ~/Library/Preferences/com.github.autopkg.plist SMB_USERNAME
         # defaults delete ~/Library/Preferences/com.github.autopkg.plist SMB_PASSWORD
-        autopkg_run_options+=("--key")
-        autopkg_run_options+=("jcds2_mode=True")
+        # autopkg_run_options+=("--key")
+        # autopkg_run_options+=("jcds2_mode=True")
     fi
 
     # option to replace pkg
