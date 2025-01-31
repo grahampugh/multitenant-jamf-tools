@@ -629,6 +629,11 @@ send_curl_request() {
         final_args=("${curl_standard_args[@]}" "${curl_args[@]}" "$curl_url")
         curl_request=$(curl "${final_args[@]}")
 
+        if [[ $verbose -gt 0 ]]; then
+            echo "Complete curl command sent:"
+            echo "curl ${final_args[*]}"
+        fi
+
         http_response="$curl_request"
 
         # These lines can be commented out if we need to see what the request was and what the response is 
@@ -645,6 +650,14 @@ send_curl_request() {
             break
         elif [[ "$http_response" == "400" ]]; then
             echo "Fail response ($http_response) - aborting"
+            if [[ $verbose -gt 0 ]]; then
+                echo
+                cat "$curl_headers_file"
+                echo
+                cat "$curl_output_file"
+                echo
+                echo
+            fi
             break
         else
             echo "Fail response ($http_response) - attempt #$try."

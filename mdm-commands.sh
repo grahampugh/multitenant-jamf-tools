@@ -333,7 +333,75 @@ redeploy_framework() {
     done
 
     # Send Slack notification
-    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Reploy Framework'}"
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Redeploy Framework'}"
+    send_slack_notification "$slack_text"
+}
+
+get_software_update_feature_status() {
+    # grab current value
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    endpoint="api/v1/managed-software-updates/plans/feature-toggle"
+    curl_url="$jss_url/$endpoint"
+    curl_args=("--request")
+    curl_args+=("GET")
+    curl_args+=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+
+    toggle_value=$(/usr/bin/plutil -extract toggle raw "$curl_output_file" 2>/dev/null)
+    toggle_set_value="true"
+    if [[ $toggle_value == "true" ]]; then 
+        toggle_set_value="false"
+    fi
+
+    echo "   [toggle_software_update_feature] Current toggle value is '$toggle_value'. "
+
+    # grab current background status
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    endpoint="api/v1/managed-software-updates/plans/feature-toggle/status"
+    curl_url="$jss_url/$endpoint"
+    curl_args=("--request")
+    curl_args+=("GET")
+    curl_args+=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+
+    toggle_on_value=$(/usr/bin/plutil -extract toggleOn.formattedPercentComplete raw "$curl_output_file" 2>/dev/null)
+    toggle_off_value=$(/usr/bin/plutil -extract toggleOff.formattedPercentComplete raw "$curl_output_file" 2>/dev/null)
+
+    echo "   [toggle_software_update_feature] Toggle on status: '$toggle_on_value'..."
+    echo "   [toggle_software_update_feature] Toggle off status: '$toggle_off_value'..."
+    echo "   [toggle_software_update_feature] WARNING: Do not proceed if either of the above values is less than 100%"
+    echo "   [toggle_software_update_feature] Proceed to toggle to '$toggle_set_value'..."
+}
+
+toggle_software_update_feature() {
+    # This function will toggle the "new" software update feature allowing to clear any plans
+
+    echo
+    echo "   [toggle_software_update_feature] Toggling software update command on $jss_instance"
+    echo "   [toggle_software_update_feature] This endpoint is asynchronous, the provided value will not be immediately updated."
+    echo
+
+    # toggle software update feature
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    endpoint="api/v1/managed-software-updates/plans/feature-toggle"
+    curl_url="$jss_url/$endpoint"
+    curl_args=("--request")
+    curl_args+=("PUT")
+    curl_args+=("--header")
+    curl_args+=("Accept: application/json")
+    curl_args+=("--header")
+    curl_args+=("Content-Type: application/json")
+    curl_args+=("--data-raw")
+    curl_args+=("{\"toggle\": $toggle_set_value}")
+    send_curl_request
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Toggle Software Update Plan Feature to $toggle_set_value'}"
     send_slack_notification "$slack_text"
 }
 
@@ -897,6 +965,9 @@ while test $# -gt 0 ; do
         --flushmdm|--flush-mdm)
             mdm_command="flushmdm"
             ;;
+        --toggle)
+            mdm_command="toggle"
+            ;;
         --recovery-lock-password)
             shift
             cli_recovery_lock_password="$1"
@@ -967,6 +1038,7 @@ else
     echo "   [L] Logout user (mobile devices)"
     echo "   [B0] [B1] Disable/Enable Bluetooth (mobile devices)"
     echo "   [F] Flush MDM commands"
+    echo "   [T] Toggle Software Update Plan Feature"
     printf 'Choose one : '
     read -r action_question
 
@@ -1001,6 +1073,9 @@ else
         F|f)
             mdm_command="flushmdm"
             ;;
+        T|t)
+            mdm_command="toggle"
+            ;;
         *)
             echo
             echo "No valid action chosen!"
@@ -1010,7 +1085,7 @@ else
 fi
 
 # if a group name was supplied at the command line, compile the list of computers/mobile devices from that group
-if [[ $group_name && $mdm_command != "flushmdm" ]]; then
+if [[ $group_name && $mdm_command != "flushmdm" && $mdm_command != "toggle" ]]; then
     echo
     if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" ]]; then
         get_mobile_devices_in_group
@@ -1024,13 +1099,17 @@ fi
 if [[ ($mdm_command == "flushmdm" && ! $group_name) || $mdm_command != "flushmdm" ]]; then
     if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" || $mdm_command == "bluetooth"* || ($mdm_command == "flushmdm" && $device_type == "devices") ]]; then
         generate_mobile_device_list
-    else
+    elif [[ $mdm_command != "toggle" ]]; then
         generate_computer_list
     fi
-else
+elif [[ $mdm_command != "toggle" ]]; then
     echo "Using group: $group_name"
 fi
 
+# for toggling software update feature status we want to display the current value
+if [[ $mdm_command == "toggle" ]]; then
+    get_software_update_feature_status
+fi
 
 # are we sure to proceed?
 are_you_sure
@@ -1038,38 +1117,6 @@ are_you_sure
 
 # the following section depends on the chosen MDM command
 case "$mdm_command" in
-    eacas)
-        echo "   [main] Sending MDM erase command"
-        eacas
-        ;;
-    redeploy)
-        echo "   [main] Redeploying Management Framework"
-        redeploy_framework
-        ;;
-    recovery)
-        echo "   [main] Setting recovery lock"
-        set_recovery_lock
-        ;;
-    removemdm)
-        echo "   [main] Removing MDM Enrollment Profile"
-        remove_mdm
-        ;;
-    deleteusers)
-        echo "   [main] Deleting All Users"
-        delete_users
-        ;;
-    restart)
-        echo "   [main] Restarting Device(s)"
-        restart
-        ;;
-    logout)
-        echo "   [main] Logging Out User on Device(s)"
-        logout_users
-        ;;
-    flushmdm)
-        echo "   [main] Flushing MDM Commands"
-        flush_mdm
-        ;;
     bluetooth-off)
         echo "   [main] Disabling Bluetooth on Device"
         send_settings_command "bluetooth" "false"
@@ -1077,5 +1124,41 @@ case "$mdm_command" in
     bluetooth-on)
         echo "   [main] Enabling Bluetooth on Device"
         send_settings_command "bluetooth" "true"
+        ;;
+    deleteusers)
+        echo "   [main] Deleting All Users"
+        delete_users
+        ;;
+    eacas)
+        echo "   [main] Sending MDM erase command"
+        eacas
+        ;;
+    flushmdm)
+        echo "   [main] Flushing MDM Commands"
+        flush_mdm
+        ;;
+    logout)
+        echo "   [main] Logging Out User on Device(s)"
+        logout_users
+        ;;
+    recovery)
+        echo "   [main] Setting recovery lock"
+        set_recovery_lock
+        ;;
+    redeploy)
+        echo "   [main] Redeploying Management Framework"
+        redeploy_framework
+        ;;
+    removemdm)
+        echo "   [main] Removing MDM Enrollment Profile"
+        remove_mdm
+        ;;
+    restart)
+        echo "   [main] Restarting Device(s)"
+        restart
+        ;;
+    toggle)
+        echo "   [main] Toggling Software Update Plan Feature"
+        toggle_software_update_feature
         ;;
 esac
