@@ -182,13 +182,15 @@ choose_destination_instances
 if [[ $chosen_instance ]]; then
     jss_instance="$chosen_instance"
     set_credentials "$jss_instance"
-    echo "Running jamf-api-tool on $jss_instance..."
+    echo "Running on $jss_instance..."
+    echo "jamf-upload.sh ${args[*]}"
     run_jamfupload
 else
     for instance in "${instance_choice_array[@]}"; do
         jss_instance="$instance"
         set_credentials "$jss_instance"
-        echo "Running jamf-api-tool on $jss_instance..."
+        echo "Running on $jss_instance..."
+        echo "jamf-upload.sh ${args[*]}"
         run_jamfupload
     done
 fi

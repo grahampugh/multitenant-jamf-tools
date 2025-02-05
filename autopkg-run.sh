@@ -49,6 +49,12 @@ run_autopkg() {
     autopkg_run_options+=("--key")
     autopkg_run_options+=("API_PASSWORD=$jss_api_password")
 
+    # temporarily clear any API clients in the AutoPkg prefs
+    autopkg_run_options+=("--key")
+    autopkg_run_options+=("CLIENT_ID=")
+    autopkg_run_options+=("--key")
+    autopkg_run_options+=("CLIENT_SECRET=")
+
     # determine the share
     get_instance_distribution_point
     if [[ "$smb_url" ]]; then
