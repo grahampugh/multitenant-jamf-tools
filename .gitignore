@@ -5,3 +5,5 @@ tst.txt
 tmp*.txt
 Private-*.xml
 playground/*
+slack-webhooks/*.txt
+instance-lists/*.txt
