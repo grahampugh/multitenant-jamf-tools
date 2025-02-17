@@ -727,6 +727,51 @@ choose_template_file() {
     fi
 }
 
+element_in() {
+  local e match="$1"
+  shift
+  for e; do [[ "$e" == "$match" ]] && return 0; done
+  return 1
+}
+
+run_jamfupload() {
+    instance_args=()
+    
+    # specify the URL
+    instance_args+=("--url")
+    instance_args+=("$jss_instance")
+
+    # add the credentials
+    instance_args+=("--user")
+    instance_args+=("$jss_api_user")
+    instance_args+=("--pass")
+    instance_args+=("$jss_api_password")
+
+    # determine the share
+    if element_in "pkg" "${args[@]}" || element_in "package" "${args[@]}"; then
+        get_instance_distribution_point
+        if [[ "$smb_url" ]]; then
+            # get the smb credentials from the keychain
+            get_smb_credentials
+
+            instance_args+=("--smb-url")
+            instance_args+=("$smb_url")
+            instance_args+=("--smb-user")
+            instance_args+=("$smb_user")
+            instance_args+=("--smb-pass")
+            instance_args+=("$smb_pass")
+        fi
+    fi
+
+    # Run the script and output to stdout
+    # echo "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" # TEMP
+    "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" 
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_instance', 'text': '*jamfuploader_run.sh*\nUser: $jss_api_user\nInstance: $jss_instance\nArguments: ${args[*]}'}"
+    send_slack_notification "$slack_text"
+}
+
 get_api_object_type() {
     local api_xml_object=$1
 
@@ -784,6 +829,7 @@ get_api_object_from_type() {
     esac
     echo "$api_xml_object"
 }
+
 
 
 # ljt section

@@ -20,6 +20,10 @@ xml_folder="$xml_folder_default"
 mkdir -p "${xml_folder}"
 
 
+###########
+## USAGE ##
+###########
+
 usage() {
     cat <<'USAGE'
 Usage:
@@ -38,6 +42,11 @@ Usage:
 -v                            - add verbose curl output
 USAGE
 }
+
+
+###############
+## FUNCTIONS ##
+###############
 
 encode_name() {
     # encode space, '&amp;', percent
@@ -78,13 +87,27 @@ if [[ ! -d "${this_script_dir}" ]]; then
     exit 1
 fi
 
-## MAIN BODY
 
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+##############
+## DEFAULTS ##
+##############
+
+if [[ ! -f "$jamf_upload_path" ]]; then
+    # default path to jamf-upload-sh
+    jamf_upload_path="$HOME/Library/AutoPkg/RecipeRepos/com.github.grahampugh.jamf-upload/jamf-upload.sh"
+fi
+# ensure the path exists, revert to defaults otherwise
+if [[ ! -f "$jamf_upload_path" ]]; then
+    jamf_upload_path="../jamf-upload/jamf-upload.sh"
+fi
+
+
+###############
+## ARGUMENTS ##
+###############
 
 ea_type="computer"
+args=()
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -101,6 +124,10 @@ while [[ "$#" -gt 0 ]]; do
         --name)
             shift
             ea_name="$1"
+        ;;
+        -d|--download-all)
+            shift
+            ea_name="ALL"
         ;;
         --ios|--device)
             shift
@@ -126,12 +153,20 @@ while [[ "$#" -gt 0 ]]; do
 done
 echo
 
+# fail if no valid path found
+if [[ ! -f "$jamf_upload_path" ]]; then
+    echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"
+    exit 1
+fi
+
 # ------------------------------------------------------------------------------------
 # 1. Ask for the instance list, show list, ask to apply to one, multiple or all
 # ------------------------------------------------------------------------------------
 
-# set ldap user
-if [[ ! $ea_name ]]; then
+# get the EA name
+if [[ $ea_name == "ALL" ]]; then
+    all_objects=1
+elif [[ ! $ea_name ]]; then
     read -r -p "Enter Extension Attribute Name : " ea_name
 fi
 
@@ -141,24 +176,68 @@ default_instance_list="prd"
 # select the instances that will be changed
 choose_destination_instances
 
-# get specific instance if entered
+# set jamf-upload args
+args+=(read)
+
+if [[ ! $verbosity_mode && ! $quiet_mode ]]; then
+    # default verbosity
+    args+=(-v)
+elif [[ ! $quiet_mode ]]; then
+    args+=("$verbosity_mode")
+fi
+
+if [[ $ea_type == "device" ]]; then
+    args+=(--type mobile_device_extension_attribute)
+else
+    args+=(--type computer_extension_attribute)
+fi
+
+if [[ $all_objects ]]; then
+    args+=(--all)
+else
+    args+=(--name "$ea_name")
+fi
+
+args+=(--output "$xml_folder")
+
+# now run jamf-upload
 if [[ $chosen_instance ]]; then
     jss_instance="$chosen_instance"
-    if [[ $ea_type == "device" ]]; then
-        fetch_api_object_by_name mobile_device_extension_attribute "$ea_name"
-    else
-        fetch_api_object_by_name computer_extension_attribute "$ea_name"
-    fi
+    set_credentials "$jss_instance"
+    echo "Running on $jss_instance..."
+    echo "jamf-upload.sh ${args[*]}"
+    run_jamfupload
 else
     for instance in "${instance_choice_array[@]}"; do
         jss_instance="$instance"
-    if [[ $ea_type == "device" ]]; then
-        fetch_api_object_by_name mobile_device_extension_attribute "$ea_name"
-    else
-        fetch_api_object_by_name computer_extension_attribute "$ea_name"
-    fi
+        set_credentials "$jss_instance"
+        echo "Running on $jss_instance..."
+        echo "jamf-upload.sh ${args[*]}"
+        run_jamfupload
     done
 fi
+
+
+
+
+# get specific instance if entered
+# if [[ $chosen_instance ]]; then
+#     jss_instance="$chosen_instance"
+#     if [[ $ea_type == "device" ]]; then
+#         fetch_api_object_by_name mobile_device_extension_attribute "$ea_name"
+#     else
+#         fetch_api_object_by_name computer_extension_attribute "$ea_name"
+#     fi
+# else
+#     for instance in "${instance_choice_array[@]}"; do
+#         jss_instance="$instance"
+#     if [[ $ea_type == "device" ]]; then
+#         fetch_api_object_by_name mobile_device_extension_attribute "$ea_name"
+#     else
+#         fetch_api_object_by_name computer_extension_attribute "$ea_name"
+#     fi
+#     done
+# fi
 
 echo 
 echo "Finished"

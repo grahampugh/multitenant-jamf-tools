@@ -36,74 +36,18 @@ jamfuploader-run.sh usage:
 "
 }
 
-###############
-## FUNCTIONS ##
-###############
-
-element_in() {
-  local e match="$1"
-  shift
-  for e; do [[ "$e" == "$match" ]] && return 0; done
-  return 1
-}
-
-run_jamfupload() {
-    instance_args=()
-    
-    # specify the URL
-    instance_args+=("--url")
-    instance_args+=("$jss_instance")
-
-    # add the credentials
-    instance_args+=("--user")
-    instance_args+=("$jss_api_user")
-    instance_args+=("--pass")
-    instance_args+=("$jss_api_password")
-
-    # determine the share
-    if element_in "pkg" "${args[@]}" || element_in "package" "${args[@]}"; then
-        get_instance_distribution_point
-        if [[ "$smb_url" ]]; then
-            # get the smb credentials from the keychain
-            get_smb_credentials
-
-            instance_args+=("--smb-url")
-            instance_args+=("$smb_url")
-            instance_args+=("--smb-user")
-            instance_args+=("$smb_user")
-            instance_args+=("--smb-pass")
-            instance_args+=("$smb_pass")
-        fi
-    fi
-
-    # Run the script and output to stdout
-    # echo "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" # TEMP
-    "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" 
-
-    # Send Slack notification
-    slack_text="{'username': '$jss_instance', 'text': '*jamfuploader_run.sh*\nUser: $jss_api_user\nInstance: $jss_instance\nArguments: ${args[*]}'}"
-    send_slack_notification "$slack_text"
-}
-
-
 ##############
 ## DEFAULTS ##
 ##############
 
 if [[ ! -f "$jamf_upload_path" ]]; then
-    # default path to jamf-upload-sh
+    # default path to jamf-upload.sh
     jamf_upload_path="$HOME/Library/AutoPkg/RecipeRepos/com.github.grahampugh.jamf-upload/jamf-upload.sh"
 fi
 # ensure the path exists, revert to defaults otherwise
 if [[ ! -f "$jamf_upload_path" ]]; then
     jamf_upload_path="../jamf-upload/jamf-upload.sh"
 fi
-# fail if no valid path found
-if [[ ! -f "$jamf_upload_path" ]]; then
-    echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"
-    exit 1
-fi
-
 
 ###############
 ## ARGUMENTS ##
@@ -133,7 +77,11 @@ while test $# -gt 0 ; do
             all_instances=1
             ;;
         -j)
-            jamf_upload_path="../jamf-upload/jamf-upload.sh"
+            jamf_upload_path="$1"
+            if [[ ! -f "$jamf_upload_path" ]]; then
+                echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"
+                exit 1
+            fi
             ;;
         -q)
             quiet_mode="yes"
@@ -160,6 +108,14 @@ while test $# -gt 0 ; do
     shift
 done
 echo
+
+# fail if no valid path found
+if [[ ! -f "$jamf_upload_path" ]]; then
+    echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"
+    exit 1
+fi
+
+
 
 if [[ ! $verbosity_mode && ! $quiet_mode ]]; then
     # default verbosity
