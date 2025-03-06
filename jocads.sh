@@ -1764,9 +1764,7 @@ do_parsing() {
     grep -v '<id>' < "${fetched_file}" \
     | sed '/<computers>/,/<\/computers>/d' \
     | sed '/<mobile_devices>/,/<\/mobile_devices>/d' \
-    | sed '/<limit_to_users>/,/<\/limit_to_users>/d' \
     | sed '/<users>/,/<\/users>/d' \
-    | sed '/<user_groups>/,/<\/user_groups>/d' \
     | sed '/<self_service_icon>/,/<\/self_service_icon>/d' \
     | sed 's/<redeploy_on_update>Newly Assigned<\/redeploy_on_update>/<redeploy_on_update>All<\/redeploy_on_update>/g' \
     > "${parsed_file}"
