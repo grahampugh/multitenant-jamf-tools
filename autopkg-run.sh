@@ -160,6 +160,12 @@ if [[ ! -f "$autopkg_binary" ]]; then
     exit 1
 fi
 
+# ensure pillow module is installed, this is required for recipes that use IconGenerator
+if ! /usr/local/autopkg/python -m pip show pillow 2>/dev/null; then
+    echo "Installing Pillow module..."
+    /usr/local/autopkg/python -m pip install --upgrade pillow
+fi
+
 # -------------------------------------------------------------------------
 # Command line options (presets to avoid interaction)
 # -------------------------------------------------------------------------
