@@ -68,8 +68,7 @@ list_browsers() {
 }
 
 open_jss() {
-    # determine jss_url
-    # echo "open -a \"$browser_selected\" \"$jss_instance\""
+    echo  # weirdly, Safari crashes without this line
     sleep 0.1
     open -a "$browser_selected" "$jss_instance"
 }
