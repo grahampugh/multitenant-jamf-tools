@@ -1972,7 +1972,8 @@ main() {
     # -------------------------------------------------------------------------
 
     # Set default instance list
-    default_instance_list="prd"
+    default_instance_list_file="instance-lists/default-instance-list.txt"
+    [[ -f "$default_instance_list_file" ]] && default_instance_list=$(cat "$default_instance_list_file") || default_instance_list="prd"
 
     # Check and create the JSS xml folder and archive folders if missing.
     xml_folder="$xml_folder_default"

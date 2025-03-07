@@ -111,7 +111,8 @@ check_xml_folder() {
 
 setup_the_action() {
     # Set default instance list
-    default_instance_list="prd"
+    default_instance_list_file="instance-lists/default-instance-list.txt"
+    [[ -f "$default_instance_list_file" ]] && default_instance_list=$(cat "$default_instance_list_file") || default_instance_list="prd"
 
     # Check and create the JSS xml folder and archive folders if missing.
     xml_folder="$xml_folder_default"
@@ -993,7 +994,8 @@ main_menu() {
     # -------------------------------------------------------------------------
 
     # Set default server
-    default_source_server="prd"
+    default_instance_list_file="instance-lists/default-instance-list.txt"
+    [[ -f "$default_instance_list_file" ]] && default_source_server=$(cat "$default_instance_list_file") || default_source_server="prd"
 
     # These are the endpoints we're going to read
     readfiles=()

@@ -100,7 +100,8 @@ mkdir -p "$(dirname "$output_csv")"
 echo "" > "$output_csv"
 
 # Set default instance list
-default_instance_list="prd"
+default_instance_list_file="instance-lists/default-instance-list.txt"
+[[ -f "$default_instance_list_file" ]] && default_instance_list=$(cat "$default_instance_list_file") || default_instance_list="prd"
 
 # select the instances that will be changed
 choose_destination_instances

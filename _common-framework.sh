@@ -91,7 +91,7 @@ get_instance_list_files() {
             instance_list_files+=("$filename")
             echo "[$i] $filename"
             ((i++))
-        done < <(find "$instance_lists_folder" -type f -name "*.txt" -print0)
+        done < <(find "$instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -print0)
     fi
     if [[ $i -eq 0 ]]; then
         echo
@@ -120,9 +120,10 @@ get_instance_list() {
                 note=""
             fi
             if [[ "$instance" ]]; then
-                # strip the URL back to remove trailing slashes or parameters
-                instance=$(strip_url "$instance")
-
+                if [[ $strip_failover != "no" ]]; then
+                    # strip the URL back to remove failover or other supplied URL parameters
+                    instance=$(strip_url "$instance")
+                fi
                 instances_list_inc_ios_instances+=("$instance") 
                 if [[ "$note" != *"iOS"* ]]; then
                     instances_list+=("$instance")
