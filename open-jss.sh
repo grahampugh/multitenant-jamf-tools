@@ -60,7 +60,8 @@ list_browsers() {
         read -r -p "Enter the number of the browser to use : " browser_selection
     fi
     if [[ "$browser_selection" ]]; then
-        browser_selected="${browser_list[instance_selection]}"
+        browser_selected="${browser_list[browser_selection]}"
+        echo "Selected browser: $browser_selected"
     else
         browser_selected="${browser_list[$default_browser_number]}"
     fi
@@ -68,6 +69,8 @@ list_browsers() {
 
 open_jss() {
     # determine jss_url
+    # echo "open -a \"$browser_selected\" \"$jss_instance\""
+    sleep 0.1
     open -a "$browser_selected" "$jss_instance"
 }
 
@@ -127,12 +130,12 @@ list_browsers
 # get specific instance if entered
 if [[ $chosen_instance ]]; then
     jss_instance="$chosen_instance"
-    echo "Opening $jss_instance in the default browser..."
+    echo "Opening $jss_instance in $browser_selected..."
     open_jss
 else
     for instance in "${instance_choice_array[@]}"; do
         jss_instance="$instance"
-        echo "Opening $jss_instance in the default browser..."
+        echo "Opening $jss_instance in $browser_selected..."
         open_jss
     done
 fi
