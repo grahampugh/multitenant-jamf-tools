@@ -103,7 +103,7 @@ get_instance_list_files() {
     # repeat for the default in case we need to keep private lists
     if [[ -d "$default_instance_lists_folder" ]] && [[ $(find "$default_instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -maxdepth 1 2>/dev/null | wc -l) -gt 0 ]]; then
         echo
-        echo "Private Instance lists folder: $instance_lists_folder"
+        echo "Private Instance lists folder: $default_instance_lists_folder"
         echo
         while IFS= read -r -d '' file; do
             filename=$(basename "$file" | cut -d. -f 1)
