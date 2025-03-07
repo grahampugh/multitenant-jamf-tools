@@ -81,7 +81,13 @@ get_slack_webhook() {
 
 get_instance_list_files() {
     # get a list of instance list files
-    instance_lists_folder="$this_script_dir/instance-lists"
+    # import relevant instance list
+    default_instance_lists_folder="$this_script_dir/instance-lists"
+    if defaults read com.github.autopkg instance_lists &>/dev/null; then
+        instance_lists_folder=$(defaults read com.github.autopkg instance_lists)
+        echo "Instance lists folder: $instance_lists_folder"
+        echo
+    fi
     i=0
     instance_list_files=()
 
@@ -93,18 +99,36 @@ get_instance_list_files() {
             ((i++))
         done < <(find "$instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -print0)
     fi
+
+    # repeat for the default in case we need to keep private lists
+    if [[ -d "$default_instance_lists_folder" ]] && [[ $(find "$default_instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -maxdepth 1 2>/dev/null | wc -l) -gt 0 ]]; then
+        echo
+        echo "Private Instance lists folder: $instance_lists_folder"
+        echo
+        while IFS= read -r -d '' file; do
+            filename=$(basename "$file" | cut -d. -f 1)
+            match=0
+            for il in "${instance_list_files[@]}"; do
+                if [[ "$il" == "$filename" ]]; then
+                    match=1
+                fi
+            done
+            if [[ $match -eq 0 ]] ; then
+                instance_list_files+=("$filename")
+                echo "[$i] $filename"
+                ((i++))
+            fi
+        done < <(find "$default_instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -print0)
+    fi
     if [[ $i -eq 0 ]]; then
         echo
-        echo "No instance lists found. To create an instance list, add a text file into the $instance_lists_folder folder"
+        echo "   [get_instance_list_files] No instance lists found. To create an instance list, add a text file into the $instance_lists_folder folder"
         exit 1
     fi
 }
 
 get_instance_list() {
     instance_list_file="$1"
-
-    # import relevant instance list
-    instance_lists_folder="$this_script_dir/instance-lists"
 
     if [[ -f "$instance_lists_folder/$instance_list_file.txt" ]]; then
         # generate a standard "complete" list 
@@ -140,8 +164,6 @@ get_instance_list() {
 
 choose_instance_list() {
     # get instance list files
-    echo
-    echo "Instance lists:"
     echo
     get_instance_list_files
     echo
