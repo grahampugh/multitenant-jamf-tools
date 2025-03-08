@@ -8,3 +8,7 @@ playground/*
 dotmobi-Customers.txt
 JSPP-Customers.txt
 Test-Enviroments.txt
+.DS_Store
+.gitignore
+instance-lists/jspp.txt
+instance-lists/datajar-mobi.txt

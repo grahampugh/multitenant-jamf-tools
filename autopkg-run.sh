@@ -6,7 +6,12 @@ DOC
 
 # source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+mjt_repo_dir=$(mdfind -literal "kMDItemDisplayName == 'multitenant-jamf-tools'" 2>/dev/null)
+if [[ ! -d "$mjt_repo_dir" ]]; then
+    echo "ERROR: multitenant-jamf-tools not found"
+    exit 1
+fi
+source "$mjt_repo_dir/_common-framework.sh"
 
 # reduce the curl tries
 max_tries_override=2
