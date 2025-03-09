@@ -128,10 +128,7 @@ fi
 # 1. Ask for the instance list, show list, ask to apply to one, multiple or all
 # ------------------------------------------------------------------------------------
 
-# Set default instance list
-default_instance_list_file="instance-lists/default-instance-list.txt"
-[[ -f "$default_instance_list_file" ]] && default_instance_list=$(cat "$default_instance_list_file") || default_instance_list="prd"
-
+echo "This script will run grahampugh/jamf-upload/jamf-upload.sh on the instance(s) you choose."
 
 # select the instances that will be changed
 choose_destination_instances

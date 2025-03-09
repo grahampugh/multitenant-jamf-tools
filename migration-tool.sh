@@ -993,10 +993,6 @@ main_menu() {
     # Set the source and destination server(s) and instance(s)
     # -------------------------------------------------------------------------
 
-    # Set default server
-    default_instance_list_file="instance-lists/default-instance-list.txt"
-    [[ -f "$default_instance_list_file" ]] && default_source_server=$(cat "$default_instance_list_file") || default_source_server="prd"
-
     # These are the endpoints we're going to read
     readfiles=()
     while read -r line; do

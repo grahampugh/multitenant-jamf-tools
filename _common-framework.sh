@@ -82,19 +82,41 @@ get_slack_webhook() {
 get_instance_list_files() {
     # get a list of instance list files
     # import relevant instance list
+    echo
     default_instance_lists_folder="$this_script_dir/instance-lists"
     if defaults read com.github.autopkg instance_lists &>/dev/null; then
-        instance_lists_folder=$(defaults read com.github.autopkg instance_lists)
-        echo "Instance lists folder: $instance_lists_folder"
-        echo
+        if [[ $(defaults read com.github.autopkg instance_lists) ]]; then
+            instance_lists_folder=$(defaults read com.github.autopkg instance_lists)
+            echo "Instance lists folder: $instance_lists_folder"
+            echo
+        fi
     fi
+    # Set default instance list
+    if [[ -d "$instance_lists_folder" ]]; then
+        default_instance_list_file="$instance_lists_folder/default-instance-list.txt"
+        if [[ -f "$default_instance_list_file" ]]; then
+            default_instance_list="$instance_lists_folder/$(cat "$default_instance_list_file").txt"
+        else
+            default_instance_list="$instance_lists_folder/prd.txt"
+        fi
+    else
+        default_instance_list_file="$default_instance_lists_folder/default-instance-list.txt"
+        if [[ -f "$default_instance_list_file" ]]; then
+            default_instance_list="$default_instance_lists_folder/$(cat "$default_instance_list_file").txt"
+        else
+            default_instance_list="$default_instance_lists_folder/prd.txt"
+        fi
+    fi
+
+    default_instance_list_for_dialogs="$(basename "$default_instance_list" | cut -d. -f 1)"
+
     i=0
     instance_list_files=()
 
     if [[ -d "$instance_lists_folder" ]]; then
         while IFS= read -r -d '' file; do
             filename=$(basename "$file" | cut -d. -f 1)
-            instance_list_files+=("$filename")
+            instance_list_files+=("$file")
             echo "[$i] $filename"
             ((i++))
         done < <(find "$instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -print0)
@@ -114,7 +136,7 @@ get_instance_list_files() {
                 fi
             done
             if [[ $match -eq 0 ]] ; then
-                instance_list_files+=("$filename")
+                instance_list_files+=("$file")
                 echo "[$i] $filename"
                 ((i++))
             fi
@@ -130,7 +152,7 @@ get_instance_list_files() {
 get_instance_list() {
     instance_list_file="$1"
 
-    if [[ -f "$instance_lists_folder/$instance_list_file.txt" ]]; then
+    if [[ -f "$instance_list_file" ]]; then
         # generate a standard "complete" list 
         instances_list=()
         instances_list_inc_ios_instances=()
@@ -154,7 +176,7 @@ get_instance_list() {
                 fi
             fi
 
-        done < "$instance_lists_folder/$instance_list_file.txt"
+        done < "$instance_list_file"
     else
         echo
         echo "No instance list found."
@@ -164,30 +186,22 @@ get_instance_list() {
 
 choose_instance_list() {
     # get instance list files
-    echo
     get_instance_list_files
     echo
 
     # set instance list
-    if [[ $instance_list_file ]]; then
+    if [[ -f $instance_list_file ]]; then
         echo "Instance list $instance_list_file chosen"
-        if [[ $instance_list_file != *".txt" ]]; then
-            instance_list_file_with_suffix="$instance_list_file.txt"
-        fi
-        if [[ ! -f "$instance_lists_folder/$instance_list_file_with_suffix" ]]; then
-            echo "Instance list not found"
-            exit 1
-        fi
     else
         echo "Choose the instance list from the list above"
-        if [[ $default_instance_list && -f "$instance_lists_folder/$default_instance_list.txt" ]]; then
-            echo "or press ENTER to choose list $default_instance_list"
+        if [[ -f "$default_instance_list" ]]; then
+            echo "or press ENTER to choose list $default_instance_list_for_dialogs"
         fi
         read -r -p "Instance list : " instance_list
         echo
-        if [[ $instance_list && -f "$instance_lists_folder/${instance_list_files[$instance_list]}.txt" ]]; then
+        if [[ $instance_list && -f "${instance_list_files[$instance_list]}" ]]; then
             instance_list_file="${instance_list_files[$instance_list]}"
-        elif [[ -f "$instance_lists_folder/$default_instance_list.txt" ]]; then
+        elif [[ -f "$default_instance_list" ]]; then
             instance_list_file="$default_instance_list"
         else
             echo "Instance list not found"
@@ -205,7 +219,6 @@ choose_instance_list() {
         working_instances_list=("${instances_list[@]}")
     fi
 
-    echo
     echo "Instance list $instance_list_file:"
     item=0
     for instance in "${working_instances_list[@]}"; do
@@ -274,6 +287,7 @@ strip_url() {
 }
 
 choose_destination_instances() {
+    echo
     choose_instance_list
 
     instance_selection=""

@@ -91,11 +91,6 @@ while [[ "$#" -gt 0 ]]; do
 done
 echo
 
-# Set default instance list
-default_instance_list_file="instance-lists/default-instance-list.txt"
-[[ -f "$default_instance_list_file" ]] && default_instance_list=$(cat "$default_instance_list_file") || default_instance_list="prd"
-
-
 # get template
 choose_template_file
 

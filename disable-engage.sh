@@ -83,15 +83,13 @@ while [[ "$#" -gt 0 ]]; do
     # Shift after checking all the cases to get the next option
     shift
 done
-echo
 
 # ------------------------------------------------------------------------------------
 # 1. Ask for the instance list, show list, ask to apply to one, multiple or all
 # ------------------------------------------------------------------------------------
 
-# Set default instance list
-default_instance_list_file="instance-lists/default-instance-list.txt"
-[[ -f "$default_instance_list_file" ]] && default_instance_list=$(cat "$default_instance_list_file") || default_instance_list="prd"
+echo
+echo "This script will disable Engage on the chosen instance(s)."
 
 # select the instances that will be changed
 choose_destination_instances

@@ -161,7 +161,7 @@ if [[ ! -f "$autopkg_binary" ]]; then
 fi
 
 # ensure pillow module is installed, this is required for recipes that use IconGenerator
-if ! /usr/local/autopkg/python -m pip show pillow 2>/dev/null; then
+if ! /usr/local/autopkg/python -m pip show pillow &>/dev/null; then
     echo "Installing Pillow module..."
     /usr/local/autopkg/python -m pip install --upgrade pillow
 fi
@@ -228,15 +228,13 @@ while [[ "$#" -gt 0 ]]; do
     # Shift after checking all the cases to get the next option
     shift
 done
-echo
 
 # ------------------------------------------------------------------------------------
 # 1. Ask for the instance list, show list, ask to apply to one, multiple or all
 # ------------------------------------------------------------------------------------
 
-# Set default instance list
-default_instance_list_file="instance-lists/default-instance-list.txt"
-[[ -f "$default_instance_list_file" ]] && default_instance_list=$(cat "$default_instance_list_file") || default_instance_list="prd"
+echo
+echo "This script will run autopkg recipes on the instance(s) you choose."
 
 # select the instances that will be changed
 choose_destination_instances

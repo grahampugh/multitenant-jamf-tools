@@ -125,10 +125,6 @@ while [[ "$#" -gt 0 ]]; do
 done
 echo
 
-# Set default instance list
-default_instance_list_file="instance-lists/default-instance-list.txt"
-[[ -f "$default_instance_list_file" ]] && default_instance_list=$(cat "$default_instance_list_file") || default_instance_list="prd"
-
 # set default
 if [[ $days -ne 30 && $days -ne 90 && $days -ne 180 ]]; then
     read -r -p "Enter 30 or 90 : " days
