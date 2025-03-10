@@ -1980,18 +1980,20 @@ main() {
     do_all_instances=""
 
     # select the instance that will be used as the source
-    if [[ $source_instance_list ]]; then
-        instance_list_file="$source_instance_list"
+    if [[ $chosen_source_instance_list ]]; then
+        chosen_instance_list_file="$chosen_source_instance_list"
+        echo "   [main] Source instance selected from CLI: $chosen_instance_list_file ($chosen_source_instance_list)" # TEMP
     fi
     choose_source_instance
     source_instance_list="$instance_list_file"
     default_instance_list="$source_instance_list" # reset default to match source
+    echo "   [main] Dest instance selected: $source_instance_list ($default_instance_list)" # TEMP
 
     # now select the destination instances
-    if [[ $dest_instance_list ]]; then
-        instance_list_file="$dest_instance_list"
+    if [[ $chosen_dest_instance_list ]]; then
+        chosen_instance_list_file="$chosen_dest_instance_list"
     else
-        instance_list_file=""
+        chosen_instance_list_file=""
     fi
     echo "Now select the destination instance list"
     choose_destination_instances
@@ -2578,24 +2580,24 @@ while [[ "$#" -gt 0 ]]; do
         ;;
 
         --source-list=*)
-            source_instance_list="${key#*=}"
+            chosen_source_instance_list="${key#*=}"
             echo "   [main] CLI: Source instance list: $source_instance_list"
         ;;
 
         -il|--source-list)
             shift
-            source_instance_list="${1}"
+            chosen_source_instance_list="${1}"
             echo "   [main] CLI: Source instance list: $source_instance_list"
         ;;
 
         --dest-list=*)
-            dest_instance_list="${key#*=}"
+            chosen_dest_instance_list="${key#*=}"
             echo "   [main] CLI: Destination instance list: $dest_instance_list"
         ;;
 
         -dil|--dest-list)
             shift
-            dest_instance_list="${1}"
+            chosen_dest_instance_list="${1}"
             echo "   [main] CLI: Destination instance list: $dest_instance_list"
         ;;
 

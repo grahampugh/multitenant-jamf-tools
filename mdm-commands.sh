@@ -632,9 +632,9 @@ recovery_lock_password=""
 # read inputs
 while test $# -gt 0 ; do
     case "$1" in
-        -sl|--server-list)
+        -il|--instance-list)
             shift
-            server_list="$1"
+            chosen_instance_list_file="$1"
         ;;
         -si|--instance)
             shift

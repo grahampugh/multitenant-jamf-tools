@@ -67,7 +67,7 @@ while [[ "$#" -gt 0 ]]; do
         ;;
         -il|--instance-list)
             shift
-            instance_list_file="$1"
+            chosen_instance_list_file="$1"
         ;;
         -i|--instance)
             shift

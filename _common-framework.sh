@@ -91,20 +91,22 @@ get_instance_list_files() {
             echo
         fi
     fi
-    # Set default instance list
-    if [[ -d "$instance_lists_folder" ]]; then
-        default_instance_list_file="$instance_lists_folder/default-instance-list.txt"
-        if [[ -f "$default_instance_list_file" ]]; then
-            default_instance_list="$instance_lists_folder/$(cat "$default_instance_list_file").txt"
+    # Set default instance list (already set if using jocads.sh and selecting destination)
+    if [[ ! $default_instance_list ]]; then
+        if [[ -d "$instance_lists_folder" ]]; then
+            default_instance_list_file="$instance_lists_folder/default-instance-list.txt"
+            if [[ -f "$default_instance_list_file" ]]; then
+                default_instance_list="$instance_lists_folder/$(cat "$default_instance_list_file").txt"
+            else
+                default_instance_list="$instance_lists_folder/prd.txt"
+            fi
         else
-            default_instance_list="$instance_lists_folder/prd.txt"
-        fi
-    else
-        default_instance_list_file="$default_instance_lists_folder/default-instance-list.txt"
-        if [[ -f "$default_instance_list_file" ]]; then
-            default_instance_list="$default_instance_lists_folder/$(cat "$default_instance_list_file").txt"
-        else
-            default_instance_list="$default_instance_lists_folder/prd.txt"
+            default_instance_list_file="$default_instance_lists_folder/default-instance-list.txt"
+            if [[ -f "$default_instance_list_file" ]]; then
+                default_instance_list="$default_instance_lists_folder/$(cat "$default_instance_list_file").txt"
+            else
+                default_instance_list="$default_instance_lists_folder/prd.txt"
+            fi
         fi
     fi
 
@@ -112,10 +114,14 @@ get_instance_list_files() {
 
     i=0
     instance_list_files=()
+    chosen_instance_list_filepath=""
 
     if [[ -d "$instance_lists_folder" ]]; then
         while IFS= read -r -d '' file; do
             filename=$(basename "$file" | cut -d. -f 1)
+            if [[ "$filename" == "$chosen_instance_list_file" ]]; then
+                chosen_instance_list_filepath="$file"
+            fi
             instance_list_files+=("$file")
             echo "[$i] $filename"
             ((i++))
@@ -131,11 +137,15 @@ get_instance_list_files() {
             filename=$(basename "$file" | cut -d. -f 1)
             match=0
             for il in "${instance_list_files[@]}"; do
-                if [[ "$il" == "$filename" ]]; then
+                ilb=$(basename "$il" | cut -d. -f 1)
+                if [[ "$ilb" == "$filename" ]]; then
                     match=1
                 fi
             done
             if [[ $match -eq 0 ]] ; then
+                if [[ $filename == "$chosen_instance_list_file" ]]; then
+                    chosen_instance_list_filepath="$file"
+                fi
                 instance_list_files+=("$file")
                 echo "[$i] $filename"
                 ((i++))
@@ -190,8 +200,9 @@ choose_instance_list() {
     echo
 
     # set instance list
-    if [[ -f $instance_list_file ]]; then
-        echo "Instance list $instance_list_file chosen"
+    if [[ -f "$chosen_instance_list_filepath" ]]; then
+        echo "Instance list $chosen_instance_list_file chosen"
+        instance_list_file="$chosen_instance_list_filepath"
     else
         echo "Choose the instance list from the list above"
         if [[ -f "$default_instance_list" ]]; then
