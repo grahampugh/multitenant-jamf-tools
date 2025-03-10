@@ -134,7 +134,6 @@ run_autopkg() {
         fi
     fi
 
-
     if [[ $recipe_list ]]; then
         "$autopkg_binary" run "$autopkg_verbosity" --recipe-list "$recipe_list" "${autopkg_run_options[@]}"
     elif  [[ $recipe ]]; then
@@ -145,12 +144,13 @@ run_autopkg() {
     fi
 }
 
+
+## MAIN BODY
+
 if [[ ! -d "${this_script_dir}" ]]; then
     echo "ERROR: path to repo ambiguous. Aborting."
     exit 1
 fi
-
-## MAIN BODY
 
 # check if autopkg is installed, otherwise this won't work
 autopkg_binary="/usr/local/bin/autopkg"
