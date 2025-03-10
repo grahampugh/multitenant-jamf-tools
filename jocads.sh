@@ -1856,15 +1856,6 @@ main() {
     # Select the API object type
     # -------------------------------------------------------------------------
 
-    # Start menu screen here
-    echo
-    echo "   ---------------------------------------------------"
-    echo "     JOCADS - the Jamf Object Copy and Delete Script"
-    echo "   ---------------------------------------------------"
-    echo
-    echo "   [main] script started at $(date)"
-    echo
-
     # default instance list type
     instance_list_type="mac"
 
@@ -1982,12 +1973,12 @@ main() {
     # select the instance that will be used as the source
     if [[ $chosen_source_instance_list ]]; then
         chosen_instance_list_file="$chosen_source_instance_list"
-        echo "   [main] Source instance selected from CLI: $chosen_instance_list_file ($chosen_source_instance_list)" # TEMP
+        echo "   [main] Source instance list selected from CLI: $chosen_instance_list_file" # TEMP
     fi
     choose_source_instance
     source_instance_list="$instance_list_file"
     default_instance_list="$source_instance_list" # reset default to match source
-    echo "   [main] Dest instance selected: $source_instance_list ($default_instance_list)" # TEMP
+    # echo "   [main] Dest instance selected: $source_instance_list ($default_instance_list)" # TEMP
 
     # now select the destination instances
     if [[ $chosen_dest_instance_list ]]; then
@@ -2550,6 +2541,19 @@ main() {
 }
 
 # -------------------------------------------------------------------------
+# Main script
+# -------------------------------------------------------------------------
+
+# Start menu screen here
+echo
+echo "   ---------------------------------------------------"
+echo "     JOCADS - the Jamf Object Copy and Delete Script"
+echo "   ---------------------------------------------------"
+echo
+echo "   [main] script started at $(date)"
+echo
+
+# -------------------------------------------------------------------------
 # Command line options (presets to avoid interaction)
 # -------------------------------------------------------------------------
 
@@ -2562,7 +2566,7 @@ while [[ "$#" -gt 0 ]]; do
             echo "   [main] CLI: Source instance: ${source_instance}"
         ;;
 
-        -i|--source)
+        -i|-si|--source)
             shift
             source_instance="${1}"
             echo "   [main] CLI: Source instance: ${source_instance}"
@@ -2581,24 +2585,24 @@ while [[ "$#" -gt 0 ]]; do
 
         --source-list=*)
             chosen_source_instance_list="${key#*=}"
-            echo "   [main] CLI: Source instance list: $source_instance_list"
+            echo "   [main] CLI: Source instance list: $chosen_source_instance_list"
         ;;
 
-        -il|--source-list)
+        -il|-sl|--source-list)
             shift
             chosen_source_instance_list="${1}"
-            echo "   [main] CLI: Source instance list: $source_instance_list"
+            echo "   [main] CLI: Source instance list: $chosen_source_instance_list"
         ;;
 
         --dest-list=*)
-            chosen_dest_instance_list="${key#*=}"
-            echo "   [main] CLI: Destination instance list: $dest_instance_list"
+            chosen_source_instance_list="${key#*=}"
+            echo "   [main] CLI: Destination instance list: $chosen_source_instance_list"
         ;;
 
-        -dil|--dest-list)
+        -dl|--dest-list)
             shift
             chosen_dest_instance_list="${1}"
-            echo "   [main] CLI: Destination instance list: $dest_instance_list"
+            echo "   [main] CLI: Destination instance list: $chosen_dest_instance_list"
         ;;
 
         -c|--copy)

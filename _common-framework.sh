@@ -249,11 +249,14 @@ choose_source_instance() {
     if [[ $source_instance == "template" || $source_instance == "0" ]]; then
         source_instance="$source_default_template_instance"
     else
-        instance_selection=""
-        echo "Enter the number of source instance from which to download API data,"
-        echo "   or enter a string to select the FIRST matching instance,"
-        read -r -p "   or press enter for '(0) $source_default_template_instance' : " instance_selection
-
+        if [[ $source_instance ]]; then
+            instance_selection="$source_instance"
+        else
+            instance_selection=""
+            echo "Enter the number of source instance from which to download API data,"
+            echo "   or enter a string to select the FIRST matching instance,"
+            read -r -p "   or press enter for '(0) $source_default_template_instance' : " instance_selection
+        fi
         # Check for the default or non-context
         if grep -qe "[A-Za-z]" <<< "$instance_selection"; then
             for instance in "${working_instances_list[@]}"; do
@@ -392,7 +395,7 @@ get_instance_distribution_point() {
         dp_names_list=$(xmllint --xpath "//distribution_points/distribution_point/name" "$curl_output_file" 2>/dev/null | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n")
         # loop through the DPs and check that we have credentials for them - only check the first one for now
         while read -r dp; do
-            echo "Distribution Point: $dp" # TEMP
+            # echo "Distribution Point: $dp" # TEMP
             if [[ $dp_url_filter ]]; then
                 if [[ $dp != *"$dp_url_filter"* ]]; then
                     echo "Skipping $dp"
