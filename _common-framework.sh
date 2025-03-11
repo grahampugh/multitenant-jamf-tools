@@ -59,11 +59,11 @@ root_check() {
 
 get_slack_webhook() {
     instance_list_file="$1" # slack webhook filename should match the current instance list file
-    slack_webhook_folder="$this_script_dir/slack-webhooks"
+    slack_webhook_file="$(dirname "$instance_list_file")/../slack-webhooks/$(basename "$instance_list_file")"
 
-    if [[ -f "$slack_webhook_folder/$instance_list_file.txt" ]]; then
+    webhook_found=0
+    if [[ -f "$slack_webhook_file" ]]; then
         # generate a standard "complete" list 
-        webhook_found=0
         slack_webhook_url=""
         while IFS= read -r slack_webhook_url; do
             if [[ "$slack_webhook_url" ]]; then
@@ -71,10 +71,9 @@ get_slack_webhook() {
                 echo "   [get_slack_webhook] Slack webhook found."
                 break
             fi
-        done < "$slack_webhook_folder/$instance_list_file.txt"
+        done < "$slack_webhook_file"
     fi
     if [[ $webhook_found -eq 0 ]]; then
-        echo "   [get_slack_webhook] No Slack webhook for $instance_list_file found."
         return 1
     fi
 }
@@ -496,9 +495,7 @@ get_smb_credentials() {
 send_slack_notification() {
     local slack_text=$1
 
-    get_slack_webhook "$instance_list_file"
-
-    if [[ $slack_webhook_url ]]; then
+    if get_slack_webhook "$instance_list_file"; then
         response=$(
             curl -s -o /dev/null -S -i -X POST -H "Content-Type: application/json" \
             --write-out '%{http_code}' \
@@ -506,6 +503,8 @@ send_slack_notification() {
             "$slack_webhook_url"
         )
         echo "   [send_slack_notification] Sent Slack notification (response: $response)"
+    else
+        echo "   [send_slack_notification] No Slack webhook found"
     fi
 }
 

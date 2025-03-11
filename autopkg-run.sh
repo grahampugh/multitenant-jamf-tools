@@ -132,6 +132,8 @@ run_autopkg() {
                 "com.github.grahampugh.jamf-upload.processors/JamfUploaderSlacker"
             )
         fi
+    else
+        echo "No Slack webhook found for $instance_list_file"
     fi
 
     if [[ $recipe_list ]]; then
