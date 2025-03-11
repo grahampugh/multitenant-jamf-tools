@@ -1,4 +1,5 @@
 #!/bin/bash
+# shellcheck disable=SC2154
 
 : <<'DOC'
 This script is meant to be sourced in order to supply credentials and a token to Jamf Pro API scripts
@@ -332,6 +333,7 @@ choose_destination_instances() {
         fi
     elif [[ $all_instances -eq 1 || "$instance_selection" == "ALL" ]]; then
         instance_choice_array+=("${working_instances_list[@]}")
+        # shellcheck disable=SC2034
         do_all_instances="yes"
     elif grep -qe "[A-Za-z]" <<< "$instance_selection"; then
         for instance in "${working_instances_list[@]}"; do
@@ -460,13 +462,16 @@ get_instance_distribution_point_new_api() {
         elif [[ "$dp_type" == "SMB" ]]; then
             dp_protocol="smb"
             dp_share=$(plutil -extract results.0.SMBFileShare.shareName raw "$curl_output_file")
+            # shellcheck disable=SC2034
             user_rw=$(plutil -extract results.0.SMBFileShare.readWriteUsername raw "$curl_output_file")
+            # shellcheck disable=SC2034
             pass_rw=$(plutil -extract results.0.SMBFileShare.readWritePassword raw "$curl_output_file")
         fi
     # if > 1 # TODO
     fi
     # smb url
     smb_url="$dp_protocol://$dp_server/$dp_share"
+    # shellcheck disable=SC2034
     smb_uri="$dp_server/$dp_share"
 }
 
@@ -845,6 +850,7 @@ get_object_id_from_name() {
     # echo
 
     # get id from output
+    # shellcheck disable=SC2034
     existing_id=$(xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = '$object_name']/id/text()" "$curl_output_file" 2>/dev/null)
     # xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = 'Administrator Rights']" "$curl_output_file" # TEMP
 }

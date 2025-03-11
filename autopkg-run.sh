@@ -76,7 +76,7 @@ run_autopkg() {
                     smb_pass=$(/usr/bin/security find-generic-password -s "$dp" -w -g 2>/dev/null)
                     if [[ $smb_url == *"(readwrite)"* && $smb_user && $smb_pass ]]; then
                         echo "Username and password for $dp found in keychain - URL=$smb_url"
-                        dp_found=1
+                        # dp_found=1
                         pass_rw="$smb_pass"
                         return
                     fi
@@ -196,10 +196,10 @@ while [[ "$#" -gt 0 ]]; do
             shift
             chosen_instance="$1"
         ;;
-        -s|--share)
-            shift
-            smb_share="$1"
-        ;;
+        # -s|--share)
+        #     shift
+        #     smb_share="$1"
+        # ;;
         -d|--dp)
             shift
             dp_url_filter="$1"
