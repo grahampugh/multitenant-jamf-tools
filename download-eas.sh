@@ -214,28 +214,6 @@ else
     done
 fi
 
-
-
-
-# get specific instance if entered
-# if [[ $chosen_instance ]]; then
-#     jss_instance="$chosen_instance"
-#     if [[ $ea_type == "device" ]]; then
-#         fetch_api_object_by_name mobile_device_extension_attribute "$ea_name"
-#     else
-#         fetch_api_object_by_name computer_extension_attribute "$ea_name"
-#     fi
-# else
-#     for instance in "${instance_choice_array[@]}"; do
-#         jss_instance="$instance"
-#     if [[ $ea_type == "device" ]]; then
-#         fetch_api_object_by_name mobile_device_extension_attribute "$ea_name"
-#     else
-#         fetch_api_object_by_name computer_extension_attribute "$ea_name"
-#     fi
-#     done
-# fi
-
 echo 
 echo "Finished"
 echo

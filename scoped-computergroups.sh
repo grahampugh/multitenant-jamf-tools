@@ -1,60 +1,6 @@
 #!/bin/bash
 
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#
-# Copyright (c) 2018 Jamf.  All rights reserved.
-#
-#       Redistribution and use in source and binary forms, with or without
-#       modification, are permitted provided that the following conditions are met:
-#               * Redistributions of source code must retain the above copyright
-#                 notice, this list of conditions and the following disclaimer.
-#               * Redistributions in binary form must reproduce the above copyright
-#                 notice, this list of conditions and the following disclaimer in the
-#                 documentation and/or other materials provided with the distribution.
-#               * Neither the name of the Jamf nor the names of its contributors may be
-#                 used to endorse or promote products derived from this software without
-#                 specific prior written permission.
-#
-#       THIS SOFTWARE IS PROVIDED BY JAMF SOFTWARE, LLC "AS IS" AND ANY
-#       EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
-#       WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
-#       DISCLAIMED. IN NO EVENT SHALL JAMF SOFTWARE, LLC BE LIABLE FOR ANY
-#       DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
-#       (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
-#       LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND
-#       ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-#       (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
-#       SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
-#
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-#
-# What is scoped to my Computer Groups?
-#
-# In this script we will utilize the Jamf Pro API to determine what Policies, Configuration
-# Profiles, Restricted Software, Mac App Store Apps and eBooks are assigned to your
-# Computer Groups.
-#
-# OBJECTIVES
-#       - Create a list of all Smart Groups
-#       - Provide a list of what is scoped to each Smart Group
-#
-# For more information, visit https://github.com/kc9wwh/JamfProGroupsScoped
-#
-#
-# Written by: Joshua Roskos | Jamf
-#
-# Created On: October 2nd, 2017
-# Updated On: February 1st, 2024 (added support for Sonoma and bearer token)
-# 
-# This version adapted for use with multiple Jamf Pro clients by Graham Pugh
-#
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# SETUP FOR MULTITENANT-JAMF-TOOLS
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
+# A script to check which policies, configuration profiles, restricted software, Mac App Store apps and eBooks are scoped to a specific computer group
 
 # source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
@@ -66,15 +12,33 @@ max_tries_override=2
 # set instance list type
 instance_list_type="ios"
 
-# obtain current user for exporting file
-currentUser=$(/usr/bin/stat -f%Su /dev/console)
-
 if [[ ! -d "${this_script_dir}" ]]; then
     echo "ERROR: path to repo ambiguous. Aborting."
     exit 1
 fi
 
+# prepare working directory
+workdir="/Users/Shared/Jamf/ScopedComputerGroups"
+mkdir -p "$workdir"
+
+
 ## MAIN BODY
+
+usage() {
+    cat <<'USAGE'
+Usage:
+./set_credentials.sh          - set the Keychain credentials
+
+[no arguments]                - interactive mode
+--il FILENAME (without .txt)  - provide an instance list filename
+                                (must exist in the instance-lists folder)
+--i JSS_URL                   - perform action on a single instance
+                                (must exist in the relevant instance list)
+--all                         - perform action on ALL instances in the instance list
+--group GROUP_NAME            - specify the group name to search for
+-v                            - add verbose curl output
+USAGE
+}
 
 # -------------------------------------------------------------------------
 # Command line options (presets to avoid interaction)
@@ -95,6 +59,10 @@ while [[ "$#" -gt 0 ]]; do
         -a|--all)
             all_instances=1
         ;;
+        -g|--group)
+            shift
+            group_name="$1"
+        ;;
         -v|--verbose)
             verbose=1
         ;;
@@ -113,22 +81,46 @@ echo
 # FUNCTIONS
 # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
 
-# getBearerToken() {
-# 	response=$(curl -s -u "$jamfUser":"$jamfPass" "$jamfURL"/api/v1/auth/token -X POST)
-# 	access_token=$(echo "$response" | plutil -extract token raw -)
-# }
+prepareOutputFile() {
+    # prepare the output file
+    jss_shortname=$( echo "$jss_instance" | sed 's|https://||' | sed 's|http://||' | sed 's|/$||' )
+    output_file="$workdir/$jss_shortname-$group_name.txt"
+    # ensure the directories can be written to, and empty the files
+    echo "" > "$output_file"
+    (
+        echo "Timestamp: $( date )"
+        echo "-------------------------------------------------------------------------------"
+        echo "Group Name: $group_name"                        
+        echo "-------------------------------------------------------------------------------"
+        echo "Object Type            Name"                        
+        echo "-------------------------------------------------------------------------------"
+    ) > "$output_file"
+}
 
-## Function Format - findScopedObjects
-## $1: Object Type (Policy, Configuration Profile, Restricted Software, Mac App Store App, eBook)
-## $2: xpath/XML Tree - Top Level Only (policy, os_x_configuration_profile, restricted_software, mac_application, ebook)
+printScopedObjects() {
+    # print the scoped objects
+    for obj in "${scoped_objects[@]}"; do
+        printf "%-22s %s\n" "$object_printname" "$obj" >> "$output_file"
+    done
+    echo
+}
+
+
 findScopedObjects() {
+    # find scoped objects of a specific type
+    # $1: Object Type (Policy, Configuration Profile, Restricted Software, Mac App Store App, eBook)
+    # $2: xpath/XML Tree - Top Level Only (policy, os_x_configuration_profile, restricted_software, mac_application, ebook)
+    # $3: Group Name
     local object_printname="$1"
     local api_xml_object="$2"
+    local group_name="$3"
     api_object_type=$( get_api_object_type "$api_xml_object" )
 
     echo "Retrieving List of All $object_printname IDs..."
-    unset objectIDs
+    unset object_ids
 
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
     # send request
     curl_url="$jss_url/JSSResource/$api_object_type"
     curl_args=("--request")
@@ -137,17 +129,22 @@ findScopedObjects() {
     curl_args+=("Accept: application/xml")
     send_curl_request
 
-    # cat "$curl_output_file"
+    # echo "Output of $curl_output_file:" # TEMP
+    # cat "$curl_output_file" # TEMP
 
 
-    objectIDs=$(
+    object_ids=$(
         xmllint --xpath "//$api_xml_object/id" \
         "$curl_output_file" 2>/dev/null \
         | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
     )
 
+    scoped_objects=()
+
+    echo "Checking for every $object_printname scoped to '$group_name'..."
+    echo "Matches will be listed below:"
     while read -r i; do
-        echo "Retrieving $object_printname ID $i's' Data..."
+        # echo "Retrieving $object_printname ID $i's data..."
 
         # send request
         curl_url="$jss_url/JSSResource/$api_object_type/id/$i"
@@ -157,163 +154,43 @@ findScopedObjects() {
         curl_args+=("Accept: application/xml")
         send_curl_request
 
-        objectName=$(/usr/bin/xmllint --xpath "//$api_xml_object/general/name/text()" "$curl_output_file" 2>/dev/null)
+        # if [[ $api_xml_object == "policy" ]]; then
+        #     object_name=$(/usr/bin/xmllint --xpath "//$api_xml_object/general/name/text()" "$curl_output_file" 2>/dev/null)
+        # else
+        #     object_name=$(/usr/bin/xmllint --xpath "//$api_xml_object/name/text()" "$curl_output_file" 2>/dev/null)
+        # fi
+        object_name=$(/usr/bin/xmllint --xpath "//$api_xml_object/general/name/text()" "$curl_output_file" 2>/dev/null)
 
         if [[ "$object_printname" == "Policy" ]]; then
             ## Check if is a Jamf Remote Policy
-            echo "Checking if '$objectName' is a Jamf Remote Policy..."
-            if [[ $objectName == $(/usr/bin/grep -qe -B1 '[0-9]+-[0-9]{2}-[0-9]{2} at [0-9]{1,2}:[0-9]{2,2} [AP]M \| .* \| .*' <<< "$objectName" 2>&1) ]]; then
+            # echo "Checking if '$object_name' is a Jamf Remote Policy..."
+            if [[ $object_name == $(/usr/bin/grep -qe -B1 '[0-9]+-[0-9]{2}-[0-9]{2} at [0-9]{1,2}:[0-9]{2,2} [AP]M \| .* \| .*' <<< "$object_name" 2>&1) ]]; then
                 ## This is a Jamf Remote Policy
                 ## Setting policy name in array to "JamfRemotePolicy-Ignore"
-                echo "    '$objectName' is a Jamf Remote policy"
+                echo "    '$object_name' is a Jamf Remote policy"
                 continue
-            else
-                ## This is NOT a Casper Remote Policy
-                ## Storing Policy Name and Grabbing Scope Data
-                echo "    '$objectName' is a standard policy"
-
-                ## Extract Scoped Computer Group ID(s)
-                unset grpID
-                grpIDs=$(
-                    xmllint --xpath "//$api_xml_object/scope/computer_groups/computer_group/id" \
-                    "$curl_output_file" 2>/dev/null \
-                    | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
-                )
-
-                if [[ ! $grpIDs ]]; then
-                    echo "No Computer Groups Scoped in $object_printname ${objectIDs[$i]}..."
-                else
-                    echo "Computer Groups found for $1 ${objectIDs[$i]}..."
-                    while read -r id; do
-                        grpName=$(xmllint --xpath "//$api_xml_object/scope/computer_groups/computer_group[id=$id]/name/text()" "$curl_output_file")
-                        echo "    Group ID: $id - Group Name: $grpName" # TEMP
-                        declare -a "compGrp${id}=($grpName)"
-                        # eval compGrp$id+=\(\"$objectName \($object_printname\)\"\)
-                    done <<< "${grpIDs[@]}"
-
-                fi
-            fi
-        else
-            # cat "$curl_output_file" # TEMP
-            echo "    Checking for groups in '$objectName' ($i)"
-            unset grpID
-            grpIDs=$(
-                xmllint --xpath "//$api_xml_object/scope/computer_groups/computer_group/id" \
-                "$curl_output_file" 2>/dev/null \
-                | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
-            )
-
-            if [[ ! $grpIDs ]]; then
-                echo "    No Computer Groups Scoped in '$objectName' ($i)"
-            else
-                echo "    Computer Groups found for '$objectName' ($i):"
-                while read -r gid ; do
-                    grpName=$(xmllint --xpath "//$api_xml_object/scope/computer_groups/computer_group[id=$gid]/name/text()" "$curl_output_file")
-                    declare -a "compGrp${gid}=($grpName)"
-                    echo "        $grpName (${gid})" # TEMP
-                done <<< "${grpIDs}"
-               
-
-                # while read -r id; do
-                #     grpName=$(xmllint --xpath "//$api_xml_object/scope/computer_groups/computer_group[id=$id]/name/text()" "$curl_output_file")
-                #     echo "    Group ID: $id - Group Name: $grpName" # TEMP
-                #     # eval compGrp$id+=\(\"$objectName \($object_printname\)\"\)
-                # done <<< "${grpIDs[@]}"
-                # tempthing="compGrp$id"
-                # echo "    TEMP THING: ${!tempthing[*]}" # TEMP
             fi
         fi
-        sleep .3
-    done <<< "${objectIDs[@]}"
-}
 
-getUsedGroups() {
-    # determine jss_url
-    set_credentials "$jss_instance"
-    jss_url="$jss_instance"
-    # send request
-    curl_url="$jss_url/JSSResource/computergroups"
-    curl_args=("--request")
-    curl_args+=("GET")
-    curl_args+=("--header")
-    curl_args+=("Accept: application/xml")
-    send_curl_request
+        # cat "$curl_output_file" # TEMP
+        # echo "Checking for groups in '$object_name' ($i)"
+        group_names=$(
+            xmllint --xpath "//$api_xml_object/scope/computer_groups/computer_group/name" \
+            "$curl_output_file" 2>/dev/null \
+            | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+        )
 
-    ## Retrieve & Extract Computer Group IDs/Names & Build Array
-    compGrpSize=$(/usr/bin/xmllint --xpath "//computer_groups/size/text()" "$curl_output_file" 2>/dev/null)
+        while read -r targeted_group ; do
+            # echo "    Checking if '$object_name' ($i) is scoped to $group_name..." # TEMP
+            # echo "    Comparing $targeted_group to $group_name..." # TEMP
+            if [[ "$targeted_group" == "$group_name" ]]; then
+                echo "$object_printname - '$object_name' ($i)"
+                scoped_objects+=("$object_name")
+            fi
+        done <<< "${group_names}"
+    done <<< "${object_ids[@]}"
 
-    echo
-    cat "$curl_output_file"
-    echo
-
-    ## Error handling for computer group data and size
-    if [[ $compGrpSize == 0 ]] ; then
-    	echo "ERROR: No groups were downloaded.  Please verify connection to the JSS."
-    	exit 2
-    fi
-
-    if grep "Unauthorized" "$curl_output_file"; then
-    	echo "ERROR: JSS rejected the API credentials.  Please double-check the script and run again."
-    	exit 1
-    fi
-
-    index=0
-    declare -a compGrpNames
-    declare -a compGrpIDs
-    while [[ $index -lt $compGrpSize ]]; do
-        element=$((index+1))
-        compGrpName=$(/usr/bin/xmllint --xpath "//computer_groups/computer_group[${element}]/name/text()" "$curl_output_file" 2>/dev/null)
-        compGrpID=$(/usr/bin/xmllint --xpath "//computer_groups/computer_group[${element}]/id/text()" "$curl_output_file" 2>/dev/null)
-        echo "    Computer Group ID: $compGrpID"  # TEMP
-        echo "    Computer Group Name: $compGrpName"  # TEMP
-        compGrpNames[index]="$compGrpName"
-        compGrpIDs[index]="$compGrpID"
-        ((index++))
-    done
-
-    echo 
-    echo
-
-    ## Check Policies, Configuration Profiles, Restircted Software and Mac App Store Apps
-    # findScopedObjects "Policy" "policy"
-    findScopedObjects "Configuration Profile" "os_x_configuration_profile"
-    # findScopedObjects "Restricted Software" "restricted_software"
-    # findScopedObjects "Mac App Store App" "mac_application"
-    # findScopedObjects "eBook" "ebook"
-
-    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-    # BUILD HTML REPORT
-    # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-    reportDate=$(/bin/date "+%Y-%m-%d %H%M%S")
-    reportName="/Users/${currentUser}/Desktop/Jamf Pro Computer Group Report - $reportDate.html"
-    echo "<html>
-    <head>
-    <title>Jamf Pro Computer Groups Report - $reportDate</title>
-    </head>
-    <body>
-    <h1>Jamf Pro Computer Groups Report</h1>
-    <i>Report Date: $reportDate<br/>Jamf Pro server: $jss_url</i>
-    <hr/>
-    <p/>" > "$reportName"
-    for (( x = 0 ; x < ${#compGrpNames[@]} ; x++ )); do
-        echo "    Group Name: ${compGrpNames[$x]}" # TEMP
-        echo "<b>${compGrpNames[$x]}</b><br/><ul>" >> "$reportName"
-        groupID="${compGrpIDs[$x]}"
-        echo "    Group ID: $groupID" # TEMP
-        # declare -n localGroupIDarray="compGrp$groupID"
-        eval "localGroupIDarray=( \${compGrp${groupID}[@]} )" 
-        echo "    Group ID Name: $localGroupIDarray" # TEMP
-        echo "    Group ID List: ${localGroupIDarray[*]}" # TEMP
-        for (( y = 0 ; y < ${#localGroupIDarray[@]} ; y++ )); do
-            echo "<li>${localGroupIDarray[$y]}</li>" >> "$reportName"
-        done
-        echo "</ul><p/>" >> "$reportName"
-    done
-    echo "</body>
-    </html>" >> "$reportName"
-
-    open "$reportName"
+    printScopedObjects
 
 }
 
@@ -327,15 +204,28 @@ choose_destination_instances
 # get specific instance if entered
 if [[ $chosen_instance ]]; then
     jss_instance="$chosen_instance"
-    echo "Generating report on $jss_instance..."
-    getUsedGroups
+    prepareOutputFile
+    echo "Looking for scope of $group_name on $jss_instance..."
+    ## Check Policies, Configuration Profiles, Restircted Software and Mac App Store Apps
+    findScopedObjects "Policy" "policy" "$group_name"
+    findScopedObjects "Configuration Profile" "os_x_configuration_profile" "$group_name"
+    findScopedObjects "Restricted Software" "restricted_software" "$group_name"
+    findScopedObjects "Mac App Store App" "mac_application" "$group_name"
 else
     for instance in "${instance_choice_array[@]}"; do
         jss_instance="$instance"
-        echo "Generating report on $jss_instance..."
-        getUsedGroups
+        prepareOutputFile
+        echo "Looking for scope of $group_name on $jss_instance..."
+        ## Check Policies, Configuration Profiles, Restircted Software and Mac App Store Apps
+        findScopedObjects "Policy" "policy" "$group_name"
+        findScopedObjects "Configuration Profile" "os_x_configuration_profile" "$group_name"
+        findScopedObjects "Restricted Software" "restricted_software" "$group_name"
+        findScopedObjects "Mac App Store App" "mac_application" "$group_name"
     done
 fi
+
+    echo "-------------------------------------------------------------------------------" > "$output_file"
+
 
 echo 
 echo "Finished"
