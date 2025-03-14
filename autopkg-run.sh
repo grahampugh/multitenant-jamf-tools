@@ -44,10 +44,10 @@ run_autopkg() {
     autopkg_run_options+=("JSS_URL=$jss_instance")
 
     # add the credentials
-    autopkg_run_options+=("--key")
-    autopkg_run_options+=("API_USERNAME=$jss_api_user")
-    autopkg_run_options+=("--key")
-    autopkg_run_options+=("API_PASSWORD=$jss_api_password")
+    # autopkg_run_options+=("--key")
+    # autopkg_run_options+=("API_USERNAME=$jss_api_user")
+    # autopkg_run_options+=("--key")
+    # autopkg_run_options+=("API_PASSWORD=$jss_api_password")
 
     # temporarily clear any API clients in the AutoPkg prefs
     autopkg_run_options+=("--key")

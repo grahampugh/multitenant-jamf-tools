@@ -797,10 +797,10 @@ run_jamfupload() {
     instance_args+=("$jss_instance")
 
     # add the credentials
-    instance_args+=("--user")
-    instance_args+=("$jss_api_user")
-    instance_args+=("--pass")
-    instance_args+=("$jss_api_password")
+    # instance_args+=("--user")
+    # instance_args+=("$jss_api_user")
+    # instance_args+=("--pass")
+    # instance_args+=("$jss_api_password")
 
     # determine the share
     if element_in "pkg" "${args[@]}" || element_in "package" "${args[@]}"; then
@@ -830,7 +830,6 @@ run_jamfupload() {
 encode_name() {
     group_name_encoded="$( echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
 }
-
 
 get_object_id_from_name() {
     set_credentials "$jss_instance"
