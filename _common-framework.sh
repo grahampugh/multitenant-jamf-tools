@@ -533,7 +533,7 @@ set_credentials() {
     jss_api_password=$(/usr/bin/security find-internet-password -s "$jss_url" -a "$jss_api_user" -w -g 2>&1 )
 
     if [[ ! $jss_api_password ]]; then
-        echo "No password for $jss_api_user found. Please run the set_credentials.sh script to add the password to your keychain"
+        echo "No password/Client ID for $jss_api_user found. Please run the set_credentials.sh script to add the password/Client ID to your keychain"
         exit 1
     fi
 
@@ -544,14 +544,52 @@ set_credentials() {
 }
 
 get_new_token() {
-    # request the token
-    curl --location --silent \
-        --request POST \
-        --header "authorization: Basic $b64_credentials" \
-        --url "${jss_url}/api/v1/auth/token" \
-        --header 'Accept: application/json' \
-        --cookie-jar "$cookie_jar" \
-        -o "$token_file"
+    # check if the user is a UUID (therefore implying a Client ID)
+    if [[ $cred_type == "client-id" ]]; then
+        http_response=$(
+            curl --request POST \
+            --silent \
+            --url "$jss_url/api/oauth/token" \
+            --header 'Content-Type: application/x-www-form-urlencoded' \
+            --data-urlencode "client_id=$jss_api_user" \
+            --data-urlencode "grant_type=client_credentials" \
+            --data-urlencode "client_secret=$jss_api_password" \
+            --write-out "%{http_code}" \
+            --header 'Accept: application/json' \
+            --cookie-jar "$cookie_jar" \
+            --output "$token_file"
+        )
+        if [[ $verbose -gt 0 ]]; then
+            echo "Token request HTTP response: $http_response"
+        fi
+        if [[ $http_response -lt 400 ]]; then
+            token=$(plutil -extract access_token raw "$token_file")
+        else
+            echo "Token download failed"
+            exit 1
+        fi
+    else
+        http_response=$(
+            curl --request POST \
+            --silent \
+            --url "$jss_url/api/v1/auth/token" \
+            --header "authorization: Basic $b64_credentials" \
+            --write-out "%{http_code}" \
+            --header 'Accept: application/json' \
+            --cookie-jar "$cookie_jar" \
+            --output "$token_file"
+        )
+        if [[ $verbose -gt 0 ]]; then
+            echo "Token request HTTP response: $http_response"
+        fi
+        if [[ $http_response -lt 400 ]]; then
+            token=$(plutil -extract token raw "$token_file")
+        else
+            echo "Token download failed"
+            exit 1
+        fi
+    fi
+
     echo "${jss_url}" > "$server_check_file"
     echo "$jss_api_user" > "$user_check_file"
 
@@ -559,56 +597,69 @@ get_new_token() {
         echo "Token for $jss_api_user on ${jss_url} written to $token_file"
     fi
 }
-
-api_client_get_new_cleint() {
-    # request the token
-    curl --location --silent \
-        --request POST \
-        --header "authorization: Basic $b64_credentials" \
-        --url "${jss_url}/api/v1/auth/token" \
-        --header 'Accept: application/json' \
-        --cookie-jar "$cookie_jar" \
-        -o "$token_file"
-    echo "${jss_url}" > "$server_check_file"
-    echo "$jss_api_user" > "$user_check_file"
-
-    if [[ $verbose -gt 0 ]]; then
-        echo "Token for $jss_api_user on ${jss_url} written to $token_file"
-    fi
-}
-
 
 check_token() {
+    # determine account type
+    if [[ $jss_api_user =~ ^\{?[A-F0-9a-f]{8}-[A-F0-9a-f]{4}-[A-F0-9a-f]{4}-[A-F0-9a-f]{4}-[A-F0-9a-f]{12}\}?$ ]]; then
+        cred_type="client-id"
+    else
+        cred_type="account"
+    fi
+
     # is there a token file
     if [[ -f "$token_file" ]]; then
         # check we are still querying the same server and with the same account
         server_check=$( cat "$server_check_file" )
         user_check=$( cat "$user_check_file" )
         if [[ "$server_check" == "${jss_url}" && "$user_check" == "$jss_api_user" ]]; then
-            if plutil -extract token raw "$token_file" >/dev/null; then
-                token=$(plutil -extract token raw "$token_file")
-            else
-                token=""
-            fi
-            if plutil -extract expires raw "$token_file" >/dev/null; then
-                expires=$(plutil -extract expires raw "$token_file" | awk -F . '{print $1}')
-                expiration_epoch=$(date -j -f "%Y-%m-%dT%T" "$expires" +"%s")
-            else
-                expiration_epoch="0"
-            fi
-            # set a cutoff of one minute in the future to prevent problems with mismatched expiration
-            # cutoff=$(date -v +1M -u +"%Y-%m-%dT%H:%M:%S")
-            cutoff_epoch=$(date -j -f "%Y-%m-%dT%T" "$(date -u +"%Y-%m-%dT%T")" +"%s")
-
-            if [[ $expiration_epoch -lt $cutoff_epoch ]]; then
-                if [[ $verbose -gt 0 ]]; then
-                    echo "token expired or invalid ($expiration_epoch v $cutoff_epoch). Grabbing a new one"
+            if [[ $cred_type == "client-id" ]]; then
+                if plutil -extract access_token raw "$token_file" >/dev/null; then
+                    token=$(plutil -extract access_token raw "$token_file")
+                else
+                    token=""
                 fi
-                sleep 1
-                get_new_token "${jss_url}"
+                if plutil -extract expires_in raw "$token_file" >/dev/null; then
+                    expires=$(plutil -extract expires_in raw "$token_file")
+                    current_time_epoch=$(/bin/date +%s)
+                    expiration_epoch=$(($current_epoch + $token_expires_in - 1))
+                else
+                    expiration_epoch="0"
+                fi
+                if [[ $expiration_epoch -gt $current_time_epoch ]]; then
+                    echo "Token valid until the following epoch time: $expiration_epoch"
+                else
+                    if [[ $verbose -gt 0 ]]; then
+                        echo "token expired or invalid ($expiration_epoch v $cutoff_epoch). Grabbing a new one"
+                    fi
+                    sleep 1
+                    get_new_token "${jss_url}"
+                fi
             else
-                if [[ $verbose -gt 0 ]]; then
-                    echo "Existing token still valid"
+                if plutil -extract token raw "$token_file" >/dev/null; then
+                    token=$(plutil -extract token raw "$token_file")
+                else
+                    token=""
+                fi
+                if plutil -extract expires raw "$token_file" >/dev/null; then
+                    expires=$(plutil -extract expires raw "$token_file" | awk -F . '{print $1}')
+                    expiration_epoch=$(date -j -f "%Y-%m-%dT%T" "$expires" +"%s")
+                else
+                    expiration_epoch="0"
+                fi
+                # set a cutoff of one minute in the future to prevent problems with mismatched expiration
+                # cutoff=$(date -v +1M -u +"%Y-%m-%dT%H:%M:%S")
+                cutoff_epoch=$(date -j -f "%Y-%m-%dT%T" "$(date -u +"%Y-%m-%dT%T")" +"%s")
+
+                if [[ $expiration_epoch -lt $cutoff_epoch ]]; then
+                    if [[ $verbose -gt 0 ]]; then
+                        echo "token expired or invalid ($expiration_epoch v $cutoff_epoch). Grabbing a new one"
+                    fi
+                    sleep 1
+                    get_new_token "${jss_url}"
+                else
+                    if [[ $verbose -gt 0 ]]; then
+                        echo "Existing token still valid"
+                    fi
                 fi
             fi
         elif [[ "$server_check" == "${jss_url}" ]]; then
@@ -636,8 +687,6 @@ check_token() {
         fi
         get_new_token "$1"
     fi
-
-    token=$(plutil -extract token raw "$token_file")
     export token
 }
 
