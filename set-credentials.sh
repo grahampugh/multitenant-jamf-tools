@@ -48,7 +48,7 @@ echo
 # check for existing password entry in login keychain
 instance_pass=$(security find-internet-password -s "${instance_choice_array[0]}" -l "$instance_base ($inputted_username)" -a "$inputted_username" -w -g 2>&1)
 
-if [[ $instance_pass ]]; then
+if [[ ${#instance_pass} -gt 0 && $instance_pass != "security: "* ]]; then
     echo "Password/Client Secret for $inputted_username found on $instance_base"
 else
     echo "Password/Client Secret for $inputted_username not found on $instance_base"
