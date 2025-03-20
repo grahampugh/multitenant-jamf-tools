@@ -49,6 +49,7 @@ if [[ ! -f "$jamf_upload_path" ]]; then
 fi
 # ensure the path exists, revert to defaults otherwise
 if [[ ! -f "$jamf_upload_path" ]]; then
+    cd "$(dirname "${BASH_SOURCE[0]}")" || exit
     jamf_upload_path="../jamf-upload/jamf-upload.sh"
 fi
 
