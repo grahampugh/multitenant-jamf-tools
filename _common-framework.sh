@@ -393,6 +393,13 @@ get_instance_distribution_point() {
         echo "No DP found - assuming JCDS"
         smb_url=""
     else
+        # check if dp_url_filter has been written to the autopkg prefs
+        if [[ -f "$autopkg_prefs" ]]; then
+            dp_key=$(defaults read "$autopkg_prefs" dp_url_filter 2>/dev/null)
+            if [[ "$dp_key" && ! "$dp_url_filter" ]]; then
+                dp_url_filter="$dp_key"
+            fi
+        fi
         dp_names_list=$(xmllint --xpath "//distribution_points/distribution_point/name" "$curl_output_file" 2>/dev/null | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n")
         # loop through the DPs and check that we have credentials for them - only check the first one for now
         while read -r dp; do

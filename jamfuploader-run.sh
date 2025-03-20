@@ -12,6 +12,9 @@ source "$DIR/_common-framework.sh"
 # set instance list type
 instance_list_type="mac"
 
+# define autopkg_prefs
+autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
+
 ###########
 ## USAGE ##
 ###########
@@ -83,6 +86,14 @@ while test $# -gt 0 ; do
                 exit 1
             fi
             ;;
+        --prefs)
+            shift
+            autopkg_prefs="$1"
+            if [[ ! -f "$autopkg_prefs" ]]; then
+                echo "ERROR: prefs file not found"
+                exit 1
+            fi
+        ;;
         -q)
             quiet_mode="yes"
             ;;
@@ -114,8 +125,6 @@ if [[ ! -f "$jamf_upload_path" ]]; then
     echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"
     exit 1
 fi
-
-
 
 if [[ ! $verbosity_mode && ! $quiet_mode ]]; then
     # default verbosity

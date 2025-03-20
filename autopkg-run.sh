@@ -15,6 +15,9 @@ max_tries_override=2
 # set instance list type
 instance_list_type="mac"
 
+# define autopkg_prefs
+autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
+
 usage() {
     cat <<'USAGE'
 Usage:
@@ -84,7 +87,7 @@ run_autopkg() {
             fi
         else
             echo "DP not determined. Trying AutoPkg prefs"
-            pass_rw=$(defaults read ~/Library/Preferences/com.github.autopkg.plist SMB_PASSWORD)
+            pass_rw=$(defaults read "$autopkg_prefs" SMB_PASSWORD)
             if [[ ! "$pass_rw" ]]; then
                 echo "ERROR: DP not determined. Cannot continue"
                 exit 1
@@ -92,9 +95,9 @@ run_autopkg() {
         fi
 
     else
-        defaults delete ~/Library/Preferences/com.github.autopkg.plist SMB_URL
-        # defaults delete ~/Library/Preferences/com.github.autopkg.plist SMB_USERNAME
-        # defaults delete ~/Library/Preferences/com.github.autopkg.plist SMB_PASSWORD
+        defaults delete "$autopkg_prefs" SMB_URL
+        # defaults delete "$autopkg_prefs" SMB_USERNAME
+        # defaults delete "$autopkg_prefs" SMB_PASSWORD
         # autopkg_run_options+=("--key")
         # autopkg_run_options+=("jcds2_mode=True")
     fi
@@ -203,6 +206,14 @@ while [[ "$#" -gt 0 ]]; do
         -d|--dp)
             shift
             dp_url_filter="$1"
+        ;;
+        --prefs)
+            shift
+            autopkg_prefs="$1"
+            if [[ ! -f "$autopkg_prefs" ]]; then
+                echo "ERROR: prefs file not found"
+                exit 1
+            fi
         ;;
         -a|--all)
             all_instances=1
