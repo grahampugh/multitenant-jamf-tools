@@ -1865,11 +1865,12 @@ main() {
         echo "API object type options:"
         echo "   A - [A]dvanced Computer Search"
         echo "   B - Advanced Mo[b]ile Device Search"
-        echo "   C - [C]onfiguration Profile"
-        echo "   F - Configuration Profile - [f]ix Payload Organisation"
-        echo "   O - Configuration Profile - specify UUID to rescue [o]rphaned profile"
+        echo "   C - Computer [C]onfiguration Profile"
+        echo "   F - Computer Configuration Profile - [f]ix Payload Organisation"
+        echo "   O - Computer Configuration Profile - specify UUID to rescue [o]rphaned profile"
         echo "   D - Mobile [D]evice Configuration Profile"
-        echo "   E - [E]xtension Attribute"
+        echo "   E - Computer [E]xtension Attribute"
+        echo "   X - Mobile Device E[x]tension Attribute"
         echo "   G - Computer [G]roup"
         echo "   H - Mobile Device Group"
         echo "   I - [i]OS App Store App"
@@ -1947,6 +1948,9 @@ main() {
             V|v)
                 api_xml_object="group"
                 instance_list_type="ios"
+            ;;
+            X|x)
+                api_xml_object="mobile_device_extension_attribute"
             ;;
             *)
                 api_xml_object="policy"
@@ -2695,13 +2699,26 @@ while [[ "$#" -gt 0 ]]; do
             inputted_api_obj_name="${key#*=}"
             api_object_type="computerextensionattributes"
             api_xml_object="computer_extension_attribute"
-            echo "   [main] CLI: Extension Attribute: $inputted_api_obj_name"
+            echo "   [main] CLI: Computer Extension Attribute: $inputted_api_obj_name"
         ;;
 
         --ea)
             api_object_type="computerextensionattributes"
             api_xml_object="computer_extension_attribute"
-            echo "   [main] CLI: Extension Attribute: $inputted_api_obj_name"
+            echo "   [main] CLI: Computer Extension Attribute: $inputted_api_obj_name"
+        ;;
+
+        --mea=*)
+            inputted_api_obj_name="${key#*=}"
+            api_object_type="mobiledeviceextensionattributes"
+            api_xml_object="mobile_device_extension_attribute"
+            echo "   [main] CLI: Mobile Device Extension Attribute: $inputted_api_obj_name"
+        ;;
+
+        --mea)
+            api_object_type="mobiledeviceextensionattributes"
+            api_xml_object="mobile_device_extension_attribute"
+            echo "   [main] CLI: EMobile Device xtension Attribute: $inputted_api_obj_name"
         ;;
 
         --package=*)
