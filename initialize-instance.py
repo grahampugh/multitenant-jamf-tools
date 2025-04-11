@@ -50,12 +50,14 @@ class JamfInitializer:
             dict: The parsed health check response or None if request fails
         """
         try:
-            response = self.session.get(f"{self.base_url}/healthCheck.html", timeout=30)
+            response = self.session.get(
+                f"{self.base_url}/api/startup-status", timeout=30
+            )
             response.raise_for_status()
 
             # Clean up the response - replace HTML encoded quotes
             cleaned_response = response.text.replace("&quot;", '"')
-            return json.loads(cleaned_response)[0]
+            return json.loads(cleaned_response)
 
         except requests.exceptions.RequestException as e:
             logger.error(f"Error checking instance status: {str(e)}")
@@ -216,7 +218,7 @@ def main():
 
         logger.info(f"Health check status: {status}")
 
-        if status.get("description") == "SetupAssistant":
+        if status.get("setupAssistantNecessary") is True:
             logger.info("Instance requires initialization, proceeding...")
 
             if initializer.initialize_instance(
