@@ -74,7 +74,7 @@ class JamfInitializer:
         admin_password: str,
         activation_code: str,
         institution_name: str = "Jamf",
-        email: str = "",
+        email: str = "default@example.com",
     ) -> bool:
         """
         Initialize the Jamf Pro instance using the API.
