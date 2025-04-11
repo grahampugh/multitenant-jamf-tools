@@ -17,6 +17,8 @@ import json
 import logging
 import sys
 import time
+import secrets
+import string
 
 from typing import Optional
 from urllib.parse import urlparse
@@ -139,6 +141,25 @@ def validate_url(url: str) -> str:
         ) from exc
 
 
+def generate_secure_password() -> str:
+    """
+    Generate a secure password that meets Jamf Pro requirements.
+    Returns a 16-character password with letters, numbers, and at least one hyphen or underscore.
+    """
+    # Basic character set
+    chars = string.ascii_letters + string.digits
+
+    # Generate first 31 characters
+    password = [secrets.choice(chars) for _ in range(31)]
+
+    # Ensure at least one hyphen or underscore by adding it at a random position
+    symbol = secrets.choice('-')
+    insert_pos = secrets.randbelow(32)  # Random position 0-31
+    password.insert(insert_pos, symbol)
+
+    return ''.join(password)
+
+
 def parse_arguments() -> argparse.Namespace:
     """
     Parse and validate command line arguments.
@@ -151,7 +172,7 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example usage:
-  %(prog)s -u https://myjamfinstance.jamfcloud.com -a jamfadmin -p MySecurePassword123 -c MyActivationCode
+  %(prog)s -u https://myjamfinstance.jamfcloud.com -a jamfadmin -c MyActivationCode
   %(prog)s --url https://myjamfinstance.jamfcloud.com --username jamfadmin --password MySecurePassword123 -activationcode MyActivationCode
         """,
     )
@@ -169,7 +190,7 @@ Example usage:
     )
 
     parser.add_argument(
-        "-p", "--password", required=True, help="Admin password for initialization"
+        "-p", "--password", required=False, help="Admin password for initialization, random if not provided"
     )
 
     parser.add_argument(
@@ -210,6 +231,13 @@ Example usage:
 def main():
     # Parse command line arguments
     args = parse_arguments()
+
+    if not args.password:
+        generated_password = generate_secure_password()
+        args.password = generated_password
+        logger.info("Generated secure random password:")
+        print(f"\nGenerated Password: {generated_password}\n")
+        logger.info("Please save this password in a secure location!")
 
     initializer = JamfInitializer(args.url)
 
