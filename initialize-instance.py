@@ -12,14 +12,16 @@
 # pip3 install requests
 
 
-import requests
-import json
-import time
-import logging
-from typing import Optional
-import sys
 import argparse
+import json
+import logging
+import sys
+import time
+
+from typing import Optional
 from urllib.parse import urlparse
+
+import requests
 
 # Configure logging
 logging.basicConfig(
@@ -72,6 +74,7 @@ class JamfInitializer:
         admin_password: str,
         activation_code: str,
         institution_name: str = "Jamf",
+        email: str = "",
     ) -> bool:
         """
         Initialize the Jamf Pro instance using the API.
@@ -92,6 +95,7 @@ class JamfInitializer:
                 "activationCode": activation_code,
                 "eulaAccepted": True,
                 "institutionName": institution_name,
+                "email": email,
             }
             # Send initialization request
 
@@ -181,6 +185,10 @@ Example usage:
     )
 
     parser.add_argument(
+        "-e", "--email", required=False, help="Email address for initialization"
+    )
+
+    parser.add_argument(
         "--max-attempts",
         type=int,
         default=10,
@@ -222,7 +230,11 @@ def main():
             logger.info("Instance requires initialization, proceeding...")
 
             if initializer.initialize_instance(
-                args.username, args.password, args.activationcode
+                args.username,
+                args.password,
+                args.activationcode,
+                args.institution_name,
+                args.email,
             ):
                 logger.info("Instance initialization successful!")
                 sys.exit(0)
