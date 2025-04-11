@@ -62,10 +62,10 @@ class JamfInitializer:
             return json.loads(cleaned_response)
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error checking instance status: {str(e)}")
+            logger.error("Error checking instance status: %s", str(e))
             return None
         except (json.JSONDecodeError, IndexError) as e:
-            logger.error(f"Error parsing health check response: {str(e)}")
+            logger.error("Error parsing health check response: %s", str(e))
             return None
 
     def initialize_instance(
@@ -83,6 +83,8 @@ class JamfInitializer:
             admin_username (str): The username for the initial admin account
             admin_password (str): The password for the initial admin account
             activation_code (str): The activation code for the instance
+            institution_name (str): The name of the institution (default: "Jamf")
+            email (str): The email address for the initial admin account
 
         Returns:
             bool: True if initialization was successful, False otherwise
@@ -109,7 +111,7 @@ class JamfInitializer:
             return True
 
         except requests.exceptions.RequestException as e:
-            logger.error(f"Error initializing instance: {str(e)}")
+            logger.error("Error initializing instance: %s", str(e))
             return False
 
 
@@ -131,10 +133,10 @@ def validate_url(url: str) -> str:
         if all([result.scheme, result.netloc]):
             return url
         raise ValueError
-    except ValueError:
+    except ValueError as exc:
         raise argparse.ArgumentTypeError(
             f"Invalid URL format: {url}. URL must include scheme (e.g., https://)"
-        )
+        ) from exc
 
 
 def parse_arguments() -> argparse.Namespace:
