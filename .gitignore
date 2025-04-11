@@ -7,5 +7,6 @@ Private-*.xml
 playground/*
 slack-webhooks/*.txt
 instance-lists/*.txt
+instance-lists/*.json
 exclusion-lists/*.txt
 **/.DS_Store
