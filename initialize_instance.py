@@ -163,7 +163,7 @@ def generate_secure_password() -> str:
     lowercase = string.ascii_lowercase
     uppercase = string.ascii_uppercase
     digits = string.digits
-    symbols = "-_!^"
+    symbols = "-_^"
 
     # Ensure at least one of each type
     password = [
