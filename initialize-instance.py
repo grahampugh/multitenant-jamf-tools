@@ -144,18 +144,29 @@ def validate_url(url: str) -> str:
 def generate_secure_password() -> str:
     """
     Generate a secure password that meets Jamf Pro requirements.
-    Returns a 16-character password with letters, numbers, and at least one hyphen or underscore.
+    Returns a 64-character password with letters, numbers, and select symbols.
+    Ensures at least one of each required character type is included.
     """
-    # Basic character set
-    chars = string.ascii_letters + string.digits
+    # Define character sets
+    lowercase = string.ascii_lowercase
+    uppercase = string.ascii_uppercase
+    digits = string.digits
+    symbols = "-_!^"
 
-    # Generate first 31 characters
-    password = [secrets.choice(chars) for _ in range(31)]
+    # Ensure at least one of each type
+    password = [
+        secrets.choice(lowercase),  # at least one lowercase
+        secrets.choice(uppercase),  # at least one uppercase
+        secrets.choice(digits),     # at least one number
+        secrets.choice(symbols),    # at least one symbol
+    ]
 
-    # Ensure at least one hyphen or underscore by adding it at a random position
-    symbol = secrets.choice('-')
-    insert_pos = secrets.randbelow(32)  # Random position 0-31
-    password.insert(insert_pos, symbol)
+    # Fill the rest of the password
+    all_chars = lowercase + uppercase + digits + symbols
+    password.extend(secrets.choice(all_chars) for _ in range(60))  # 64 - 4 = 60 remaining chars
+
+    # Shuffle the password to avoid predictable character positions
+    secrets.SystemRandom().shuffle(password)
 
     return ''.join(password)
 
