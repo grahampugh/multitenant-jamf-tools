@@ -1,16 +1,23 @@
 #!/usr/bin/env python3
 
-# This script initializes a new Jamf Pro instance using the Jamf Pro API.
-# It checks the instance status and if it requires initialization, it sends the necessary data to initialize it.
-# The script accepts command line arguments for the instance URL, admin username, password, and activation code.
-# It also includes error handling and logging for better debugging and user feedback.
+"""
+This script initializes a new Jamf Pro instance using the Jamf Pro API.
+It checks the instance status and if it requires initialization,
+it sends the necessary data to initialize it.
 
-# note: This script is designed to be run in a Python 3 environment. It required the requests library.
-# It can be installed using pip:
-# pip install requests
-# or
-# pip3 install requests
+The script accepts command line arguments for the instance URL, admin username,
+password, and activation code.
 
+It also includes error handling and logging for better debugging and user feedback.
+
+Note: This script is designed to be run in a Python 3 environment.
+It requires the requests library.
+It can be installed using pip:
+
+pip install requests
+or
+pip3 install requests
+"""
 
 import argparse
 import json
@@ -31,6 +38,11 @@ logger = logging.getLogger(__name__)
 
 
 class JamfInitializer:
+    """
+    Class to handle the initialization of a Jamf Pro instance.
+    It checks the instance status and initializes it if required.
+    """
+
     def __init__(self, instance_url: str):
         """
         Initialize the JamfInitializer with the Jamf Pro instance URL.
@@ -208,16 +220,21 @@ Example usage:
 
 
 def main():
+    """
+    Main function to run the script.
+    Parses command line arguments, initializes the Jamf instance,
+    and handles the initialization process.
+    """
     # Parse command line arguments
     args = parse_arguments()
 
     initializer = JamfInitializer(args.url)
 
-    logger.info(f"Starting initialization process for {args.url}")
+    logger.info("Starting initialization process for %s", args.url)
 
     for attempt in range(args.max_attempts):
         logger.info(
-            f"Checking instance status (attempt {attempt + 1}/{args.max_attempts})"
+            "Checking instance status (attempt %d/%d)", attempt + 1, args.max_attempts
         )
 
         status = initializer.check_instance_status()
@@ -226,7 +243,7 @@ def main():
             time.sleep(args.attempt_delay)
             continue
 
-        logger.info(f"Health check status: {status}")
+        logger.info("Health check status: %s", status)
 
         if status.get("setupAssistantNecessary") is True:
             logger.info("Instance requires initialization, proceeding...")
@@ -250,7 +267,8 @@ def main():
         time.sleep(args.attempt_delay)
 
     logger.error(
-        f"Maximum attempts ({args.max_attempts}) reached without successful initialization"
+        "Maximum attempts (%d) reached without successful initialization",
+        args.max_attempts,
     )
     sys.exit(1)
 
