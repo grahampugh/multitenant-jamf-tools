@@ -24,7 +24,8 @@ Usage:
 ./set_credentials.sh          - set the Keychain credentials
 
 [no arguments]                - interactive mode
--r                            - recipe to run (e.g. Firefox.jamf)
+-r                            - recipe to run (e.g. Firefox.jamf, /path/to/recipe)
+                                (multiple values can be provided)
 -l                            - recipe-list to run (must be path to a .txt file)
 -il FILENAME (without .txt)   - provide an instance list filename
                                 (must exist in the instance-lists folder)
@@ -179,12 +180,13 @@ fi
 # Command line override for the above settings
 args=()
 chosen_instances=()
+recipes=()
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
         -r|--recipe)
             shift
-            recipe="$1"
+            recipes+=("$1")
         ;;
         -l|--recipe-list)
             shift
@@ -257,16 +259,16 @@ fi
 # select the instances that will be changed
 choose_destination_instances
 
-# set recipe
-if [[ "$recipe" == "" && "$recipe_list" == "" ]]; then
+if [[ ${#recipes[@]} -ge 1 ]]; then
+    echo "Running recipes: ${recipes[*]}"
+elif [[ "$recipe" == "" && "$recipe_list" == "" ]]; then
     printf "Enter Recipe or Recipe List to run (e.g. Firefox.jamf or /path/to/recipes.txt) : "
     read -r recipe_choice
     if [[ $recipe_choice == *".txt" ]]; then
-        recipe=""
         recipe_list="$recipe_choice"
     elif [[ $recipe_choice ]]; then
         recipe_list=""
-        recipe="$recipe_choice"
+        recipes+=("$recipe_choice")
     else
         echo "ERROR: no recipe or recipe list supplied"
         exit 1
@@ -278,7 +280,16 @@ for instance in "${instance_choice_array[@]}"; do
     jss_instance="$instance"
     set_credentials "$jss_instance"
     echo "Running AutoPkg on $jss_instance..."
-    run_autopkg
+    if [[ $recipe_list ]]; then
+        run_autopkg
+    elif [[ ${#recipes[@]} -gt 0 ]]; then
+        for recipe in "${recipes[@]}"; do
+            run_autopkg
+        done
+    else
+        echo "No recipes or recipe lists supplied"
+        exit 1
+    fi
 done
 
 echo 
