@@ -28,9 +28,10 @@ Usage:
 -l                            - recipe-list to run (must be path to a .txt file)
 -il FILENAME (without .txt)   - provide an instance list filename
                                 (must exist in the instance-lists folder)
--i JSS_URL                    - perform action on a single instance
+-i JSS_URL                    - perform action on a specific instance
                                 (must exist in the relevant instance list)
---all                         - perform action on ALL instances in the instance list
+                                (multiple values can be provided)
+--all | -ai                   - perform action on ALL instances in the instance list
 --dp                          - filter DPs on DP name
 -e                            - Force policy to enabled (--key POLICY_ENABLED=True)
 -v[vv]                        - add verbose output
@@ -177,6 +178,7 @@ fi
 
 # Command line override for the above settings
 args=()
+chosen_instances=()
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
@@ -197,12 +199,8 @@ while [[ "$#" -gt 0 ]]; do
         ;;
         -i|--instance)
             shift
-            chosen_instance="$1"
+            chosen_instances+=("$1")
         ;;
-        # -s|--share)
-        #     shift
-        #     smb_share="$1"
-        # ;;
         -d|--dp)
             shift
             dp_url_filter="$1"
@@ -215,7 +213,7 @@ while [[ "$#" -gt 0 ]]; do
                 exit 1
             fi
         ;;
-        -a|--all)
+        -a|-ai|--all)
             all_instances=1
         ;;
         -e|--enabled)
@@ -249,6 +247,13 @@ done
 echo
 echo "This script will run autopkg recipes on the instance(s) you choose."
 
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
 # select the instances that will be changed
 choose_destination_instances
 
@@ -268,20 +273,13 @@ if [[ "$recipe" == "" && "$recipe_list" == "" ]]; then
     fi
 fi
 
-# get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
+# run on specified instances
+for instance in "${instance_choice_array[@]}"; do
+    jss_instance="$instance"
     set_credentials "$jss_instance"
     echo "Running AutoPkg on $jss_instance..."
     run_autopkg
-else
-    for instance in "${instance_choice_array[@]}"; do
-        jss_instance="$instance"
-        set_credentials "$jss_instance"
-        echo "Running AutoPkg on $jss_instance..."
-        run_autopkg
-    done
-fi
+done
 
 echo 
 echo "Finished"

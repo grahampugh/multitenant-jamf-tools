@@ -305,7 +305,7 @@ choose_destination_instances() {
     choose_instance_list
 
     instance_selection=""
-    if [[ ! $chosen_instance && $all_instances -ne 1 ]]; then
+    if [[ ! $chosen_instance && ${#chosen_instances[@]} -eq 0 && $all_instances -ne 1 ]]; then
         echo "Enter the number(s) of the destination JSS instance(s),"
         echo "   or enter a string to select the FIRST matching instance,"
         echo "   or enter 'ALL' to propagate to all destination instances"
@@ -331,6 +331,15 @@ choose_destination_instances() {
             echo "Chosen instance $chosen_instance does not exist in the selected instance list. Cannot continue."
             exit 1
         fi
+    elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+        for instance in "${chosen_instances[@]}"; do
+            for jss_instance in "${working_instances_list[@]}"; do
+                if [[ "$instance" == "$jss_instance" ]]; then
+                    instance_choice_array+=("$jss_instance")
+                    break
+                fi
+            done
+        done
     elif [[ $all_instances -eq 1 || "$instance_selection" == "ALL" ]]; then
         instance_choice_array+=("${working_instances_list[@]}")
         # shellcheck disable=SC2034

@@ -29,6 +29,7 @@ jamfuploader-run.sh usage:
                                 (must exist in the instance-lists folder)
 -i JSS_URL                    - perform action on a single instance
                                 (must exist in the relevant instance list)
+                                (multiple values can be provided)
 -ai | --all-instances         - perform action on ALL instances in the instance list
 --dp                          - filter DPs on DP name
 --prefs <path>                - Inherit AutoPkg prefs file provided by the full path to the file
@@ -58,7 +59,7 @@ fi
 ###############
 
 args=()
-
+chosen_instances=()
 while test $# -gt 0 ; do
     case "$1" in
         -il|--instance-list)
@@ -67,8 +68,8 @@ while test $# -gt 0 ; do
             ;;
         -i|--instance)
             shift
-            chosen_instance="$1"
-            ;;
+            chosen_instances+=("$1")
+        ;;
         -s|--share)
             shift
             smb_url="$1"
@@ -140,25 +141,24 @@ fi
 
 echo "This script will run grahampugh/jamf-upload/jamf-upload.sh on the instance(s) you choose."
 
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
 # select the instances that will be changed
 choose_destination_instances
 
-# get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
+# run on specified instances
+for instance in "${instance_choice_array[@]}"; do
+    jss_instance="$instance"
     set_credentials "$jss_instance"
     echo "Running on $jss_instance..."
     echo "jamf-upload.sh ${args[*]}"
     run_jamfupload
-else
-    for instance in "${instance_choice_array[@]}"; do
-        jss_instance="$instance"
-        set_credentials "$jss_instance"
-        echo "Running on $jss_instance..."
-        echo "jamf-upload.sh ${args[*]}"
-        run_jamfupload
-    done
-fi
+done
 
 echo 
 echo "Finished"
