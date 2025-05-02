@@ -437,8 +437,10 @@ get_instance_distribution_point() {
                     continue
                 fi
             fi
+            # url encode the dp name
+            url_encoded_dp=$(encode_name "$dp")
             # send request
-            curl_url="$jss_url/JSSResource/distributionpoints/name/$dp"
+            curl_url="$jss_url/JSSResource/distributionpoints/name/$url_encoded_dp"
             curl_args=("--header")
             curl_args+=("Accept: application/xml")
             send_curl_request
@@ -911,7 +913,8 @@ run_jamfupload() {
 }
 
 encode_name() {
-    group_name_encoded="$( echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
+    url_encoded_name="$( echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
+    return "$url_encoded_name"
 }
 
 get_object_id_from_name() {
@@ -943,7 +946,8 @@ get_computers_in_group() {
     jss_url="$jss_instance"
 
     # send request to get each version
-    curl_url="$jss_url/JSSResource/computergroups/name/${group_name_encoded}"
+    url_encoded_group=$(encode_name "$group_name")
+    curl_url="$jss_url/JSSResource/computergroups/name/${url_encoded_group}"
     curl_args=("--header")
     curl_args+=("Accept: application/json")
     send_curl_request
@@ -980,7 +984,8 @@ get_mobile_devices_in_group() {
     jss_url="$jss_instance"
 
     # send request to get each version
-    curl_url="$jss_url/JSSResource/mobiledevicegroups/name/${group_name_encoded}"
+    url_encoded_group=$(encode_name "$group_name")
+    curl_url="$jss_url/JSSResource/mobiledevicegroups/name/${url_encoded_group}"
     curl_args=("--header")
     curl_args+=("Accept: application/json")
     send_curl_request

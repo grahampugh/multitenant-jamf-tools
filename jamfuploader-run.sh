@@ -106,9 +106,6 @@ while test $# -gt 0 ; do
                 exit 1
             fi
             ;;
-        -x|--nointeraction)
-            no_interaction=1
-            ;;
         -q)
             quiet_mode="yes"
             ;;

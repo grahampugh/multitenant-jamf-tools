@@ -41,16 +41,12 @@ Usage:
 USAGE
 }
 
-encode_name() {
-    group_name_encoded="$( echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
-}
-
 do_the_counting() {
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
 
     # send request to get each version
-    curl_url="$jss_url/JSSResource/computergroups/name/${group_name_encoded}"
+    curl_url="$jss_url/JSSResource/computergroups/name/${encoded_group_name}"
     curl_args=("--header")
     curl_args+=("Accept: application/xml")
     send_curl_request
@@ -134,9 +130,9 @@ if [[ $days -ne 30 && $days -ne 90 && $days -ne 180 ]]; then
 fi
 echo
 
-# encode the group name - returns $group_name_encoded
+# encode the group name
 group_name="Computer not checked in $days days"
-encode_name "$group_name"
+encoded_group_name=$(encode_name "$group_name")
 
 # set default output file
 if [[ ! $output_file ]]; then
