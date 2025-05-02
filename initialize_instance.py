@@ -24,6 +24,8 @@ import json
 import logging
 import sys
 import time
+import secrets
+import string
 
 from typing import Optional
 from urllib.parse import urlparse
@@ -151,6 +153,36 @@ def validate_url(url: str) -> str:
         ) from exc
 
 
+def generate_secure_password() -> str:
+    """
+    Generate a secure password that meets Jamf Pro requirements.
+    Returns a 64-character password with letters, numbers, and select symbols.
+    Ensures at least one of each required character type is included.
+    """
+    # Define character sets
+    lowercase = string.ascii_lowercase
+    uppercase = string.ascii_uppercase
+    digits = string.digits
+    symbols = "-_^"
+
+    # Ensure at least one of each type
+    password = [
+        secrets.choice(lowercase),  # at least one lowercase
+        secrets.choice(uppercase),  # at least one uppercase
+        secrets.choice(digits),     # at least one number
+        secrets.choice(symbols),    # at least one symbol
+    ]
+
+    # Fill the rest of the password
+    all_chars = lowercase + uppercase + digits + symbols
+    password.extend(secrets.choice(all_chars) for _ in range(60))  # 64 - 4 = 60 remaining chars
+
+    # Shuffle the password to avoid predictable character positions
+    secrets.SystemRandom().shuffle(password)
+
+    return ''.join(password)
+
+
 def parse_arguments() -> argparse.Namespace:
     """
     Parse and validate command line arguments.
@@ -163,7 +195,7 @@ def parse_arguments() -> argparse.Namespace:
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Example usage:
-  %(prog)s -u https://myjamfinstance.jamfcloud.com -a jamfadmin -p MySecurePassword123 -c MyActivationCode
+  %(prog)s -u https://myjamfinstance.jamfcloud.com -a jamfadmin -c MyActivationCode
   %(prog)s --url https://myjamfinstance.jamfcloud.com --username jamfadmin --password MySecurePassword123 -activationcode MyActivationCode
         """,
     )
@@ -181,7 +213,7 @@ Example usage:
     )
 
     parser.add_argument(
-        "-p", "--password", required=True, help="Admin password for initialization"
+        "-p", "--password", required=False, help="Admin password for initialization, random if not provided"
     )
 
     parser.add_argument(
@@ -227,6 +259,13 @@ def main():
     """
     # Parse command line arguments
     args = parse_arguments()
+
+    if not args.password:
+        generated_password = generate_secure_password()
+        args.password = generated_password
+        logger.info("Generated secure random password:")
+        print(f"\nGenerated Password: {generated_password}\n")
+        logger.info("Please save this password in a secure location!")
 
     initializer = JamfInitializer(args.url)
 
