@@ -22,21 +22,28 @@ autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
 usage() {
     echo "
 jamfuploader-run.sh usage:
-./set_credentials.sh          - set the Keychain credentials
+./set_credentials.sh             - set the Keychain credentials
 
-[no arguments]                - interactive mode
--il FILENAME (without .txt)   - provide an instance list filename
-                                (must exist in the instance-lists folder)
--i JSS_URL                    - perform action on a single instance
-                                (must exist in the relevant instance list)
-                                (multiple values can be provided)
--ai | --all-instances         - perform action on ALL instances in the instance list
---dp                          - filter DPs on DP name
---prefs <path>                - Inherit AutoPkg prefs file provided by the full path to the file
--v[vvv]                       - Set value of verbosity (default is -v)
--q                            - Quiet mode (verbosity 0)
---[args]                      - Pass through any arguments for jamf-upload.sh
+UPLOADTYPE                       - type of upload (e.g. pkg, policy, script, etc. One value must be provided)
+-il | --instance-list FILENAME   - provide an instance list filename (without .txt)
+                                   (must exist in the instance-lists folder)
+-i | --instance JSS_URL          - perform action on a specific instance
+                                   (must exist in the relevant instance list)
+                                   (multiple values can be provided)
+-a | --all | --all-instances     - perform action on ALL instances in the instance list
+-x | --nointeraction             - run without checking instance is in an instance list 
+                                   (prevents interactive mode)
+-ai | --all-instances            - perform action on ALL instances in the instance list
+--dp                             - filter fileshare distribution points on DP name
+--prefs <path>                   - Inherit AutoPkg prefs file provided by the full path to the file
+-v[vvv]                          - Set value of verbosity (default is -v)
+-q                               - Quiet mode (verbosity 0)
+-h | --help                      - Show this help message
+--[args]                         - Pass through required arguments for jamf-upload.sh
 
+Note that credentials set in the AutoPkg preferences file will be used if they exist. If not, the keychain will be used. If there is no keychain entry, the script will prompt for you to run the set_credentials.sh script.
+
+The --dp argument can be bypassed by setting the environment variable 'dp_url_filter' to the desired value in the AutoPkg preferences.
 "
 }
 
@@ -78,8 +85,11 @@ while test $# -gt 0 ; do
             shift
             dp_url_filter="$1"
             ;;
-        -ai|--all-instances)
+        -a|-ai|--all|--all-instances)
             all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
             ;;
         -j)
             jamf_upload_path="$1"
@@ -95,7 +105,10 @@ while test $# -gt 0 ; do
                 echo "ERROR: prefs file not found"
                 exit 1
             fi
-        ;;
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -q)
             quiet_mode="yes"
             ;;

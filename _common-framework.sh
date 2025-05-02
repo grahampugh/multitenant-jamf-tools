@@ -301,77 +301,95 @@ strip_url() {
 }
 
 choose_destination_instances() {
+    # Ask which instance we need to process, check if it exists and go from there
     echo
-    choose_instance_list
-
-    instance_selection=""
-    if [[ ! $chosen_instance && ${#chosen_instances[@]} -eq 0 && $all_instances -ne 1 ]]; then
-        echo "Enter the number(s) of the destination JSS instance(s),"
-        echo "   or enter a string to select the FIRST matching instance,"
-        echo "   or enter 'ALL' to propagate to all destination instances"
-        if [[ $source_instance ]]; then
-            echo "   or press enter for '($source_instance_selection) $source_instance'."
-        else
-            echo "   or press enter for '(0) ${working_instances_list[0]}'."
-        fi
-        read -r -p "   Instance(s) : " instance_selection
-        echo
-    fi
-
-    # Create an array of destination instances
-    instance_choice_array=()
-    if [[ $chosen_instance ]]; then
-        for instance in "${working_instances_list[@]}"; do
-            if [[ "$chosen_instance" == "$instance" ]]; then
-                instance_choice_array+=("$instance")
-                break
+    if [[ $no_interaction -eq 1 ]]; then
+        # if no_interaction is set, we skip straight to a single provided instance
+        if [[ $chosen_instance || ${#chosen_instances[@]} -gt 0 ]]; then
+            instance_choice_array=()
+            if [[ $chosen_instance ]]; then
+                instance_choice_array+=("$chosen_instance")
+            elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+                for instance in "${chosen_instances[@]}"; do
+                    instance_choice_array+=("$instance")
+                done
             fi
-        done
-        if [[ ${#instance_choice_array[@]} -eq 0 ]]; then
-            echo "Chosen instance $chosen_instance does not exist in the selected instance list. Cannot continue."
+        else
+            echo "No instance chosen. Cannot continue."
             exit 1
         fi
-    elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
-        for instance in "${chosen_instances[@]}"; do
-            for jss_instance in "${working_instances_list[@]}"; do
-                if [[ "$instance" == "$jss_instance" ]]; then
-                    instance_choice_array+=("$jss_instance")
+    else
+        choose_instance_list
+        instance_selection=""
+        if [[ ! $chosen_instance && ${#chosen_instances[@]} -eq 0 && $all_instances -ne 1 ]]; then
+            echo "Enter the number(s) of the destination JSS instance(s),"
+            echo "   or enter a string to select the FIRST matching instance,"
+            echo "   or enter 'ALL' to propagate to all destination instances"
+            if [[ $source_instance ]]; then
+                echo "   or press enter for '($source_instance_selection) $source_instance'."
+            else
+                echo "   or press enter for '(0) ${working_instances_list[0]}'."
+            fi
+            read -r -p "   Instance(s) : " instance_selection
+            echo
+        fi
+
+        # Create an array of destination instances
+        instance_choice_array=()
+        if [[ $chosen_instance ]]; then
+            for instance in "${working_instances_list[@]}"; do
+                if [[ "$chosen_instance" == "$instance" ]]; then
+                    instance_choice_array+=("$instance")
                     break
                 fi
             done
-        done
-    elif [[ $all_instances -eq 1 || "$instance_selection" == "ALL" ]]; then
-        instance_choice_array+=("${working_instances_list[@]}")
-        # shellcheck disable=SC2034
-        do_all_instances="yes"
-    elif grep -qe "[A-Za-z]" <<< "$instance_selection"; then
-        for instance in "${working_instances_list[@]}"; do
-            if [[ "$instance" == *"${instance_selection}."* || "$instance" == *"${instance_selection}-"* ]]; then
-                instance_choice_array+=("$instance")
-                break
+            if [[ ${#instance_choice_array[@]} -eq 0 ]]; then
+                echo "Chosen instance $chosen_instance does not exist in the selected instance list. Cannot continue."
+                exit 1
             fi
-        done
-        if [[ ${#instance_choice_array[@]} -eq 0  ]]; then
-            echo "ERROR: could not find matching instance"
-            exit 1
-        fi
-    elif [[ "$instance_selection" ]]; then
-        for instance in $instance_selection; do
-            if [[ $instance == *"-"* ]]; then
-                list_first=$(echo "$instance" | cut -d'-' -f1)
-                list_last=$(echo "$instance" | cut -d'-' -f2)
-                for (( i=list_first; i<=list_last; i++ )); do
-                    instance_choice_array+=("${working_instances_list[$i]}")
+        elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+            for instance in "${chosen_instances[@]}"; do
+                for jss_instance in "${working_instances_list[@]}"; do
+                    if [[ "$instance" == "$jss_instance" ]]; then
+                        instance_choice_array+=("$jss_instance")
+                        break
+                    fi
                 done
-            else
-                instance_choice_array+=("${working_instances_list[$instance]}")
+            done
+        elif [[ $all_instances -eq 1 || "$instance_selection" == "ALL" ]]; then
+            instance_choice_array+=("${working_instances_list[@]}")
+            # shellcheck disable=SC2034
+            do_all_instances="yes"
+        elif grep -qe "[A-Za-z]" <<< "$instance_selection"; then
+            for instance in "${working_instances_list[@]}"; do
+                if [[ "$instance" == *"${instance_selection}."* || "$instance" == *"${instance_selection}-"* ]]; then
+                    instance_choice_array+=("$instance")
+                    break
+                fi
+            done
+            if [[ ${#instance_choice_array[@]} -eq 0  ]]; then
+                echo "ERROR: could not find matching instance"
+                exit 1
             fi
-        done
-    elif [[ "$source_instance" ]]; then
-        instance_choice_array+=("${working_instances_list[$source_instance_selection]}")
-    else
-        instance_choice_array+=("${working_instances_list[0]}")
+        elif [[ "$instance_selection" ]]; then
+            for instance in $instance_selection; do
+                if [[ $instance == *"-"* ]]; then
+                    list_first=$(echo "$instance" | cut -d'-' -f1)
+                    list_last=$(echo "$instance" | cut -d'-' -f2)
+                    for (( i=list_first; i<=list_last; i++ )); do
+                        instance_choice_array+=("${working_instances_list[$i]}")
+                    done
+                else
+                    instance_choice_array+=("${working_instances_list[$instance]}")
+                fi
+            done
+        elif [[ "$source_instance" ]]; then
+            instance_choice_array+=("${working_instances_list[$source_instance_selection]}")
+        else
+            instance_choice_array+=("${working_instances_list[0]}")
+        fi
     fi
+
 
     echo "Instances chosen:"
     echo

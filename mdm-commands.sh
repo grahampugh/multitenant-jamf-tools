@@ -554,10 +554,13 @@ usage() {
 ./set_credentials.sh            - set the Keychain credentials
 
 [no arguments]                  - interactive mode
--il FILENAME (without .txt)     - provide an instance list filename
+-il | --instance-list FILENAME  - provide an instance list filename (without .txt)
                                   (must exist in the instance-lists folder)
--i JSS_URL                      - perform action on a single instance
+-i | --instance JSS_URL         - perform action on a specific instance
                                   (must exist in the relevant instance list)
+                                  (multiple values can be provided)
+-x | --nointeraction            - run without checking instance is in an instance list 
+                                  (prevents interactive choosing of instances)
 -v                              - add verbose curl output
 
 MDM command type:
@@ -635,12 +638,15 @@ while test $# -gt 0 ; do
         -il|--instance-list)
             shift
             chosen_instance_list_file="$1"
-        ;;
-        -si|--instance)
+            ;;
+        -i|--instance)
             shift
             chosen_instance="$1"
-        ;;
-        -i|--id)
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
+        --id)
             shift
             id="$1"
             ;;

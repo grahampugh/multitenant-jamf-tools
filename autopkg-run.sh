@@ -21,22 +21,23 @@ autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
 usage() {
     cat <<'USAGE'
 Usage:
-./set_credentials.sh          - set the Keychain credentials
+./set_credentials.sh             - set the Keychain credentials
 
-[no arguments]                - interactive mode
--r                            - recipe to run (e.g. Firefox.jamf, /path/to/recipe)
-                                (multiple values can be provided)
--l                            - recipe-list to run (must be path to a .txt file)
--il FILENAME (without .txt)   - provide an instance list filename
-                                (must exist in the instance-lists folder)
--i JSS_URL                    - perform action on a specific instance
-                                (must exist in the relevant instance list)
-                                (multiple values can be provided)
---all | -ai                   - perform action on ALL instances in the instance list
---dp                          - filter DPs on DP name
--e                            - Force policy to enabled (--key POLICY_ENABLED=True)
--v[vv]                        - add verbose output
---[args]                      - Pass through any arguments for AutoPkg
+-r | --recipe RECIPE             - recipe to run (e.g. Firefox.jamf, /path/to/recipe)
+                                   (multiple values can be provided)
+-l | --recipe-list LIST          - recipe-list to run (must be path to a .txt file)
+-il | --instance-list FILENAME   - provide an instance list filename (without .txt)
+                                   (must exist in the instance-lists folder)
+-i | --instance JSS_URL          - perform action on a specific instance
+                                   (must exist in the relevant instance list)
+                                   (multiple values can be provided)
+-a | --all | --all-instances     - perform action on ALL instances in the instance list
+-x | --nointeraction             - run without checking instance is in an instance list 
+                                   (prevents interactive choosing of instances)
+--dp                             - filter DPs on DP name
+-e                               - Force policy to enabled (--key POLICY_ENABLED=True)
+-v[vv]                           - add verbose output
+--[args]                         - Pass through any arguments for AutoPkg
 USAGE
 }
 
@@ -187,26 +188,29 @@ while [[ "$#" -gt 0 ]]; do
         -r|--recipe)
             shift
             recipes+=("$1")
-        ;;
+            ;;
         -l|--recipe-list)
             shift
             recipe_list="$1"
-        ;;
+            ;;
         -p|--replace)
             replace_pkg=1
-        ;;
+            ;;
         -il|--instance-list)
             shift
             chosen_instance_list_file="$1"
-        ;;
+            ;;
         -i|--instance)
             shift
             chosen_instances+=("$1")
-        ;;
+            ;;
+        -a|-ai|--all|--all-instances)
+            all_instances=1
+            ;;
         -d|--dp)
             shift
             dp_url_filter="$1"
-        ;;
+            ;;
         --prefs)
             shift
             autopkg_prefs="$1"
@@ -214,26 +218,23 @@ while [[ "$#" -gt 0 ]]; do
                 echo "ERROR: prefs file not found"
                 exit 1
             fi
-        ;;
-        -a|-ai|--all)
-            all_instances=1
-        ;;
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -e|--enabled)
             policy_enabled=1
-        ;;
-        -v)
-            verbose=1
-        ;;
-        -vv)
-            verbose=2
-        ;;
-        -vvv*)
-            verbose=3
-        ;;
+            ;;
+        -q)
+            quiet_mode="yes"
+            ;;
+        -v*)
+            verbosity_mode="$1"
+            ;;
         -h|--help)
             usage
             exit
-        ;;
+            ;;
         *)
             args+=("$1")
             ;;
@@ -241,6 +242,13 @@ while [[ "$#" -gt 0 ]]; do
     # Shift after checking all the cases to get the next option
     shift
 done
+
+if [[ ! $verbosity_mode && ! $quiet_mode ]]; then
+    # default verbosity
+    args+=("-v")
+elif [[ ! $quiet_mode ]]; then
+    args+=("$verbosity_mode")
+fi
 
 # ------------------------------------------------------------------------------------
 # 1. Ask for the instance list, show list, ask to apply to one, multiple or all
