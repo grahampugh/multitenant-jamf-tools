@@ -85,13 +85,14 @@ while test $# -gt 0 ; do
             shift
             dp_url_filter="$1"
             ;;
-        -a|-ai|--all|--all-instances)
+        -a|-ai|--all-instances)
             all_instances=1
             ;;
         -x|--nointeraction)
             no_interaction=1
             ;;
         -j)
+            shift
             jamf_upload_path="$1"
             if [[ ! -f "$jamf_upload_path" ]]; then
                 echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"

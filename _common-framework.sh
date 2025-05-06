@@ -914,7 +914,7 @@ run_jamfupload() {
 
 encode_name() {
     url_encoded_name="$( echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
-    return "$url_encoded_name"
+    echo "$url_encoded_name"
 }
 
 get_object_id_from_name() {
