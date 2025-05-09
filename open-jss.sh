@@ -6,7 +6,8 @@ DOC
 
 # source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
 
 # set instance list type
 instance_list_type="ios"
@@ -24,6 +25,8 @@ Usage:
                                 (must exist in the instance-lists folder)
 --i JSS_URL                   - perform action on a single instance
                                 (must exist in the relevant instance list)
+-x | --nointeraction          - run without checking instance is in an instance list 
+                                (prevents interactive choosing of instances)
 -a                            - select browser to open the JSS in (interactively)
 -v                            - add verbose curl output
 USAGE
@@ -33,7 +36,11 @@ list_browsers() {
     # list the browsers available
 
     # default browser
-    default_browser_idenfitier=$(plutil -p ~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist | grep 'https' -b3 |awk 'NR==3 {split($4, arr, "\""); print arr[2]}')
+    default_browser_idenfitier=$(plutil -p ~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist | grep 'https' -b3 | awk 'NR==3 {split($4, arr, "\""); print arr[2]}')
+    # fix for Safari bug
+    if [[ "$default_browser_idenfitier" == "com.apple.safari" ]]; then
+        default_browser_idenfitier="com.apple.Safari"
+    fi
     default_browser=$(mdfind "kMDItemCFBundleIdentifier == $default_browser_idenfitier" | grep -e "^/Applications/" | grep -iv "dropbox" | head -n 1)
 
     # check for browsers using mdfind
@@ -47,7 +54,7 @@ list_browsers() {
     item=0
     for browser in "${browser_list[@]}"; do
         printf '   %-7s %-30s\n' "($item)" "$browser"
-        if [[ "$browser" == "$default_browser" ]]; then
+        if [[ "$(echo "$browser" | tr '[:upper:]' '[:lower:]')" == "$(echo "$default_browser" | tr '[:upper:]' '[:lower:]')" ]]; then
             default_browser_number=$item
         fi
         ((item++))
@@ -55,8 +62,10 @@ list_browsers() {
     echo
     browser_selection=""
     if [[ $select_browser ]]; then
-        echo "Enter the number of the browser to use,"
-        echo "   or leave blank to select [$default_browser_number] $default_browser:"
+        if [[ "$default_browser_number" ]]; then
+            echo "Enter the number of the browser to use,"
+            echo "   or leave blank to select [$default_browser_number] $default_browser:"
+        fi
         read -r -p "Enter the number of the browser to use : " browser_selection
     fi
     if [[ "$browser_selection" ]]; then
@@ -85,6 +94,7 @@ fi
 # -------------------------------------------------------------------------
 
 # Command line override for the above settings
+chosen_instances=()
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
@@ -92,9 +102,12 @@ while [[ "$#" -gt 0 ]]; do
             shift
             chosen_instance_list_file="$1"
         ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -i|--instance)
             shift
-            chosen_instance="$1"
+            chosen_instances+=("$1")
         ;;
         -v|--verbose)
             verbose=1
@@ -116,24 +129,25 @@ echo
 # 1. Ask for the instance list, show list, ask to apply to one, multiple or all
 # ------------------------------------------------------------------------------------
 
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
 # select the instances that will be changed
 choose_destination_instances
 
 # list browsers
 list_browsers
 
-# get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
+# open each selected instance in the selected browser
+for instance in "${instance_choice_array[@]}"; do
+    jss_instance="$instance"
     echo "Opening $jss_instance in $browser_selected..."
     open_jss
-else
-    for instance in "${instance_choice_array[@]}"; do
-        jss_instance="$instance"
-        echo "Opening $jss_instance in $browser_selected..."
-        open_jss
-    done
-fi
+done
 
 echo 
 echo "Finished"
