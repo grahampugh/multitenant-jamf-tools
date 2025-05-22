@@ -70,23 +70,11 @@ run_autopkg() {
         autopkg_run_options+=("SMB_USERNAME=$user_rw")
         # we need the new endpoints for the password. For now use the keychain
         if [[ "$dp" ]]; then
-            echo "   [check_for_smb_repo] Checking credentials for '$dp'."
-            # check for existing service entry in login keychain
-            dp_check=$(/usr/bin/security find-generic-password -s "$dp" 2>/dev/null)
-            if [[ $dp_check ]]; then
-                # echo "   [check_for_smb_repo] Checking keychain entry for $dp_check" # TEMP
-                smb_url=$(/usr/bin/grep "0x00000007" <<< "$dp_check" 2>&1 | /usr/bin/cut -d \" -f 2 |/usr/bin/cut -d " " -f 1)
-                if [[ $smb_url ]]; then
-                    # echo "   [check_for_smb_repo] Checking $smb_url" # TEMP
-                    smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
-                    smb_pass=$(/usr/bin/security find-generic-password -s "$dp" -w -g 2>/dev/null)
-                    if [[ $smb_url == *"(readwrite)"* && $smb_user && $smb_pass ]]; then
-                        echo "Username and password for $dp found in keychain - URL=$smb_url"
-                        # dp_found=1
-                        pass_rw="$smb_pass"
-                        return
-                    fi
-                fi
+            get_smb_credentials
+            if [[ $smb_url && $smb_user && $smb_pass ]]; then
+                echo "Username and password for $dp found in keychain - URL=$smb_url"
+                # dp_found=1
+                pass_rw="$smb_pass"
             fi
         else
             echo "DP not determined. Trying AutoPkg prefs"
@@ -95,6 +83,13 @@ run_autopkg() {
                 echo "ERROR: DP not determined. Cannot continue"
                 exit 1
             fi
+        fi
+        if [[ $pass_rw ]]; then
+            autopkg_run_options+=("--key")
+            autopkg_run_options+=("SMB_PASSWORD=$pass_rw")
+        else
+            echo "ERROR: Password not found for $dp"
+            exit 1
         fi
 
     else

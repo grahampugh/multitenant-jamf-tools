@@ -6,7 +6,7 @@ osxconfigurationprofiles
 advancedcomputersearches
 patches
 patchexternalsources
-patchinternalsources
+# patchinternalsources
 patchpolicies
 macapplications
 computers
@@ -30,27 +30,28 @@ distributionpoints
 smtpserver
 # activationcode
 computerinventorycollection
-# vppaccounts
-# vppassignments
-# vppinvitations
+vppaccounts
+vppassignments
+vppinvitations
 # webhooks
 diskencryptionconfigurations
-# ebooks
+ebooks
 dockitems
 printers
 # licensedsoftware
 # managedpreferenceprofiles
-# packages
+packages
 advancedcomputersearches
+advancedmobiledevicesearches
+mobiledevicegroups
 mobiledevicegroups
 mobiledevicegroups
 mobiledeviceapplications
 mobiledeviceconfigurationprofiles
-# mobiledeviceenrollmentprofiles
+mobiledeviceenrollmentprofiles
 mobiledeviceextensionattributes
-# mobiledeviceprovisioningprofiles
-# classes
-advancedmobiledevicesearches
+mobiledeviceprovisioningprofiles
+classes
 userextensionattributes
 # usergroups
 # users

@@ -521,7 +521,7 @@ get_smb_credentials() {
             # echo "   [get_smb_credentials] Checking keychain entry for $dp_check" # TEMP
             # echo "   [get_smb_credentials] Checking $smb_url" # TEMP
             smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
-            smb_pass=$(/usr/bin/security find-generic-password -s "$dp_server" -w -g 2>/dev/null)
+            smb_pass=$(/usr/bin/security find-generic-password -a "$smb_user" -s "$dp_server" -w -g 2>/dev/null)
             # smb_pass=${smb_pass//\!/} # exclamation points are ignored and mess up the SMB command so we remove them
             # echo "   [get_smb_credentials] User: $smb_user - Pass: $smb_pass" # TEMP
         # else
