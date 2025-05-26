@@ -6,7 +6,8 @@ DOC
 
 # source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
 
 # reduce the curl tries
 max_tries_override=2
@@ -26,6 +27,8 @@ Usage:
 --i JSS_URL                   - perform action on a single instance
                                 (must exist in the relevant instance list)
 --all                         - perform action on ALL instances in the instance list
+-x | --nointeraction             - run without checking instance is in an instance list 
+                                   (prevents interactive mode)
 -v                            - add verbose curl output
 USAGE
 }
@@ -130,9 +133,12 @@ while [[ "$#" -gt 0 ]]; do
             shift
             chosen_instance="$1"
         ;;
-        -a|--all)
+        -a|-ai|--all|--all-instances)
             all_instances=1
         ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         --confirm)
             echo "   [main] CLI: Action: auto-confirm copy or delete, for non-interactive use."
             confirmed="yes"
@@ -171,7 +177,9 @@ for instance in "${instance_choice_array[@]}"; do
         echo "Existing Activation Code on $jss_instance matches the inputted code. No need to update."
     else
         # are we sure to proceed?
-        are_you_sure
+        if [[ $no_interaction -ne 1 ]]; then
+            are_you_sure
+        fi
 
         echo "Updating Activation Code on $jss_instance..."
         write_activation_code
