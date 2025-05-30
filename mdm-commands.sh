@@ -85,8 +85,6 @@ get_software_update_feature_status() {
 
     echo "   [toggle_software_update_feature] Toggle on status: '$toggle_on_value'..."
     echo "   [toggle_software_update_feature] Toggle off status: '$toggle_off_value'..."
-    echo "   [toggle_software_update_feature] WARNING: Do not proceed if either of the above values is less than 100%"
-    echo "   [toggle_software_update_feature] Proceed to toggle to '$toggle_set_value'..."
 }
 
 toggle_software_update_feature() {
@@ -115,6 +113,105 @@ toggle_software_update_feature() {
     # Send Slack notification
     slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Toggle Software Update Plan Feature to $toggle_set_value'}"
     send_slack_notification "$slack_text"
+}
+
+get_computer_list() {
+    # get a list of computers from the JSS
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    endpoint="api/preview/computers"
+    url_filter="?page=0&page-size=1000&sort=id"
+    curl_url="$jss_url/$endpoint/$url_filter"
+    curl_args=("--request")
+    curl_args+=("GET")
+    curl_args+=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+    # create a variable containing the json output from $curl_output_file
+    computer_output=$(cat "$curl_output_file")
+    cp "$curl_output_file" /tmp/computer_output.json
+}
+
+get_mobile_device_list() {
+    # get a list of mobile devices from the JSS
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    endpoint="api/v2/mobile-devices"
+    url_filter="?page=0&page-size=1000&sort=id"
+    curl_url="$jss_url/$endpoint/$url_filter"
+    curl_args=("--request")
+    curl_args+=("GET")
+    curl_args+=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+    # create a variable containing the json output from $curl_output_file
+    mobile_device_output=$(cat "$curl_output_file")
+}
+
+ddm_plan_status() {
+    # This function will get the DDM Software Update plan status for individual devices
+
+    # we get the device names from the JSS for use in the output
+    get_computer_list
+    get_mobile_device_list
+
+    # cat "$computer_output" # TEMP
+
+    # get DDM Software Update plan status
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    endpoint="api/v1/managed-software-updates/plans?page=0&page-size=100&sort=planUuid%3Aasc"
+    curl_url="$jss_url/$endpoint"
+    curl_args=("--request")
+    curl_args+=("GET")
+    curl_args+=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+
+    plan_output="$curl_output_file"
+    echo "   [ddm_plan_status] DDM Software Update plan statuses:"
+    # cat "$plan_output" # TEMP
+
+    # now loop through the output using jq, output the computer ID, the updateAction value, the versionType value, the forceInstallLocalDateTime value, and the status state and errorReasons. The following is an example of the output for one device in the list:
+
+    echo
+    echo "   [ddm_plan_status] DDM Software Update plan status for individual devices:"
+    echo
+    /usr/bin/jq -c '.results[]' "$plan_output" | while IFS= read -r item; do
+        device_id=$(echo "$item" | /usr/bin/jq -r '.device.deviceId')
+        object_type=$(echo "$item" | /usr/bin/jq -r '.device.objectType')
+        plan_uuid=$(echo "$item" | /usr/bin/jq -r '.planUuid')
+        update_action=$(echo "$item" | /usr/bin/jq -r '.updateAction')
+        version_type=$(echo "$item" | /usr/bin/jq -r '.versionType')
+        force_install_local_datetime=$(echo "$item" | /usr/bin/jq -r '.forceInstallLocalDateTime')
+        state=$(echo "$item" | /usr/bin/jq -r '.status.state')
+        error_reasons=$(echo "$item" | /usr/bin/jq -r '.status.errorReasons | join(", ")')
+
+        if [[ "$object_type" == "COMPUTER" ]]; then
+            echo "Computer ID: $device_id"
+            device_name=$(jq -r --arg id "$device_id" '.results[] | select(.id == $id) | .name' <<< "$computer_output")
+            echo "Computer Name: $device_name"
+        else
+            echo "Device ID: $device_id"
+            device_name=$(jq -r --arg id "$device_id" '.results[] | select(.id == $id) | .name' <<< "$mobile_device_output")
+            echo "Device Name: $device_name"
+        fi
+
+        echo "Plan UUID: $plan_uuid"
+        echo "Update Action: $update_action"
+        echo "Version Type: $version_type"
+        echo "Force Install Local DateTime: $force_install_local_datetime"
+        echo "State: $state"
+        if [[ "$state" == "PlanFailed" ]]; then
+            echo "Error Reasons: $error_reasons"
+        fi
+        echo
+    done
+
+
+    # # Send Slack notification
+    # slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Get DDM Software Update Plan Status'}"
+    # send_slack_notification "$slack_text"   
 }
 
 delete_users() {
@@ -574,9 +671,13 @@ MDM command type:
 --deleteusers                   - Delete all users from a device (Shared iPad)
 --restart                       - Restart device (mobile devices only)
 --logout                        - Log out user from a device (mobile devices only)
---flushmdm                     - Flush MDM commands
+--flushmdm                      - Flush MDM commands
 --bluetooth-off                 - Disable Bluetooth (mobile devices only)
 --bluetooth-on                  - Enable Bluetooth (mobile devices only)
+--toggle                        - Toggle Software Update Plan Feature
+                                  This will toggle the feature on or off, clearing any plans
+                                  that may be set.
+--plan                          - Get DDM Software Update plan status for individual devices
 
 Options for the --recovery type:
 
@@ -684,10 +785,13 @@ while test $# -gt 0 ; do
             mdm_command="recovery"
             ;;
         --removemdm|--remove-mdm-profile)
-            mdm_command="remove_mdm"
+            mdm_command="removemdm"
             ;;
         --flushmdm|--flush-mdm)
             mdm_command="flushmdm"
+            ;;
+        --plan|--ddm-plan)
+            mdm_command="ddmplan"
             ;;
         --toggle)
             mdm_command="toggle"
@@ -759,6 +863,7 @@ else
     echo "   [L] Logout user (mobile devices)"
     echo "   [B0] [B1] Disable/Enable Bluetooth (mobile devices)"
     echo "   [F] Flush MDM commands"
+    echo "   [DDM] Get DDM Software Update Plan Status"
     echo "   [T] Toggle Software Update Plan Feature"
     printf 'Choose one : '
     read -r action_question
@@ -775,6 +880,9 @@ else
             ;;
         P|p)
             mdm_command="removemdm"
+            ;;
+        Pl|pl)
+            mdm_command="ddmplan"
             ;;
         D|d)
             mdm_command="deleteusers"
@@ -806,7 +914,7 @@ else
 fi
 
 # if a group name was supplied at the command line, compile the list of computers/mobile devices from that group
-if [[ $group_name && $mdm_command != "flushmdm" && $mdm_command != "toggle" ]]; then
+if [[ $group_name && $mdm_command != "flushmdm" && $mdm_command != "toggle" && $mdm_command != "ddmplan" ]]; then
     echo
     if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" ]]; then
         get_mobile_devices_in_group
@@ -820,16 +928,20 @@ fi
 if [[ ($mdm_command == "flushmdm" && ! $group_name) || $mdm_command != "flushmdm" ]]; then
     if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" || $mdm_command == "bluetooth"* || ($mdm_command == "flushmdm" && $device_type == "devices") ]]; then
         generate_mobile_device_list
-    elif [[ $mdm_command != "toggle" ]]; then
+    elif [[ $mdm_command != "toggle" && $mdm_command != "ddmplan" ]]; then
         generate_computer_list
     fi
-elif [[ $mdm_command != "toggle" ]]; then
+elif [[ $mdm_command != "toggle" && $mdm_command != "ddmplan" ]]; then
     echo "Using group: $group_name"
 fi
 
 # for toggling software update feature status we want to display the current value
-if [[ $mdm_command == "toggle" ]]; then
+if [[ $mdm_command == "toggle" || $mdm_command == "ddmplan" ]]; then
     get_software_update_feature_status
+    if [[ $mdm_command == "toggle" ]]; then
+        echo "   [toggle_software_update_feature] WARNING: Do not proceed if either of the above values is less than 100%"
+        echo "   [toggle_software_update_feature] Proceed to toggle to '$toggle_set_value'..."
+    fi
 fi
 
 # are we sure to proceed?
@@ -881,5 +993,9 @@ case "$mdm_command" in
     toggle)
         echo "   [main] Toggling Software Update Plan Feature"
         toggle_software_update_feature
+        ;;
+    ddmplan)
+        echo "   [main] Toggling Software Update Plan Feature"
+        ddm_plan_status
         ;;
 esac
