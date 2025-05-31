@@ -1019,10 +1019,11 @@ get_mobile_devices_in_group() {
 
 generate_computer_list() {
     # The Jamf Pro API returns a list of all computers.
+    # first get the device count so we can find out how many loops we need
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
     endpoint="api/preview/computers"
-    url_filter="?page=0&page-size=1000&sort=id"
+    url_filter="?page=0&page-size=10"
     curl_url="$jss_url/$endpoint/$url_filter"
     curl_args=("--request")
     curl_args+=("GET")
@@ -1030,8 +1031,51 @@ generate_computer_list() {
     curl_args+=("Accept: application/json")
     send_curl_request
 
+    # how many devices are there?
+    total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
+    if [[ $total_count -eq 0 ]]; then
+        echo "No computers found"
+        exit 1
+    fi
+    echo "Total computers found: $total_count"
+
+    # we need to run multiple loops to get all the devices if there are more than 1000
+    # calculate how many loops we need
+    loop_count=$(( total_count / 1000 ))
+    if (( total_count % 1000 > 0 )); then
+        loop_count=$(( loop_count + 1 ))
+    fi
+    echo "Will loop through $loop_count times to get all computers."
+
+    # now loop through
+    i=0
+    while [[ $i -lt $loop_count ]]; do
+        # set the page number
+        page_number=$(( i * 1000 ))
+        url_filter="?page=$page_number&page-size=1000&sort=id"
+        curl_url="$jss_url/$endpoint/$url_filter"
+        curl_args=("--request")
+        curl_args+=("GET")
+        curl_args+=("--header")
+        curl_args+=("Accept: application/json")
+        send_curl_request
+        # append the results to the output file, ensuring only to append the results
+        # if this is the first loop, we need to create the file
+        combined_output_file="$output_location/jamf_computer_list_combined.json"
+        if [[ ! -f "$combined_output_file" ]]; then
+            touch "$combined_output_file"
+        fi
+        # extract the results and append them to the combined output file
+        if [[ $i -eq 0 ]]; then
+            /usr/bin/plutil -extract results raw "$curl_output_file" > "$combined_output_file"
+        else
+            /usr/bin/plutil -extract results raw "$curl_output_file" >> "$combined_output_file"
+        fi
+        ((i++))
+    done
+
     # how big should the loop be?
-    loopsize=$(/usr/bin/plutil -extract results raw "$curl_output_file")
+    loopsize="$total_count"
 
     # now loop through
     i=0
@@ -1042,10 +1086,10 @@ generate_computer_list() {
     computer_choice=()
     echo
     while [[ $i -lt $loopsize ]]; do
-        id_in_list=$(/usr/bin/plutil -extract results.$i.id raw "$curl_output_file")
-        computer_name_in_list=$(/usr/bin/plutil -extract results.$i.name raw "$curl_output_file")
-        management_id_in_list=$(/usr/bin/plutil -extract results.$i.managementId raw "$curl_output_file")
-        serial_in_list=$(/usr/bin/plutil -extract results.$i.serialNumber raw "$curl_output_file")
+        id_in_list=$(/usr/bin/plutil -extract results.$i.id raw "$combined_output_file")
+        computer_name_in_list=$(/usr/bin/plutil -extract results.$i.name raw "$combined_output_file")
+        management_id_in_list=$(/usr/bin/plutil -extract results.$i.managementId raw "$combined_output_file")
+        serial_in_list=$(/usr/bin/plutil -extract results.$i.serialNumber raw "$combined_output_file")
 
         computer_ids+=("$id_in_list")
         computer_names+=("$computer_name_in_list")
@@ -1111,10 +1155,12 @@ generate_computer_list() {
 
 generate_mobile_device_list() {
     # The Jamf Pro API returns a list of all mobile devices.
+
+    # first get the device count so we can find out how many loops we need
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
     endpoint="api/v2/mobile-devices"
-    url_filter="?page=0&page-size=1000&sort=id"
+    url_filter="?page=0&page-size=10"
     curl_url="$jss_url/$endpoint/$url_filter"
     curl_args=("--request")
     curl_args+=("GET")
@@ -1122,8 +1168,51 @@ generate_mobile_device_list() {
     curl_args+=("Accept: application/json")
     send_curl_request
 
+    # how many devices are there?
+    total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
+    if [[ $total_count -eq 0 ]]; then
+        echo "No mobile devices found"
+        exit 1
+    fi
+    echo "Total mobile devices found: $total_count"
+
+    # we need to run multiple loops to get all the devices if there are more than 1000
+    # calculate how many loops we need
+    loop_count=$(( total_count / 1000 ))
+    if (( total_count % 1000 > 0 )); then
+        loop_count=$(( loop_count + 1 ))
+    fi
+    echo "Will loop through $loop_count times to get all devices."
+
+    # now loop through
+    i=0
+    while [[ $i -lt $loop_count ]]; do
+        # set the page number
+        page_number=$(( i * 1000 ))
+        url_filter="?page=$page_number&page-size=1000&sort=id"
+        curl_url="$jss_url/$endpoint/$url_filter"
+        curl_args=("--request")
+        curl_args+=("GET")
+        curl_args+=("--header")
+        curl_args+=("Accept: application/json")
+        send_curl_request
+        # append the results to the output file, ensuring only to append the results
+        # if this is the first loop, we need to create the file
+        combined_output_file="$output_location/jamf_mobile_device_list_combined.json"
+        if [[ ! -f "$combined_output_file" ]]; then
+            touch "$combined_output_file"
+        fi
+        # extract the results and append them to the combined output file
+        if [[ $i -eq 0 ]]; then
+            /usr/bin/plutil -extract results raw "$curl_output_file" > "$combined_output_file"
+        else
+            /usr/bin/plutil -extract results raw "$curl_output_file" >> "$combined_output_file"
+        fi
+        ((i++))
+    done
+
     # how big should the loop be?
-    loopsize=$(/usr/bin/plutil -extract results raw "$curl_output_file")
+    loopsize="$total_count"
 
     # now loop through
     i=0
@@ -1134,10 +1223,10 @@ generate_mobile_device_list() {
     mobile_device_choice=()
     echo
     while [[ $i -lt $loopsize ]]; do
-        id_in_list=$(/usr/bin/plutil -extract results.$i.id raw "$curl_output_file")
-        mobile_device_name_in_list=$(/usr/bin/plutil -extract results.$i.name raw "$curl_output_file")
-        management_id_in_list=$(/usr/bin/plutil -extract results.$i.managementId raw "$curl_output_file")
-        serial_in_list=$(/usr/bin/plutil -extract results.$i.serialNumber raw "$curl_output_file")
+        id_in_list=$(/usr/bin/plutil -extract results.$i.id raw "$combined_output_file")
+        mobile_device_name_in_list=$(/usr/bin/plutil -extract results.$i.name raw "$combined_output_file")
+        management_id_in_list=$(/usr/bin/plutil -extract results.$i.managementId raw "$combined_output_file")
+        serial_in_list=$(/usr/bin/plutil -extract results.$i.serialNumber raw "$combined_output_file")
 
         mobile_device_ids+=("$id_in_list")
         mobile_device_names+=("$mobile_device_name_in_list")

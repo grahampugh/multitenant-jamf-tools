@@ -120,32 +120,112 @@ get_computer_list() {
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
     endpoint="api/preview/computers"
-    url_filter="?page=0&page-size=1000&sort=id"
+    url_filter="?page=0&page-size=10"
     curl_url="$jss_url/$endpoint/$url_filter"
     curl_args=("--request")
     curl_args+=("GET")
     curl_args+=("--header")
     curl_args+=("Accept: application/json")
     send_curl_request
+
+    # how many devices are there?
+    total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
+    if [[ $total_count -eq 0 ]]; then
+        echo "No computers found"
+        exit 1
+    fi
+    echo "Total computers found: $total_count"
+
+    # we need to run multiple loops to get all the devices if there are more than 1000
+    # calculate how many loops we need
+    loop_count=$(( total_count / 1000 ))
+    if (( total_count % 1000 > 0 )); then
+        loop_count=$(( loop_count + 1 ))
+    fi
+    echo "Will loop through $loop_count times to get all computers."
+
+    # now loop through
+    i=0
+    combined_output=""
+    while [[ $i -lt $loop_count ]]; do
+        echo "   [get_computer_list] Processing page $i of $loop_count..."
+        # set the page number
+
+        url_filter="?page=$i&page-size=1000&sort=id"
+        curl_url="$jss_url/$endpoint/$url_filter"
+        # echo "   [get_computer_list] $curl_url" # TEMP
+        curl_args=("--request")
+        curl_args+=("GET")
+        curl_args+=("--header")
+        curl_args+=("Accept: application/json")
+        send_curl_request
+        # cat "$curl_output_file" # TEMP
+        # append the results array to the combined_results array (do not export to a file)
+        combined_output+=$(cat "$curl_output_file")
+        # echo "$combined_output" > /tmp/combined_output.txt # TEMP
+        ((i++))
+    done
+
     # create a variable containing the json output from $curl_output_file
-    computer_output=$(cat "$curl_output_file")
-    cp "$curl_output_file" /tmp/computer_output.json
+    computer_results=$(echo "$combined_output" | jq -s '[.[].results[]]')
+    echo "$computer_results" > /tmp/computer_results.json # TEMP
 }
 
 get_mobile_device_list() {
     # get a list of mobile devices from the JSS
+    # first get the device count so we can find out how many loops we need
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
     endpoint="api/v2/mobile-devices"
-    url_filter="?page=0&page-size=1000&sort=id"
+    url_filter="?page=0&page-size=10"
     curl_url="$jss_url/$endpoint/$url_filter"
     curl_args=("--request")
     curl_args+=("GET")
     curl_args+=("--header")
     curl_args+=("Accept: application/json")
     send_curl_request
+
+    # how many devices are there?
+    total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
+    if [[ $total_count -eq 0 ]]; then
+        echo "No mobile devices found"
+        exit 1
+    fi
+    echo "Total mobile devices found: $total_count"
+
+    # we need to run multiple loops to get all the devices if there are more than 100
+    # calculate how many loops we need
+    loop_count=$(( total_count / 1000 ))
+    if (( total_count % 1000 > 0 )); then
+        loop_count=$(( loop_count + 1 ))
+    fi
+    echo "Will loop through $loop_count times to get all devices."
+
+    # now loop through
+    i=0
+    combined_output=""
+    while [[ $i -lt $loop_count ]]; do
+        echo "   [get_mobile_device_list] Processing page $i of $loop_count..."
+        # set the page number
+
+        url_filter="?page=$i&page-size=1000&sort=id"
+        curl_url="$jss_url/$endpoint/$url_filter"
+        # echo "   [get_mobile_device_list] $curl_url" # TEMP
+        curl_args=("--request")
+        curl_args+=("GET")
+        curl_args+=("--header")
+        curl_args+=("Accept: application/json")
+        send_curl_request
+        # cat "$curl_output_file" # TEMP
+        # append the results array to the combined_results array (do not export to a file)
+        combined_output+=$(cat "$curl_output_file")
+        # echo "$combined_output" > /tmp/combined_output.txt # TEMP
+        ((i++))
+    done
+
     # create a variable containing the json output from $curl_output_file
-    mobile_device_output=$(cat "$curl_output_file")
+    mobile_device_results=$(echo "$combined_output" | jq -s '[.[].results[]]')
+    echo "$mobile_device_results" > /tmp/device_results.json # TEMP
 }
 
 ddm_plan_status() {
@@ -154,7 +234,7 @@ ddm_plan_status() {
     # we get the device names from the JSS for use in the output
     get_computer_list
     get_mobile_device_list
-
+    # exit # TEMP
     # cat "$computer_output" # TEMP
 
     # get DDM Software Update plan status
@@ -177,6 +257,9 @@ ddm_plan_status() {
     echo
     echo "   [ddm_plan_status] DDM Software Update plan status for individual devices:"
     echo
+    # create a CSV file to store the output
+    csv_tmp_file="/tmp/ddm_plan_status.csv"
+    echo "Device ID,Device Name,Device Model,Plan UUID,Update Action,Version Type,Force Install Local DateTime,State,Error Reasons" > "$csv_tmp_file"
     /usr/bin/jq -c '.results[]' "$plan_output" | while IFS= read -r item; do
         device_id=$(echo "$item" | /usr/bin/jq -r '.device.deviceId')
         object_type=$(echo "$item" | /usr/bin/jq -r '.device.objectType')
@@ -187,14 +270,20 @@ ddm_plan_status() {
         state=$(echo "$item" | /usr/bin/jq -r '.status.state')
         error_reasons=$(echo "$item" | /usr/bin/jq -r '.status.errorReasons | join(", ")')
 
+        # echo "Object Type: $object_type"
         if [[ "$object_type" == "COMPUTER" ]]; then
             echo "Computer ID: $device_id"
-            device_name=$(jq -r --arg id "$device_id" '.results[] | select(.id == $id) | .name' <<< "$computer_output")
+            device_name=$(jq -r --arg id "$device_id" '.[] | select(.id == $id) | .name' <<< "$computer_results")
             echo "Computer Name: $device_name"
-        else
+        elif [[ "$object_type" == "MOBILE_DEVICE" ]]; then
             echo "Device ID: $device_id"
-            device_name=$(jq -r --arg id "$device_id" '.results[] | select(.id == $id) | .name' <<< "$mobile_device_output")
+            device_name=$(jq -r --arg id "$device_id" '.[] | select(.id == $id) | .name' <<< "$mobile_device_results")
+            device_model=$(jq -r --arg id "$device_id" '.[] | select(.id == $id) | .model' <<< "$mobile_device_results")
             echo "Device Name: $device_name"
+            echo "Device Model: $device_model"
+        else
+            echo "Unknown Object Type: $object_type"
+            continue
         fi
 
         echo "Plan UUID: $plan_uuid"
@@ -206,12 +295,11 @@ ddm_plan_status() {
             echo "Error Reasons: $error_reasons"
         fi
         echo
+        # append the output to a csv file
+        echo "$device_id,$device_name,$device_model,$plan_uuid,$update_action,$version_type,$force_install_local_datetime,$state,$error_reasons" >> /tmp/ddm_plan_status.csv
     done
 
-
-    # # Send Slack notification
-    # slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Get DDM Software Update Plan Status'}"
-    # send_slack_notification "$slack_text"   
+    echo "   [ddm_plan_status] CSV file outputted to: $csv_tmp_file"
 }
 
 delete_users() {
