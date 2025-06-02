@@ -189,7 +189,8 @@ get_mobile_device_list() {
     total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
     if [[ $total_count -eq 0 ]]; then
         echo "No mobile devices found"
-        exit 1
+        mobile_device_results=""
+        return
     fi
     echo "Total mobile devices found: $total_count"
 
@@ -257,15 +258,21 @@ ddm_plan_status() {
     echo
     echo "   [ddm_plan_status] DDM Software Update plan status for individual devices:"
     echo
-    # create a CSV file to store the output
-    csv_tmp_file="/tmp/ddm_plan_status.csv"
-    echo "Device ID,Device Name,Device Model,Plan UUID,Update Action,Version Type,Force Install Local DateTime,State,Error Reasons" > "$csv_tmp_file"
+    # create a CSV file to store the output. The name of the file includes the date, time, and subdomain of the JSS instance
+    jss_subdomain=$(echo "$jss_instance" | awk -F/ '{print $3}' | awk -F. '{print $1}')
+    current_datetime=$(date +"%Y-%m-%d_%H-%M-%S")
+    # create a CSV file with the name ddm_plan_status_<subdomain>_<date>_<time>.csv
+    csv_dir="/Users/Shared/MSP-Toolkit/MDM-Commands/ddm_plan_status"
+    mkdir -p "$csv_dir"
+    csv_file_name="ddm_plan_status_${jss_subdomain}_${current_datetime}.csv"
+    echo "Device ID,Device Name,Device Type,Device Model,Plan UUID,Update Action,Version Type,Specific Version,Force Install Local DateTime,State,Error Reasons" > "$csv_dir/$csv_file_name"
     /usr/bin/jq -c '.results[]' "$plan_output" | while IFS= read -r item; do
         device_id=$(echo "$item" | /usr/bin/jq -r '.device.deviceId')
         object_type=$(echo "$item" | /usr/bin/jq -r '.device.objectType')
         plan_uuid=$(echo "$item" | /usr/bin/jq -r '.planUuid')
         update_action=$(echo "$item" | /usr/bin/jq -r '.updateAction')
         version_type=$(echo "$item" | /usr/bin/jq -r '.versionType')
+        specific_version=$(echo "$item" | /usr/bin/jq -r '.specificVersion')
         force_install_local_datetime=$(echo "$item" | /usr/bin/jq -r '.forceInstallLocalDateTime')
         state=$(echo "$item" | /usr/bin/jq -r '.status.state')
         error_reasons=$(echo "$item" | /usr/bin/jq -r '.status.errorReasons | join(", ")')
@@ -289,6 +296,9 @@ ddm_plan_status() {
         echo "Plan UUID: $plan_uuid"
         echo "Update Action: $update_action"
         echo "Version Type: $version_type"
+        if [[ "$specific_version" != "null" ]]; then
+            echo "Specific Version: $specific_version"
+        fi
         echo "Force Install Local DateTime: $force_install_local_datetime"
         echo "State: $state"
         if [[ "$state" == "PlanFailed" ]]; then
@@ -296,10 +306,10 @@ ddm_plan_status() {
         fi
         echo
         # append the output to a csv file
-        echo "$device_id,$device_name,$device_model,$plan_uuid,$update_action,$version_type,$force_install_local_datetime,$state,$error_reasons" >> /tmp/ddm_plan_status.csv
+        echo "$device_id,$device_name,$(tr '[:upper:]' '[:lower:]' <<< "$object_type"),$device_model,$plan_uuid,$update_action,$version_type,$specific_version,$force_install_local_datetime,$state,$error_reasons" >> "$csv_dir/$csv_file_name"
     done
 
-    echo "   [ddm_plan_status] CSV file outputted to: $csv_tmp_file"
+    echo "   [ddm_plan_status] CSV file outputted to: $csv_dir/$csv_file_name"
 }
 
 delete_users() {
