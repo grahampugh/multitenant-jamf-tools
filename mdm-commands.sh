@@ -229,8 +229,8 @@ get_mobile_device_list() {
     echo "$mobile_device_results" > /tmp/device_results.json # TEMP
 }
 
-ddm_plan_status() {
-    # This function will get the DDM Software Update plan status for individual devices
+msu_plan_status() {
+    # This function will get the MSU Software Update plan status for individual devices
 
     # we get the device names from the JSS for use in the output
     get_computer_list
@@ -238,7 +238,7 @@ ddm_plan_status() {
     # exit # TEMP
     # cat "$computer_output" # TEMP
 
-    # get DDM Software Update plan status
+    # get MSU Software Update plan status
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
     endpoint="api/v1/managed-software-updates/plans?page=0&page-size=100&sort=planUuid%3Aasc"
@@ -250,22 +250,22 @@ ddm_plan_status() {
     send_curl_request
 
     plan_output="$curl_output_file"
-    echo "   [ddm_plan_status] DDM Software Update plan statuses:"
+    echo "   [msu_plan_status] MSU Software Update plan statuses:"
     # cat "$plan_output" # TEMP
 
     # now loop through the output using jq, output the computer ID, the updateAction value, the versionType value, the forceInstallLocalDateTime value, and the status state and errorReasons. The following is an example of the output for one device in the list:
 
     echo
-    echo "   [ddm_plan_status] DDM Software Update plan status for individual devices:"
+    echo "   [msu_plan_status] MSU Software Update plan status for individual devices:"
     echo
     # create a CSV file to store the output. The name of the file includes the date, time, and subdomain of the JSS instance
     jss_subdomain=$(echo "$jss_instance" | awk -F/ '{print $3}' | awk -F. '{print $1}')
     current_datetime=$(date +"%Y-%m-%d_%H-%M-%S")
-    # create a CSV file with the name ddm_plan_status_<subdomain>_<date>_<time>.csv
-    csv_dir="/Users/Shared/MSP-Toolkit/MDM-Commands/ddm_plan_status"
+    # create a CSV file with the name msu_plan_status_<subdomain>_<date>_<time>.csv
+    csv_dir="/Users/Shared/MSP-Toolkit/MDM-Commands/msu_plan_status"
     mkdir -p "$csv_dir"
-    csv_file_name="ddm_plan_status_${jss_subdomain}_${current_datetime}.csv"
-    echo "Device ID,Device Name,Device Type,Device Model,Plan UUID,Update Action,Version Type,Specific Version,Force Install Local DateTime,State,Error Reasons" > "$csv_dir/$csv_file_name"
+    csv_file_name="msu_plan_status_${jss_subdomain}_${current_datetime}.csv"
+    echo "Device ID,Device Name,Device Type,Device Model,Plan UUID,Update Action,Version Type,Specific Version,Max Deferrals,Force Install Local DateTime,State,Error Reasons" > "$csv_dir/$csv_file_name"
     /usr/bin/jq -c '.results[]' "$plan_output" | while IFS= read -r item; do
         device_id=$(echo "$item" | /usr/bin/jq -r '.device.deviceId')
         object_type=$(echo "$item" | /usr/bin/jq -r '.device.objectType')
@@ -273,9 +273,10 @@ ddm_plan_status() {
         update_action=$(echo "$item" | /usr/bin/jq -r '.updateAction')
         version_type=$(echo "$item" | /usr/bin/jq -r '.versionType')
         specific_version=$(echo "$item" | /usr/bin/jq -r '.specificVersion')
+        max_deferrals=$(echo "$item" | /usr/bin/jq -r '.maxDeferrals')
         force_install_local_datetime=$(echo "$item" | /usr/bin/jq -r '.forceInstallLocalDateTime')
         state=$(echo "$item" | /usr/bin/jq -r '.status.state')
-        error_reasons=$(echo "$item" | /usr/bin/jq -r '.status.errorReasons | join(", ")')
+        error_reasons=$(echo "$item" | /usr/bin/jq -r '.status.errorReasons | join("|")')
 
         # echo "Object Type: $object_type"
         if [[ "$object_type" == "COMPUTER" ]]; then
@@ -299,6 +300,7 @@ ddm_plan_status() {
         if [[ "$specific_version" != "null" ]]; then
             echo "Specific Version: $specific_version"
         fi
+        echo "Max Deferrals: $max_deferrals"
         echo "Force Install Local DateTime: $force_install_local_datetime"
         echo "State: $state"
         if [[ "$state" == "PlanFailed" ]]; then
@@ -306,10 +308,10 @@ ddm_plan_status() {
         fi
         echo
         # append the output to a csv file
-        echo "$device_id,$device_name,$(tr '[:upper:]' '[:lower:]' <<< "$object_type"),$device_model,$plan_uuid,$update_action,$version_type,$specific_version,$force_install_local_datetime,$state,$error_reasons" >> "$csv_dir/$csv_file_name"
+        echo "$device_id,$device_name,$(tr '[:upper:]' '[:lower:]' <<< "$object_type"),$device_model,$plan_uuid,$update_action,$version_type,$specific_version,$max_deferrals,$force_install_local_datetime,$state,$error_reasons" >> "$csv_dir/$csv_file_name"
     done
 
-    echo "   [ddm_plan_status] CSV file outputted to: $csv_dir/$csv_file_name"
+    echo "   [msu_plan_status] CSV file outputted to: $csv_dir/$csv_file_name"
 }
 
 delete_users() {
@@ -775,7 +777,7 @@ MDM command type:
 --toggle                        - Toggle Software Update Plan Feature
                                   This will toggle the feature on or off, clearing any plans
                                   that may be set.
---plan                          - Get DDM Software Update plan status for individual devices
+--msu                           - Get MSU Software Update plan status for individual devices
 
 Options for the --recovery type:
 
@@ -888,8 +890,8 @@ while test $# -gt 0 ; do
         --flushmdm|--flush-mdm)
             mdm_command="flushmdm"
             ;;
-        --plan|--ddm-plan)
-            mdm_command="ddmplan"
+        --msu|--msu-plan)
+            mdm_command="msuplan"
             ;;
         --toggle)
             mdm_command="toggle"
@@ -961,7 +963,7 @@ else
     echo "   [L] Logout user (mobile devices)"
     echo "   [B0] [B1] Disable/Enable Bluetooth (mobile devices)"
     echo "   [F] Flush MDM commands"
-    echo "   [DDM] Get DDM Software Update Plan Status"
+    echo "   [MSU] Get MSU Software Update Plan Status"
     echo "   [T] Toggle Software Update Plan Feature"
     printf 'Choose one : '
     read -r action_question
@@ -979,8 +981,8 @@ else
         P|p)
             mdm_command="removemdm"
             ;;
-        Pl|pl)
-            mdm_command="ddmplan"
+        MSU|msu)
+            mdm_command="msuplan"
             ;;
         D|d)
             mdm_command="deleteusers"
@@ -1012,7 +1014,7 @@ else
 fi
 
 # if a group name was supplied at the command line, compile the list of computers/mobile devices from that group
-if [[ $group_name && $mdm_command != "flushmdm" && $mdm_command != "toggle" && $mdm_command != "ddmplan" ]]; then
+if [[ $group_name && $mdm_command != "flushmdm" && $mdm_command != "toggle" && $mdm_command != "msuplan" ]]; then
     echo
     if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" ]]; then
         get_mobile_devices_in_group
@@ -1026,15 +1028,15 @@ fi
 if [[ ($mdm_command == "flushmdm" && ! $group_name) || $mdm_command != "flushmdm" ]]; then
     if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" || $mdm_command == "bluetooth"* || ($mdm_command == "flushmdm" && $device_type == "devices") ]]; then
         generate_mobile_device_list
-    elif [[ $mdm_command != "toggle" && $mdm_command != "ddmplan" ]]; then
+    elif [[ $mdm_command != "toggle" && $mdm_command != "msuplan" ]]; then
         generate_computer_list
     fi
-elif [[ $mdm_command != "toggle" && $mdm_command != "ddmplan" ]]; then
+elif [[ $mdm_command != "toggle" && $mdm_command != "msuplan" ]]; then
     echo "Using group: $group_name"
 fi
 
 # for toggling software update feature status we want to display the current value
-if [[ $mdm_command == "toggle" || $mdm_command == "ddmplan" ]]; then
+if [[ $mdm_command == "toggle" || $mdm_command == "msuplan" ]]; then
     get_software_update_feature_status
     if [[ $mdm_command == "toggle" ]]; then
         echo "   [toggle_software_update_feature] WARNING: Do not proceed if either of the above values is less than 100%"
@@ -1092,8 +1094,8 @@ case "$mdm_command" in
         echo "   [main] Toggling Software Update Plan Feature"
         toggle_software_update_feature
         ;;
-    ddmplan)
-        echo "   [main] Toggling Software Update Plan Feature"
-        ddm_plan_status
+    msuplan)
+        echo "   [main] Getting Software Update Plan Status for Individual Devices"
+        msu_plan_status
         ;;
 esac
