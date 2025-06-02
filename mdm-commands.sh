@@ -953,7 +953,7 @@ if [[ $mdm_command ]]; then
     echo "MDM command preselected: $mdm_command"
 else
     echo
-    echo "Select from the following suported MDM commands:"
+    echo "Select from the following supported MDM commands:"
     echo "   [E] Erase All Content And Settings"
     echo "   [M] Redeploy Management Framework"
     echo "   [R] Set Recovery Lock"
