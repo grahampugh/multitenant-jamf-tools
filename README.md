@@ -2,9 +2,11 @@
 
 ## About
 
-This repo contains a set of bash scripts that are designed to propagate things across a set of Jamf servers (hereafter "instances"). The USP is the ability to perform an action on any number of Jamf servers, from one, to multiple, to all in a list.
+This repo contains a set of bash scripts that are designed to propagate things across a set of Jamf servers (hereafter "instances"). Potentially uniquely, it has the ability to perform an action on any number of Jamf servers, from one, to multiple, to all in a list.
 
 `jocads.sh` is a special script which is designed to be able to copy items from one instance to one or multiple others. It can copy mutiple items at once from a source instance to any number of other instances.
+
+`migration-tool.sh` is also a special script that can copy all API endpoints from one instance to another, primarily useful for populating a fresh instance.
 
 The other scripts are designed to perform a single action on one or multiple instances.
 
