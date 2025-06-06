@@ -110,7 +110,7 @@ get_instance_list_files() {
         fi
     fi
 
-    default_instance_list_for_dialogs="$(basename "$default_instance_list" | cut -d. -f 1)"
+    default_instance_list_for_dialogs="$(basename "$default_instance_list" | sed 's/\.txt//')"
 
     i=0
     instance_list_files=()
@@ -118,14 +118,14 @@ get_instance_list_files() {
 
     if [[ -d "$instance_lists_folder" ]]; then
         while IFS= read -r -d '' file; do
-            filename=$(basename "$file" | cut -d. -f 1)
+            filename=$(basename "$file" | sed 's/\.txt//')
             if [[ "$filename" == "$chosen_instance_list_file" ]]; then
                 chosen_instance_list_filepath="$file"
             fi
             instance_list_files+=("$file")
             echo "[$i] $filename"
             ((i++))
-        done < <(find "$instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -print0)
+        done < <(find "$instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -not -name "display-name-prefix-list.txt" -not -name "script-name-prefix-list.txt" -print0)
     fi
 
     # repeat for the default in case we need to keep private lists
@@ -134,10 +134,10 @@ get_instance_list_files() {
         echo "Private Instance lists folder: $default_instance_lists_folder"
         echo
         while IFS= read -r -d '' file; do
-            filename=$(basename "$file" | cut -d. -f 1)
+            filename=$(basename "$file" | sed 's/\.txt//')
             match=0
             for il in "${instance_list_files[@]}"; do
-                ilb=$(basename "$il" | cut -d. -f 1)
+                ilb=$(basename "$il" | sed 's/\.txt//')
                 if [[ "$ilb" == "$filename" ]]; then
                     match=1
                 fi
@@ -150,7 +150,7 @@ get_instance_list_files() {
                 echo "[$i] $filename"
                 ((i++))
             fi
-        done < <(find "$default_instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -print0)
+        done < <(find "$default_instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -not -name "display-name-prefix-list.txt" -not -name "script-name-prefix-list.txt" -print0)
     fi
     if [[ $i -eq 0 ]]; then
         echo
