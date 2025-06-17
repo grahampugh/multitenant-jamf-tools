@@ -34,6 +34,7 @@ Usage:
 -a | --all | --all-instances     - perform action on ALL instances in the instance list
 -x | --nointeraction             - run without checking instance is in an instance list 
                                    (prevents interactive choosing of instances)
+--report-plist                   - pass through the report-plist value
 --dp                             - filter DPs on DP name
 -e                               - Force policy to enabled (--key POLICY_ENABLED=True)
 -v[vv]                           - add verbose output
@@ -109,6 +110,12 @@ run_autopkg() {
     if [[ $policy_enabled -eq 1 ]]; then
         autopkg_run_options+=("--key")
         autopkg_run_options+=("POLICY_ENABLED=True")
+    fi
+
+    # option to replace pkg
+    if [[ $report_plist ]]; then
+        autopkg_run_options+=("--report-plist")
+        autopkg_run_options+=("$report_plist")
     fi
 
     # add additional args
@@ -216,6 +223,10 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         -x|--nointeraction)
             no_interaction=1
+            ;;
+        --report-plist)
+            shift
+            report_plist="$1"
             ;;
         -e|--enabled)
             policy_enabled=1
