@@ -726,6 +726,73 @@ check_token() {
     export token
 }
 
+handle_jpapi_get_request() {
+    # handle Jamf Pro API GET requests that may require looping through multiple pages
+
+    # local variables to pass in
+    local endpoint="$1"
+    local sort_filter="$2"
+
+    if [[ -z $endpoint ]]; then
+        echo "   [handle_jpapi_get_request] No endpoint provided for handle_jpapi_get_request"
+        return 1
+    fi
+
+    if [[ -z $sort_filter ]]; then
+        echo "   [handle_jpapi_get_request] No sort_filter provided for handle_jpapi_get_request, using id as default"
+        sort_filter="id"
+    fi
+
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    url_filter="?page=0&page-size=1"
+    curl_url="$jss_url/$endpoint/$url_filter"
+    curl_args=("--request")
+    curl_args+=("GET")
+    curl_args+=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+
+    # how many items are in the list?
+    total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
+    if [[ $total_count -eq 0 ]]; then
+        echo "   [handle_jpapi_get_request] No items found"
+        combined_output=""
+        return
+    fi
+
+    echo "   [handle_jpapi_get_request] Total items found: $total_count"
+
+    # we need to run multiple loops to get all the devices if there are more than 1000
+    # calculate how many loops we need
+    loop_count=$(( total_count / 100 ))
+    if (( total_count % 100 > 0 )); then
+        loop_count=$(( loop_count + 1 ))
+    fi
+    echo "   [handle_jpapi_get_request] Will loop through $loop_count times to get all items."
+
+    # now loop through
+    i=0
+    combined_output=""
+    while [[ $i -lt $loop_count ]]; do
+        echo "   [handle_jpapi_get_request] Processing page $i of $loop_count..."
+        # set the page number
+
+        url_filter="?page=$i&page-size=100&sort=$sort_filter%3Aasc"
+        curl_url="$jss_url/$endpoint/$url_filter"
+        curl_args=("--request")
+        curl_args+=("GET")
+        curl_args+=("--header")
+        curl_args+=("Accept: application/json")
+        send_curl_request
+        # cat "$curl_output_file" # TEMP
+        # append the results array to the combined_results array (do not export to a file)
+        combined_output+=$(cat "$curl_output_file")
+        # echo "$combined_output" > /tmp/combined_output.txt # TEMP
+        ((i++))
+    done
+}
+
 send_curl_request() {
     # use separate config files for each instance
     instance_id=$(echo "$jss_url" | sed 's|https://||' | sed 's|:|_|g' | sed 's|/|_|g' | sed 's|\.|_|g')

@@ -115,57 +115,187 @@ toggle_software_update_feature() {
     send_slack_notification "$slack_text"
 }
 
-get_computer_list() {
-    # get a list of computers from the JSS
-    set_credentials "$jss_instance"
-    jss_url="$jss_instance"
-    endpoint="api/preview/computers"
-    url_filter="?page=0&page-size=10"
-    curl_url="$jss_url/$endpoint/$url_filter"
-    curl_args=("--request")
-    curl_args+=("GET")
-    curl_args+=("--header")
-    curl_args+=("Accept: application/json")
-    send_curl_request
+msu_create_plan() {
+    # create a plan for the MSU updates
+    # The required inputs are the group ID, the version type, the specific version if version type is "SPECIFIC_VERSION", and the Force Install Local DateTime.
+    echo "Creating MSU plan..."
 
-    # how many devices are there?
-    total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
-    if [[ $total_count -eq 0 ]]; then
-        echo "No computers found"
+    # validate device type
+    if [[ "$device_type" == "computer" ]]; then
+        device_type="COMPUTER"
+    elif [[ "$device_type" == "device" ]]; then
+        device_type="MOBILE_DEVICE"
+    elif [[ "$device_type" == "apple"* ]]; then
+        device_type="APPLE_TV"
+    else
+        # if device_type is not set, ask for it
+        if [[ $no_interaction -ne 1 ]]; then
+            echo "Please select a device type for the plan:"
+            read -r -p "Select [C] for computer, [D] for mobile device, or [A] for Apple TV: " action_question
+            case "$action_question" in
+                C|c)
+                    device_type="COMPUTER"
+                    ;;
+                D|d)
+                    device_type="MOBILE_DEVICE"
+                    ;;
+                A|a)
+                    device_type="APPLE_TV"
+                    ;;
+                *)
+                    echo "Invalid device type specified. Please use --computer, --device, or --appletv."
+                    exit 1
+                    ;;
+            esac
+        fi
+        # convert to uppercase
+        device_type=$(tr '[:lower:]' '[:upper:]' <<< "$device_type")
+    fi
+
+    if [[ "$device_type" != "COMPUTER" && "$device_type" != "MOBILE_DEVICE" && "$device_type" != "APPLE_TV" ]]; then
+        echo "Invalid device type specified. Please use --computer, --device, or --appletv."
         exit 1
     fi
-    echo "Total computers found: $total_count"
 
-    # we need to run multiple loops to get all the devices if there are more than 1000
-    # calculate how many loops we need
-    loop_count=$(( total_count / 1000 ))
-    if (( total_count % 1000 > 0 )); then
-        loop_count=$(( loop_count + 1 ))
+    if [[ -z "$group_name" ]]; then
+        echo "Group is required to create a plan."
+        if [[ $no_interaction == 1 ]]; then
+            echo "No group specified, exiting."
+            exit 1
+        fi
+        # enter a group name
+        echo ""
+        read -r -p "Please enter a group name for device type '$device_type': " group_name
     fi
-    echo "Will loop through $loop_count times to get all computers."
 
-    # now loop through
-    i=0
-    combined_output=""
-    while [[ $i -lt $loop_count ]]; do
-        echo "   [get_computer_list] Processing page $i of $loop_count..."
-        # set the page number
+    # check again that a group name was entered
+    if [[ -z "$group_name" ]]; then
+        echo "No group name specified, exiting."
+        exit 1
+    fi
 
-        url_filter="?page=$i&page-size=1000&sort=id"
-        curl_url="$jss_url/$endpoint/$url_filter"
-        # echo "   [get_computer_list] $curl_url" # TEMP
-        curl_args=("--request")
-        curl_args+=("GET")
-        curl_args+=("--header")
-        curl_args+=("Accept: application/json")
-        send_curl_request
-        # cat "$curl_output_file" # TEMP
-        # append the results array to the combined_results array (do not export to a file)
-        combined_output+=$(cat "$curl_output_file")
-        # echo "$combined_output" > /tmp/combined_output.txt # TEMP
-        ((i++))
-    done
+    # check if a version_type was specified, if not, ask for it
+    if [[ -z "$version_type" && $no_interaction -ne 1 ]]; then
+        echo "Please select a version type for the plan:"
+        read -r -p "Select [L] for latest any version, [M] for latest major version, [m] for latest minor version, or leave blank to enter a specific version: " action_question
+        case "$action_question" in
+            L|l)
+                version_type="LATEST_ANY"
+                ;;
+            M|m)
+                version_type="LATEST_MAJOR"
+                ;;
+            m|M)
+                version_type="LATEST_MINOR"
+                ;;
+        esac
+        echo
+    fi
 
+    version_type=$(tr '[:lower:]' '[:upper:]' <<< "$version_type")
+
+    if [[ "$version_type" != "LATEST_ANY" && "$version_type" != "LATEST_MAJOR" && "$version_type" != "LATEST_MINOR" ]]; then
+        if [[ "$specific_version" ]]; then
+            version_type="SPECIFIC_VERSION"
+        elif [[ "$no_interaction" -ne 1 ]]; then
+            # ask for a specific version
+            read -r -p "Please enter a specific version (e.g. 14.6): " specific_version
+            if [[ -z "$specific_version" ]]; then
+                echo "No specific version specified, exiting."
+                exit 1
+            fi
+            # validate that the specific version is in the correct format
+            if ! [[ "$specific_version" =~ ^[0-9]+\.[0-9]+(\.[0-9]+)?$ ]]; then
+                echo "Invalid specific version format. Please use 'major.minor' or 'major.minor.patch' format."
+                exit 1
+            else
+                version_type="SPECIFIC_VERSION"
+            fi
+        else
+            echo "Invalid version type specified. Please use 'LATEST_ANY', 'LATEST_MAJOR', 'LATEST_MINOR', or 'SPECIFIC_VERSION', or set a value to --specific-version."
+            exit 1
+        fi
+    else
+        specific_version="NO_SPECIFIC_VERSION"
+    fi
+    
+    # set force install local datetime (default is 7 days from now)
+    if [[ -z "$days_until_force_install" ]]; then
+        if [[ $no_interaction -ne 1 ]]; then
+            echo "Please enter the number of days until the Force Install Local DateTime"
+            echo "(or leave blank for 7 days):"
+            read -r -p "Number of days: " days_until_force_install
+            # validate that the input is a number if not blank
+            if [[ -n "$days_until_force_install" ]] && ! [[ "$days_until_force_install" =~ ^[0-9]+$ ]]; then
+                echo "Invalid input. Please enter a number."
+                exit 1
+            fi
+        fi
+    fi
+    # set default value if not set
+    if [[ -z "$days_until_force_install" ]]; then
+        echo "No days until force install specified, using default of 7 days."
+        days_until_force_install=7
+    fi
+
+    # convert to ISO 8601 format
+    force_install_local_datetime=$(date "-v+${days_until_force_install}d" +"%Y-%m-%dT%H:%M:%S")
+
+    # get group ID from name
+    object_name="$group_name"
+    if [[ "$device_type" == "COMPUTER" ]]; then
+        api_xml_object="computer_group"
+    else
+        api_xml_object="mobile_device_group"
+    fi
+    get_object_id_from_name
+    # check if we have an existing ID
+    if [[ -z "$existing_id" ]]; then
+        echo "No group with name '$group_name' found."
+        exit 1
+    fi
+
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    endpoint="api/v1/managed-software-updates/plans/group"
+    curl_url="$jss_url/$endpoint"
+    curl_args=("--request")
+    curl_args+=("POST")
+    curl_args+=("--header")
+    curl_args+=("Accept: application/json")
+    curl_args+=("--header")
+    curl_args+=("Content-Type: application/json")
+    curl_args+=("--data-raw")
+    curl_args+=('{
+        "group": {
+            "objectType": "'"$device_type"'_GROUP",
+            "groupId": "'"$existing_id"'"
+        },
+        "config": {
+            "updateAction": "DOWNLOAD_INSTALL_SCHEDULE",
+            "versionType": "'"$version_type"'",
+            "specificVersion": "'"$specific_version"'",
+            "forceInstallLocalDateTime": "'"$force_install_local_datetime"'"
+        }
+    }'
+    )
+    # show args
+    echo "Creating plan with the following parameters:" # TEMP
+    echo "${curl_args[*]}" # TEMP
+
+    send_curl_request
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Create MSU Plan for Device Type: $device_type\nGroup: $group_name\nVersion Type: $version_type\nSpecific Version: $specific_version\nForce Install Local DateTime: $force_install_local_datetime'}"
+    send_slack_notification "$slack_text"
+}
+
+get_computer_list() {
+    # get a list of computers from the JSS
+    echo "   [get_computer_list] Getting computer list from JSS instance: $jss_instance"
+    jss_url="$jss_instance"
+    endpoint="api/preview/computers"
+    handle_jpapi_get_request "$endpoint"
     # create a variable containing the json output from $curl_output_file
     computer_results=$(echo "$combined_output" | jq -s '[.[].results[]]')
     echo "$computer_results" > /tmp/computer_results.json # TEMP
@@ -174,55 +304,10 @@ get_computer_list() {
 get_mobile_device_list() {
     # get a list of mobile devices from the JSS
     # first get the device count so we can find out how many loops we need
-    set_credentials "$jss_instance"
+    echo "   [get_mobile_device_list] Getting mobile device list from JSS instance: $jss_instance"
     jss_url="$jss_instance"
     endpoint="api/v2/mobile-devices"
-    url_filter="?page=0&page-size=10"
-    curl_url="$jss_url/$endpoint/$url_filter"
-    curl_args=("--request")
-    curl_args+=("GET")
-    curl_args+=("--header")
-    curl_args+=("Accept: application/json")
-    send_curl_request
-
-    # how many devices are there?
-    total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
-    if [[ $total_count -eq 0 ]]; then
-        echo "No mobile devices found"
-        mobile_device_results=""
-        return
-    fi
-    echo "Total mobile devices found: $total_count"
-
-    # we need to run multiple loops to get all the devices if there are more than 100
-    # calculate how many loops we need
-    loop_count=$(( total_count / 1000 ))
-    if (( total_count % 1000 > 0 )); then
-        loop_count=$(( loop_count + 1 ))
-    fi
-    echo "Will loop through $loop_count times to get all devices."
-
-    # now loop through
-    i=0
-    combined_output=""
-    while [[ $i -lt $loop_count ]]; do
-        echo "   [get_mobile_device_list] Processing page $i of $loop_count..."
-        # set the page number
-
-        url_filter="?page=$i&page-size=1000&sort=id"
-        curl_url="$jss_url/$endpoint/$url_filter"
-        # echo "   [get_mobile_device_list] $curl_url" # TEMP
-        curl_args=("--request")
-        curl_args+=("GET")
-        curl_args+=("--header")
-        curl_args+=("Accept: application/json")
-        send_curl_request
-        # cat "$curl_output_file" # TEMP
-        # append the results array to the combined_results array (do not export to a file)
-        combined_output+=$(cat "$curl_output_file")
-        # echo "$combined_output" > /tmp/combined_output.txt # TEMP
-        ((i++))
-    done
+    handle_jpapi_get_request "$endpoint"
 
     # create a variable containing the json output from $curl_output_file
     mobile_device_results=$(echo "$combined_output" | jq -s '[.[].results[]]')
@@ -230,7 +315,7 @@ get_mobile_device_list() {
 }
 
 msu_plan_status() {
-    # This function will get the MSU Software Update plan status for individual devices
+    # This function will get the MSU Software Update plan statuses for individual devices
 
     # we get the device names from the JSS for use in the output
     get_computer_list
@@ -241,15 +326,11 @@ msu_plan_status() {
     # get MSU Software Update plan status
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
-    endpoint="api/v1/managed-software-updates/plans?page=0&page-size=100&sort=planUuid%3Aasc"
-    curl_url="$jss_url/$endpoint"
-    curl_args=("--request")
-    curl_args+=("GET")
-    curl_args+=("--header")
-    curl_args+=("Accept: application/json")
-    send_curl_request
+    endpoint="api/v1/managed-software-updates/plans"
+    sort_filter="planUuid"
+    handle_jpapi_get_request "$endpoint" "$sort_filter"
 
-    plan_output="$curl_output_file"
+    plan_output="$combined_output"
     echo "   [msu_plan_status] MSU Software Update plan statuses:"
     # cat "$plan_output" # TEMP
 
@@ -262,11 +343,18 @@ msu_plan_status() {
     jss_subdomain=$(echo "$jss_instance" | awk -F/ '{print $3}' | awk -F. '{print $1}')
     current_datetime=$(date +"%Y-%m-%d_%H-%M-%S")
     # create a CSV file with the name msu_plan_status_<subdomain>_<date>_<time>.csv
-    csv_dir="/Users/Shared/MSP-Toolkit/MDM-Commands/msu_plan_status"
+    csv_dir="/Users/Shared/Jamf/MDM-Commands/msu_plan_status"
     mkdir -p "$csv_dir"
     csv_file_name="msu_plan_status_${jss_subdomain}_${current_datetime}.csv"
-    echo "Device ID,Device Name,Device Type,Device Model,Plan UUID,Update Action,Version Type,Specific Version,Max Deferrals,Force Install Local DateTime,State,Error Reasons" > "$csv_dir/$csv_file_name"
-    /usr/bin/jq -c '.results[]' "$plan_output" | while IFS= read -r item; do
+
+    # add the column headings to the csv file
+    if [[ "$events" == "true" ]]; then
+        echo "Device ID,Device Name,Device Type,Device Model,Plan UUID,Update Action,Version Type,Specific Version,Max Deferrals,Force Install Local DateTime,State,Error Reasons,Plan Created,Plan Accepted,Plan Started,Declarative Command Queued,DDM Plan Scheduled,Plan Rejected" > "$csv_dir/$csv_file_name"
+    else
+        echo "Device ID,Device Name,Device Type,Device Model,Plan UUID,Update Action,Version Type,Specific Version,Max Deferrals,Force Install Local DateTime,State,Error Reasons" > "$csv_dir/$csv_file_name"
+    fi
+
+    /usr/bin/jq -c '.results[]' <<< "$plan_output" | while IFS= read -r item; do
         device_id=$(echo "$item" | /usr/bin/jq -r '.device.deviceId')
         object_type=$(echo "$item" | /usr/bin/jq -r '.device.objectType')
         plan_uuid=$(echo "$item" | /usr/bin/jq -r '.planUuid')
@@ -308,10 +396,194 @@ msu_plan_status() {
         fi
         echo
         # append the output to a csv file
-        echo "$device_id,$device_name,$(tr '[:upper:]' '[:lower:]' <<< "$object_type"),$device_model,$plan_uuid,$update_action,$version_type,$specific_version,$max_deferrals,$force_install_local_datetime,$state,$error_reasons" >> "$csv_dir/$csv_file_name"
+        if [[ "$events" == "true" ]]; then
+            # get the event details if events are enabled
+            get_event "$plan_uuid"
+            echo "$device_id,$device_name,$(tr '[:upper:]' '[:lower:]' <<< "$object_type"),$device_model,$plan_uuid,$update_action,$version_type,$specific_version,$max_deferrals,$force_install_local_datetime,$state,$error_reasons,$plan_created_event,$plan_accepted_event,$start_plan_event,$queue_declarative_command,$ddm_plan_scheduled_event,$plan_rejected_event" >> "$csv_dir/$csv_file_name"
+        else
+            echo "$device_id,$device_name,$(tr '[:upper:]' '[:lower:]' <<< "$object_type"),$device_model,$plan_uuid,$update_action,$version_type,$specific_version,$max_deferrals,$force_install_local_datetime,$state,$error_reasons" >> "$csv_dir/$csv_file_name"
+        fi
     done
 
     echo "   [msu_plan_status] CSV file outputted to: $csv_dir/$csv_file_name"
+    if [[ "$open_csv" == "true" ]]; then
+        echo "   [msu_plan_status] Opening CSV file..."
+        open "$csv_dir/$csv_file_name"
+    fi
+}
+
+get_event() {
+    # if an event UUID is provided, search for the event in the temp_file and use the api/v1/managed-software-updates/plans/$plan_uuid/events endpoint to get the event details (currently commented out because jamfapi is not successfully returning events)
+    local event="$1"
+    if [[ "$events" == "true" ]]; then
+        echo "Searching for event UUID: $event"
+        # now run the command and output the results to a file
+
+        # grab current background status
+        set_credentials "$jss_instance"
+        jss_url="$jss_instance"
+        endpoint="api/v1/managed-software-updates/plans/$event/events"
+        curl_url="$jss_url/$endpoint"
+        curl_args=("--request")
+        curl_args+=("GET")
+        curl_args+=("--header")
+        curl_args+=("Accept: application/json")
+        send_curl_request
+
+        if [[ $http_response -gt 299 ]]; then
+            echo "Error getting event details for UUID: $event"
+            echo "HTTP Response Code: $http_response"
+            echo "Response: $(cat "$curl_output_file")"
+            return 1
+        fi
+    fi
+    if [[ "$curl_output_file" ]]; then
+        # parse the event details from the temp_file
+        event_details=$(jq -r .events "$curl_output_file")
+        if [[ -n "$event_details" ]]; then
+            # echo "Event Store: $event_details" # TEMP
+            # using jq, parse the event details to get the types and their associated eventReceivedEpoch
+            # convert the eventReceivedEpoch to a human-readable format
+            plan_created_event=""
+            plan_accepted_event=""
+            start_plan_event=""
+            queue_declarative_command=""
+            ddm_plan_scheduled_event=""
+            plan_rejected_event=""
+            echo "Event Details:"
+            # using jq to format the output
+            while read -r line; do
+                event_type=$(echo "$line" | cut -d':' -f1)
+                event_received_epoch=$(echo "$line" | cut -d':' -f2) 
+                event_sent_epoch=$(echo "$line" | cut -d':' -f3) 
+                # events have a received epoch
+                if [[ "$event_received_epoch" == "null" ]]; then
+                    event_received_date=""
+                else
+                    event_received_date=$(date -r $((event_received_epoch/1000)) +"%Y-%m-%d %H:%M:%S")
+                fi
+                # commands have a sent epoch
+                if [[ "$event_sent_epoch" == "null" ]]; then
+                    event_sent_date=""
+                else
+                    event_sent_date=$(date -r $((event_sent_epoch/1000)) +"%Y-%m-%d %H:%M:%S")
+                fi
+                case "$event_type" in
+                    ".PlanCreatedEvent")
+                        echo "Plan Created: $event_received_date"
+                        plan_created_event="$event_received_date"
+                        ;;
+                    ".PlanAcceptedEvent")
+                        echo "Plan Accepted: $event_received_date"
+                        plan_accepted_event="$event_received_date"
+                        ;;
+                    ".StartPlanEvent")
+                        echo "Plan Started: $event_received_date"
+                        start_plan_event="$event_received_date"
+                        ;;
+                    ".QueueDeclarativeCommand")
+                        echo "Declarative Command Queued: $event_sent_date"
+                        queue_declarative_command="$event_sent_date"
+                        ;;
+                    ".DDMPlanScheduledEvent")
+                        echo "DDM Plan Scheduled: $event_received_date"
+                        ddm_plan_scheduled_event="$event_received_date"
+                        ;;
+                    ".PlanRejectedEvent")
+                        echo "Plan Rejected: $event_received_date"
+                        plan_rejected_event="$event_received_date"
+                        ;;
+                    *"Event")
+                        echo "Event Type $event_type: $event_received_date"
+                        ;;
+                    *"Command")
+                        echo "Command Type $event_type: $event_sent_date"
+                        ;;
+                    *)
+                        echo "Unknown Event Type: $event_type"
+                        ;;
+                esac
+            done < <(jq -r '.events[] | "\(.type):\(.eventReceivedEpoch):\(.eventSentEpoch)"' <<< "$event_details")
+        fi
+    else
+        echo "No event found with UUID: $event"
+    fi
+}
+
+
+msu_update_status() {
+    # This function will get the MSU Software Update update statuses for individual devices
+
+    # we get the device names from the JSS for use in the output
+    get_computer_list
+    get_mobile_device_list
+    # exit # TEMP
+    # cat "$computer_output" # TEMP
+
+    # get MSU Software Update plan status
+    set_credentials "$jss_instance"
+    jss_url="$jss_instance"
+    endpoint="api/v1/managed-software-updates/update-statuses"
+    sort_filter="osUpdatesStatusId"
+    handle_jpapi_get_request "$endpoint" "$sort_filter"
+
+    status_output="$combined_output"
+    echo "   [msu_update_status] MSU Software Update update statuses:"
+
+    # now loop through the output using jq, output the computer ID, the updateAction value, the versionType value, the forceInstallLocalDateTime value, and the status state and errorReasons. The following is an example of the output for one device in the list:
+
+    echo
+    echo "   [msu_update_status] MSU Software Update plan status for individual devices:"
+    echo
+    # create a CSV file to store the output. The name of the file includes the date, time, and subdomain of the JSS instance
+    jss_subdomain=$(echo "$jss_instance" | awk -F/ '{print $3}' | awk -F. '{print $1}')
+    current_datetime=$(date +"%Y-%m-%d_%H-%M-%S")
+    # create a CSV file with the name msu_plan_status_<subdomain>_<date>_<time>.csv
+    csv_dir="/Users/Shared/Jamf/MDM-Commands/msu_update_status"
+    mkdir -p "$csv_dir"
+    csv_file_name="msu_update_status_${jss_subdomain}_${current_datetime}.csv"
+    echo "Device ID,Device Name,Device Type,Device Model,Downloaded,Percent Complete,Product Key,Status,Max Deferrals,Next Scheduled Install" > "$csv_dir/$csv_file_name"
+    /usr/bin/jq -c '.results[]' <<< "$status_output" | while IFS= read -r item; do
+        device_id=$(echo "$item" | /usr/bin/jq -r '.device.deviceId')
+        object_type=$(echo "$item" | /usr/bin/jq -r '.device.objectType')
+        max_deferrals=$(echo "$item" | /usr/bin/jq -r '.maxDeferrals')
+        next_scheduled_install=$(echo "$item" | /usr/bin/jq -r '.nextScheduledInstall')
+        downloaded=$(echo "$item" | /usr/bin/jq -r '.downloaded')
+        percent_complete=$(echo "$item" | /usr/bin/jq -r '.downloadPercentComplete')
+        product_key=$(echo "$item" | /usr/bin/jq -r '.productKey')
+        status=$(echo "$item" | /usr/bin/jq -r '.status')
+    
+        if [[ "$object_type" == "COMPUTER" ]]; then
+            echo "Computer ID: $device_id"
+            device_name=$(jq -r --arg id "$device_id" '.[] | select(.id == $id) | .name' <<< "$computer_results")
+            echo "Computer Name: $device_name"
+        elif [[ "$object_type" == "MOBILE_DEVICE" ]]; then
+            echo "Device ID: $device_id"
+            device_name=$(jq -r --arg id "$device_id" '.[] | select(.id == $id) | .name' <<< "$mobile_device_results")
+            device_model=$(jq -r --arg id "$device_id" '.[] | select(.id == $id) | .model' <<< "$mobile_device_results")
+            echo "Device Name: $device_name"
+            echo "Device Model: $device_model"
+        else
+            echo "Unknown Object Type: $object_type"
+            continue
+        fi
+
+        echo "Downloaded: $downloaded"
+        echo "Percent Complete: $percent_complete"
+        echo "Product Key: $product_key"
+        echo "Status: $status"
+        echo "Max Deferrals: $max_deferrals"
+        echo "Next Scheduled Install: $next_scheduled_install"
+        echo
+        # append the output to a csv file
+        echo "$device_id,$device_name,$(tr '[:upper:]' '[:lower:]' <<< "$object_type"),$device_model,$downloaded,$percent_complete,$product_key,$status,$max_deferrals,$next_scheduled_install" >> "$csv_dir/$csv_file_name"
+    done
+
+    echo "   [msu_update_status] CSV file outputted to: $csv_dir/$csv_file_name"
+    if [[ "$open_csv" == "true" ]]; then
+        echo "   [msu_update_status] Opening CSV file..."
+        open "$csv_dir/$csv_file_name"
+    fi
 }
 
 delete_users() {
@@ -777,7 +1049,11 @@ MDM command type:
 --toggle                        - Toggle Software Update Plan Feature
                                   This will toggle the feature on or off, clearing any plans
                                   that may be set.
---msu                           - Get MSU Software Update plan status for individual devices
+--msuplanstatus                 - Get MSU Software Update plan status for individual devices
+--msuupdatestatus               - Get MSU Software Update update status for individual devices
+--msucreateplan                 - Create an MSU Software Update plan for a group of devices
+                                  Requires --group and --version-type options
+                                  (see below for more details)
 
 Options for the --recovery type:
 
@@ -792,6 +1068,26 @@ Options for the --deleteusers type:
 
 Options for the --restart and --logout types:
 --group                         - Predefine devices to those in a specified group
+
+Options for the --msucreateplan type:
+--computers                     - Device type is computers
+--devices                       - Device type is mobile devices
+--appletv                       - Device type is Apple TV
+--group                         - Predefine devices to those in a specified group (required)
+--version-type                  - Specify the version type to use for the plan
+                                  (one of 'LATEST_ANY', 'LATEST_MINOR', 'LATEST_MAJOR', 'SPECIFIC_VERSION')
+--version                       - Specify a specific version to use for the plan, if version-type is missing
+                                  or set to 'SPECIFIC_VERSION'
+                                  (e.g. 14.6, 15.0.1)
+--days-until-force-install      - Specify the number of days until the plan will force install
+                                  (default is 7)
+
+Options for the --msuplanstatus type:
+--events                      - Include event details in the output (default is false)
+--open                        - Open the output CSV file in the default application (default is false)
+
+Options for the --msuupdatestatus type:
+--open                        - Open the output CSV file in the default application (default is false)
 
 Options for the --flushmdm type:
 --pending                       - Flush pending commands only (default is pending+failed)
@@ -813,13 +1109,14 @@ You can clear the recovery lock password with --clear-recovery-lock-password
 
 are_you_sure() {
     echo
-    read -r -p "Are you sure you want to perform the action? (Y/N) : " sure
+    read -r -p "Are you sure you want to proceed? (Y/N) : " sure
     case "$sure" in
         Y|y)
             return
             ;;
         *)
-            echo "   [are_you_sure] Action cancelled, quitting"
+            echo
+            echo "Action cancelled, quitting"
             exit 
             ;;
     esac
@@ -890,8 +1187,32 @@ while test $# -gt 0 ; do
         --flushmdm|--flush-mdm)
             mdm_command="flushmdm"
             ;;
-        --msu|--msu-plan)
-            mdm_command="msuplan"
+        --msuplan|--msuplanstatus|--msu-plan)
+            mdm_command="msuplanstatus"
+            ;;
+        --msuupdate|--msuupdatestatus|--msu-update-status)
+            mdm_command="msuupdatestatus"
+            ;;
+        --events)
+            events=true
+            ;;
+        -o|--open)
+            open_csv=true
+            ;;
+        --msucreateplan|--msu-create-plan)
+            mdm_command="msucreateplan"
+            ;;
+        --version-type)
+            shift
+            version_type="$1"
+            ;;
+        --version)
+            shift
+            specific_version="$1"
+            ;;
+        --days-until-force-install)
+            shift
+            days_until_force_install="$1"
             ;;
         --toggle)
             mdm_command="toggle"
@@ -963,7 +1284,9 @@ else
     echo "   [L] Logout user (mobile devices)"
     echo "   [B0] [B1] Disable/Enable Bluetooth (mobile devices)"
     echo "   [F] Flush MDM commands"
-    echo "   [MSU] Get MSU Software Update Plan Status"
+    echo "   [MSUP] Get MSU Software Update Plan Status"
+    echo "   [MSUS] Get MSU Software Update Status"
+    echo "   [MSUC] Create MSU Software Update Plan"
     echo "   [T] Toggle Software Update Plan Feature"
     printf 'Choose one : '
     read -r action_question
@@ -981,8 +1304,14 @@ else
         P|p)
             mdm_command="removemdm"
             ;;
-        MSU|msu)
-            mdm_command="msuplan"
+        MSUP|msup)
+            mdm_command="msuplanstatus"
+            ;;
+        MSUS|msus)
+            mdm_command="msuupdatestatus"
+            ;;
+        MSUC|msuc)
+            mdm_command="msucreateplan"
             ;;
         D|d)
             mdm_command="deleteusers"
@@ -1014,7 +1343,7 @@ else
 fi
 
 # if a group name was supplied at the command line, compile the list of computers/mobile devices from that group
-if [[ $group_name && $mdm_command != "flushmdm" && $mdm_command != "toggle" && $mdm_command != "msuplan" ]]; then
+if [[ $group_name && $mdm_command != "flushmdm" && $mdm_command != "toggle" && $mdm_command != "msu"* ]]; then
     echo
     if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" ]]; then
         get_mobile_devices_in_group
@@ -1028,18 +1357,18 @@ fi
 if [[ ($mdm_command == "flushmdm" && ! $group_name) || $mdm_command != "flushmdm" ]]; then
     if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" || $mdm_command == "bluetooth"* || ($mdm_command == "flushmdm" && $device_type == "devices") ]]; then
         generate_mobile_device_list
-    elif [[ $mdm_command != "toggle" && $mdm_command != "msuplan" ]]; then
+    elif [[ $mdm_command != "toggle" && $mdm_command != "msu"* ]]; then
         generate_computer_list
     fi
-elif [[ $mdm_command != "toggle" && $mdm_command != "msuplan" ]]; then
+elif [[ $mdm_command != "toggle" && $mdm_command != "msu"* ]]; then
     echo "Using group: $group_name"
 fi
 
 # for toggling software update feature status we want to display the current value
-if [[ $mdm_command == "toggle" || $mdm_command == "msuplan" ]]; then
+if [[ $mdm_command == "toggle" || $mdm_command == "msu"* ]]; then
     get_software_update_feature_status
+    echo "   [get_software_update_feature_status] WARNING: Do not proceed if either of the above values is less than 100%"
     if [[ $mdm_command == "toggle" ]]; then
-        echo "   [toggle_software_update_feature] WARNING: Do not proceed if either of the above values is less than 100%"
         echo "   [toggle_software_update_feature] Proceed to toggle to '$toggle_set_value'..."
     fi
 fi
@@ -1094,8 +1423,16 @@ case "$mdm_command" in
         echo "   [main] Toggling Software Update Plan Feature"
         toggle_software_update_feature
         ;;
-    msuplan)
+    msuplanstatus)
         echo "   [main] Getting Software Update Plan Status for Individual Devices"
         msu_plan_status
+        ;;
+    msuupdatestatus)
+        echo "   [main] Getting Software Update Status for Individual Devices"
+        msu_update_status
+        ;;
+    msucreateplan)
+        echo "   [main] Creating Software Update Plan for Group of Devices"
+        msu_create_plan
         ;;
 esac
