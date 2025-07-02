@@ -38,6 +38,8 @@ UPLOADTYPE                       - type of upload (e.g. pkg, policy, script, etc
 --prefs <path>                   - Inherit AutoPkg prefs file provided by the full path to the file
 -v[vvv]                          - Set value of verbosity (default is -v)
 -q                               - Quiet mode (verbosity 0)
+-j <path>                        - Path to jamf-upload.sh script (default is ~/Library/AutoPkg/RecipeRepos/com.github.grahampugh.jamf-upload/jamf-upload.sh)
+                                   (if not found, will look in the parent folder of this repo)
 -h | --help                      - Show this help message
 --[args]                         - Pass through required arguments for jamf-upload.sh
 
