@@ -1490,7 +1490,11 @@ delete_api_object() {
     echo "   [delete_api_object] Deleting $api_xml_object '$chosen_api_obj_name_decoded'."
 
     # send request
-    curl_url="$jss_url/JSSResource/${api_object_type}"
+    if [[ "$api_xml_object" == "user" || "$api_xml_object" == "group" ]]; then
+        curl_url="$jss_url/JSSResource/accounts"
+    else
+        curl_url="$jss_url/JSSResource/${api_object_type}"
+    fi
     curl_args=("--header")
     curl_args+=("Accept: application/xml")
     send_curl_request
@@ -1502,7 +1506,11 @@ delete_api_object() {
         echo "   [delete_api_object] Existing ${api_xml_object} named '${chosen_api_obj_name_decoded}' found; id=${existing_id}. Deleting..."
 
         # send request
-        curl_url="$jss_url/JSSResource/${api_object_type}/id/${existing_id}"
+        if [[ "$api_xml_object" == "user" || "$api_xml_object" == "group" ]]; then
+            curl_url="$jss_url/JSSResource/accounts/${api_xml_object}id/${existing_id}"
+        else
+            curl_url="$jss_url/JSSResource/${api_object_type}/id/${existing_id}"
+        fi            
         curl_args=("--request")
         curl_args+=("DELETE")
         curl_args+=("--header")
