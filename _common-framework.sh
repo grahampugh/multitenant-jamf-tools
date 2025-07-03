@@ -645,8 +645,8 @@ check_token() {
     # is there a token file
     if [[ -f "$token_file" ]]; then
         # check we are still querying the same server and with the same account
-        server_check=$( cat "$server_check_file" )
-        user_check=$( cat "$user_check_file" )
+        server_check=$(cat "$server_check_file" 2>/dev/null)
+        user_check=$(cat "$user_check_file" 2>/dev/null)
         if [[ "$server_check" == "${jss_url}" && "$user_check" == "$jss_api_user" ]]; then
             if [[ $cred_type == "client-id" ]]; then
                 if plutil -extract access_token raw "$token_file" >/dev/null; then
