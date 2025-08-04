@@ -27,6 +27,10 @@ mkdir -p "$workdir"
 usage() {
     cat <<'USAGE'
 Usage:
+
+A script to check which policies, configuration profiles, restricted software, Mac App Store apps and eBooks are scoped to a specific computer group
+Note that Jamf Pro now provides a built-in report for this, so this script may no longer be needed.
+
 ./set_credentials.sh          - set the Keychain credentials
 
 [no arguments]                - interactive mode
@@ -195,7 +199,17 @@ findScopedObjects() {
 }
 
 # ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
+# 1. Ensure that a group name is provided
+# ------------------------------------------------------------------------------------
+
+if [[ -z "$group_name" ]]; then
+    echo "ERROR: No group name provided. Use the -g or --group option to specify a group name."
+    usage
+    exit 1
+fi
+
+# ------------------------------------------------------------------------------------
+# 2. Ask for the instance list, show list, ask to apply to one, multiple or all
 # ------------------------------------------------------------------------------------
 
 # select the instances that will be changed
