@@ -67,13 +67,11 @@ run_autopkg() {
     if [[ "$smb_url" ]]; then
         autopkg_run_options+=("--key")
         autopkg_run_options+=("SMB_URL=$smb_url")
-        autopkg_run_options+=("--key")
-        autopkg_run_options+=("SMB_USERNAME=$user_rw")
         # we need the new endpoints for the password. For now use the keychain
-        if [[ "$dp" ]]; then
+        if [[ "$dp_server" ]]; then
             get_smb_credentials
             if [[ $smb_url && $smb_user && $smb_pass ]]; then
-                echo "Username and password for $dp found in keychain - URL=$smb_url"
+                echo "Username and password for $dp_server found in keychain - URL=$smb_url"
                 # dp_found=1
                 pass_rw="$smb_pass"
             fi
@@ -85,11 +83,13 @@ run_autopkg() {
                 exit 1
             fi
         fi
+        autopkg_run_options+=("--key")
+        autopkg_run_options+=("SMB_USERNAME=$smb_user")
         if [[ $pass_rw ]]; then
             autopkg_run_options+=("--key")
             autopkg_run_options+=("SMB_PASSWORD=$pass_rw")
         else
-            echo "ERROR: Password not found for $dp"
+            echo "ERROR: Password not found for $dp_server"
             exit 1
         fi
 

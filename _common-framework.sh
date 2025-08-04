@@ -419,23 +419,58 @@ get_instance_distribution_point() {
     if [[ $dp_count -eq 0 ]]; then
         echo "No DP found - assuming JCDS"
         smb_url=""
-    # if 1
-    elif [[ $dp_count -eq 1 ]]; then
-        dp_server=$(/usr/bin/jq -r .results.[0].serverName "$curl_output_file")
-        dp_type=$(/usr/bin/jq -r .results.[0].fileSharingConnectionType "$curl_output_file")
-        if [[ "$dp_type" == "AFP" ]]; then
-            dp_protocol="afp"
-        elif [[ "$dp_type" == "SMB" ]]; then
-            dp_protocol="smb"
-        dp_share=$(/usr/bin/jq -r .results.[0].shareName "$curl_output_file")
+
+    else
+        echo "Found $dp_count DPs in $jss_url"
+        # check if dp_url_filter has been written to the autopkg prefs
+        if [[ -f "$autopkg_prefs" ]]; then
+            dp_key=$(defaults read "$autopkg_prefs" dp_url_filter 2>/dev/null)
+            if [[ "$dp_key" && ! "$dp_url_filter" ]]; then
+                dp_url_filter="$dp_key"
+            fi
         fi
+
+        # loop through the DPs and check that we have credentials for them - only check the first one for now
+        i=0
+        while ((i < dp_count)); do
+            dp_server=$(/usr/bin/jq -r .results.[$i].serverName "$curl_output_file" 2>/dev/null)
+            echo "   [get_instance_distribution_point] Checking DP $i: $dp_server"
+            # echo "Distribution Point: $dp" # TEMP
+            if [[ $dp_url_filter ]]; then
+                if [[ $dp_server == *"$dp_url_filter"* ]]; then
+                    echo "   [get_instance_distribution_point] Found matching DP: $dp_server"
+                else
+                    echo "   [get_instance_distribution_point] Skipping $dp_server - does not match filter $dp_url_filter"
+                    ((i++))
+                    continue
+                fi
+            else
+                echo "   [get_instance_distribution_point] No filter set - using $dp_server"
+            fi
+            dp_type=$(/usr/bin/jq -r .results.[$i].fileSharingConnectionType "$curl_output_file" 2>/dev/null)
+            echo "   [get_instance_distribution_point] DP type: $dp_type"
+            if [[ "$dp_type" == "AFP" ]]; then
+                dp_protocol="afp"
+            elif [[ "$dp_type" == "SMB" ]]; then
+                dp_protocol="smb"
+            else
+                echo "   [get_instance_distribution_point] Unsupported DP type: $dp_type"
+                exit 1
+            fi
+            dp_share=$(/usr/bin/jq -r .results.[$i].shareName "$curl_output_file" 2>/dev/null)
+            # user_rw=$(/usr/bin/jq -r .results.[$i].readWriteUsername "$curl_output_file" 2>/dev/null)
+            break
+        done
+        # smb url
+        smb_url="$dp_protocol://$dp_server/$dp_share"
+        echo "   [get_instance_distribution_point] SMB URL: $smb_url"
+        # smb_uri="$dp_server/$dp_share"
+        # echo "SMB_URL: $smb_url" # TEMP
+        # echo "SMB_USER: $user_rw" # TEMP
     # if > 1 # TODO
     fi
-    # smb url
-    smb_url="$dp_protocol://$dp_server/$dp_share"
-    # shellcheck disable=SC2034
-    smb_uri="$dp_server/$dp_share"
 }
+
 
 get_smb_credentials() {
     # we need the new endpoints for the password. For now use the keychain
