@@ -21,7 +21,7 @@ Usage:
 
 [no arguments]                - interactive mode
 --name EA-NAME                - provide extension attribute name
---value EA-VALUE              - provide extension attribute name
+--value EA-VALUE              - provide extension attribute value to be set
 --group                       - Predefine devices to those in a specified group
 --id                          - Predefine an ID (from Jamf) to search for
 --serial                      - Predefine a computer's Serial Number to search for. 
@@ -113,7 +113,7 @@ fi
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
-        --ea)
+        --ea|--name)
             shift
             ea_name="$1"
         ;;
@@ -206,7 +206,7 @@ if [[ ! $ea_value ]]; then
     read -r -p "Enter the value of the '$ea_name' EA you wish to set : " ea_value
     echo
 fi
-if [[ ! $ea_value || $ea_value = "BLANK" ]]; then
+if [[ ! $ea_value || $ea_value == "BLANK" ]]; then
     echo "No value supplied - setting as blank string"
     ea_value=""
 fi

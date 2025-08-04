@@ -408,100 +408,26 @@ get_instance_distribution_point() {
 
     # Check for DPs
     # send request
-    curl_url="$jss_url/JSSResource/distributionpoints"
-    curl_args=("--header")
-    curl_args+=("Accept: application/xml")
-    send_curl_request
-
-    # get the results array, find out if there are more than one
-    dp_count=$(xmllint --xpath "//distribution_points/size/text()" "$curl_output_file" 2>/dev/null)
-    # if 0
-    if [[ $dp_count -eq 0 ]]; then
-        echo "No DP found - assuming JCDS"
-        smb_url=""
-    else
-        # check if dp_url_filter has been written to the autopkg prefs
-        if [[ -f "$autopkg_prefs" ]]; then
-            dp_key=$(defaults read "$autopkg_prefs" dp_url_filter 2>/dev/null)
-            if [[ "$dp_key" && ! "$dp_url_filter" ]]; then
-                dp_url_filter="$dp_key"
-            fi
-        fi
-        dp_names_list=$(xmllint --xpath "//distribution_points/distribution_point/name" "$curl_output_file" 2>/dev/null | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n")
-        # loop through the DPs and check that we have credentials for them - only check the first one for now
-        while read -r dp; do
-            # echo "Distribution Point: $dp" # TEMP
-            if [[ $dp_url_filter ]]; then
-                if [[ $dp != *"$dp_url_filter"* ]]; then
-                    echo "Skipping $dp"
-                    continue
-                fi
-            fi
-            # url encode the dp name
-            url_encoded_dp=$(encode_name "$dp")
-            # send request
-            curl_url="$jss_url/JSSResource/distributionpoints/name/$url_encoded_dp"
-            curl_args=("--header")
-            curl_args+=("Accept: application/xml")
-            send_curl_request
-            # get settings
-            dp_type=$(xmllint --xpath "//distribution_point/connection_type/text()" "$curl_output_file" 2>/dev/null)
-            if [[ "$dp_type" == "AFP" ]]; then
-                dp_protocol="afp"
-            elif [[ "$dp_type" == "SMB" ]]; then
-                dp_protocol="smb"
-            fi
-            dp_server=$(xmllint --xpath "//distribution_point/ip_address/text()" "$curl_output_file" 2>/dev/null)
-            dp_share=$(xmllint --xpath "//distribution_point/share_name/text()" "$curl_output_file" 2>/dev/null)
-            user_rw=$(xmllint --xpath "//distribution_point/read_write_username/text()" "$curl_output_file" 2>/dev/null)
-            # pass_rw_sha256=$(xmllint --xpath "//distribution_point/read_write_password_sha256/text()" "$curl_output_file" 2>/dev/null)
-            # we are only handling one right now, so exit the loop
-            break
-        done <<< "$dp_names_list"
-        # smb url
-        smb_url="$dp_protocol://$dp_server/$dp_share"
-        smb_uri="$dp_server/$dp_share"
-        # echo "SMB_URL: $smb_url" # TEMP
-        # echo "SMB_USER: $user_rw" # TEMP
-    # if > 1 # TODO
-    fi
-}
-
-get_instance_distribution_point_new_api() {
-    # find out if there is a file share distribution point in this instance
-    # determine jss_url
-    set_credentials "$jss_instance"
-    jss_url="${jss_instance}"
-
-    # Check for DPs
-    # send request
-    curl_url="$jss_url/v1/distribution-points"
+    curl_url="$jss_url/api/v1/distribution-points"
     curl_args=("--header")
     curl_args+=("Accept: application/json")
     send_curl_request
 
     # get the results array, find out if there are more than one
-    dp_count=$(plutil -extract totalCount raw "$curl_output_file")
+    dp_count=$(/usr/bin/jq -r .totalCount "$curl_output_file")
     # if 0
     if [[ $dp_count -eq 0 ]]; then
         echo "No DP found - assuming JCDS"
         smb_url=""
     # if 1
     elif [[ $dp_count -eq 1 ]]; then
-        dp_server=$(plutil -extract results.0.serverName raw "$curl_output_file")
-        dp_type=$(plutil -extract results.0.fileSharingConnectionType raw "$curl_output_file")
+        dp_server=$(/usr/bin/jq -r .results.[0].serverName "$curl_output_file")
+        dp_type=$(/usr/bin/jq -r .results.[0].fileSharingConnectionType "$curl_output_file")
         if [[ "$dp_type" == "AFP" ]]; then
             dp_protocol="afp"
-            dp_share=$(plutil -extract results.0.AFPFileShare.shareName raw "$curl_output_file")
-            user_rw=$(plutil -extract results.0.AFPFileShare.readWriteUsername raw "$curl_output_file")
-            pass_rw=$(plutil -extract results.0.AFPFileShare.readWritePassword raw "$curl_output_file")
         elif [[ "$dp_type" == "SMB" ]]; then
             dp_protocol="smb"
-            dp_share=$(plutil -extract results.0.SMBFileShare.shareName raw "$curl_output_file")
-            # shellcheck disable=SC2034
-            user_rw=$(plutil -extract results.0.SMBFileShare.readWriteUsername raw "$curl_output_file")
-            # shellcheck disable=SC2034
-            pass_rw=$(plutil -extract results.0.SMBFileShare.readWritePassword raw "$curl_output_file")
+        dp_share=$(/usr/bin/jq -r .results.[0].shareName "$curl_output_file")
         fi
     # if > 1 # TODO
     fi
@@ -599,7 +525,7 @@ get_new_token() {
             echo "Token request HTTP response: $http_response"
         fi
         if [[ $http_response -lt 400 ]]; then
-            token=$(plutil -extract access_token raw "$token_file")
+            token=$(jq -r .access_token "$token_file")
         else
             echo "Token download failed"
             exit 1
@@ -619,7 +545,7 @@ get_new_token() {
             echo "Token request HTTP response: $http_response"
         fi
         if [[ $http_response -lt 400 ]]; then
-            token=$(plutil -extract token raw "$token_file")
+            token=$(jq -r .token "$token_file")
         else
             echo "Token download failed"
             exit 1
@@ -649,15 +575,15 @@ check_token() {
         user_check=$(cat "$user_check_file" 2>/dev/null)
         if [[ "$server_check" == "${jss_url}" && "$user_check" == "$jss_api_user" ]]; then
             if [[ $cred_type == "client-id" ]]; then
-                if plutil -extract access_token raw "$token_file" >/dev/null; then
-                    token=$(plutil -extract access_token raw "$token_file")
+                if jq -e .access_token "$token_file" >/dev/null; then
+                    token=$(jq -r .access_token "$token_file")
                 else
                     token=""
                 fi
-                if plutil -extract expires_in raw "$token_file" >/dev/null; then
-                    expires=$(plutil -extract expires_in raw "$token_file")
+                if jq -e .expires_in "$token_file" >/dev/null; then
+                    expires=$(jq -r .expires_in "$token_file")
                     current_time_epoch=$(/bin/date +%s)
-                    expiration_epoch=$(($current_epoch + $token_expires_in - 1))
+                    expiration_epoch=$((current_time_epoch + expires - 1))
                 else
                     expiration_epoch="0"
                 fi
@@ -671,20 +597,22 @@ check_token() {
                     get_new_token "${jss_url}"
                 fi
             else
-                if plutil -extract token raw "$token_file" >/dev/null; then
-                    token=$(plutil -extract token raw "$token_file")
+                if jq -e .token "$token_file" >/dev/null; then
+                    token=$(jq -r .token "$token_file")
                 else
                     token=""
                 fi
-                if plutil -extract expires raw "$token_file" >/dev/null; then
-                    expires=$(plutil -extract expires raw "$token_file" | awk -F . '{print $1}')
-                    expiration_epoch=$(date -j -f "%Y-%m-%dT%T" "$expires" +"%s")
+                if jq -e .expires "$token_file" >/dev/null; then
+                    expires=$(jq -r .expires "$token_file")
+                    # shellcheck disable=SC2001
+                    expires_stripped=$(sed 's/\.[0-9]*Z$//' <<< "$expires") # strip the milliseconds and Z from the end of the date
+                    expiration_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "$expires_stripped" +"%s")
                 else
                     expiration_epoch="0"
                 fi
                 # set a cutoff of one minute in the future to prevent problems with mismatched expiration
                 # cutoff=$(date -v +1M -u +"%Y-%m-%dT%H:%M:%S")
-                cutoff_epoch=$(date -j -f "%Y-%m-%dT%T" "$(date -u +"%Y-%m-%dT%T")" +"%s")
+                cutoff_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "$(date -u +"%Y-%m-%dT%H:%M:%S")" +"%s")
 
                 if [[ $expiration_epoch -lt $cutoff_epoch ]]; then
                     if [[ $verbose -gt 0 ]]; then
@@ -754,7 +682,7 @@ handle_jpapi_get_request() {
     send_curl_request
 
     # how many items are in the list?
-    total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
+    total_count=$(/usr/bin/jq -r .totalCount "$curl_output_file")
     if [[ $total_count -eq 0 ]]; then
         echo "   [handle_jpapi_get_request] No items found"
         combined_output=""
@@ -1024,15 +952,15 @@ get_computers_in_group() {
         computers_count=0
     else
         # now get all the computer IDs
-        computers_count=$(/usr/bin/plutil -extract computer_group.computers raw "$curl_output_file" 2>/dev/null)
+        computers_count=$(/usr/bin/jq -r .computer_group.computers "$curl_output_file" 2>/dev/null | wc -l)
         if [[ $computers_count -gt 0 ]]; then
             echo "   [get_computers_in_group] Restricting list to members of the group '$group_name'"
             computer_names_in_group=()
             computer_ids_in_group=()
             i=0
             while [[ $i -lt $computers_count ]]; do
-                computer_id_in_group=$(/usr/bin/plutil -extract computer_group.computers.$i.id raw "$curl_output_file" 2>/dev/null)
-                computer_name_in_group=$(/usr/bin/plutil -extract computer_group.computers.$i.name raw "$curl_output_file" 2>/dev/null)
+                computer_id_in_group=$(/usr/bin/jq -r .computer_group.computers[$i].id "$curl_output_file" 2>/dev/null)
+                computer_name_in_group=$(/usr/bin/jq -r .computer_group.computers[$i].name "$curl_output_file" 2>/dev/null)
                 # echo "$computer_name_in_group ($computer_id_in_group)"
                 computer_names_in_group+=("$computer_name_in_group")
                 computer_ids_in_group+=("$computer_id_in_group")
@@ -1062,15 +990,15 @@ get_mobile_devices_in_group() {
         mobile_device_count=0
     else
         # now get all the device IDs
-        mobile_device_count=$(/usr/bin/plutil -extract mobile_device_group.mobile_devices raw "$curl_output_file" 2>/dev/null)
+        mobile_device_count=$(/usr/bin/jq -r .mobile_device_group.mobile_devices "$curl_output_file" 2>/dev/null | wc -l)
         if [[ $mobile_device_count -gt 0 ]]; then
             echo "   [get_mobile_devices_in_group] Restricting list to members of the group '$group_name'"
             mobile_device_names_in_group=()
             mobile_device_ids_in_group=()
             i=0
             while [[ $i -lt $mobile_device_count ]]; do
-                mobile_device_id_in_group=$(/usr/bin/plutil -extract mobile_device_group.mobile_devices.$i.id raw "$curl_output_file" 2>/dev/null)
-                mobile_device_name_in_group=$(/usr/bin/plutil -extract mobile_device_group.mobile_devices.$i.name raw "$curl_output_file" 2>/dev/null)
+                mobile_device_id_in_group=$(/usr/bin/jq -r .mobile_device_group.mobile_devices[$i].id "$curl_output_file" 2>/dev/null)
+                mobile_device_name_in_group=$(/usr/bin/jq -r .mobile_device_group.mobile_devices[$i].name "$curl_output_file" 2>/dev/null)
                 # echo "$computer_name_in_group ($mobile_device_id_in_group)"
                 mobile_device_names_in_group+=("$mobile_device_name_in_group")
                 mobile_device_ids_in_group+=("$mobile_device_id_in_group")
@@ -1090,7 +1018,7 @@ generate_computer_list() {
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
     endpoint="api/preview/computers"
-    url_filter="?page=0&page-size=10"
+    url_filter="?page=0&page-size=1"
     curl_url="$jss_url/$endpoint/$url_filter"
     curl_args=("--request")
     curl_args+=("GET")
@@ -1099,45 +1027,41 @@ generate_computer_list() {
     send_curl_request
 
     # how many devices are there?
-    total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
+    total_count=$(/usr/bin/jq -r .totalCount "$curl_output_file")
     if [[ $total_count -eq 0 ]]; then
         echo "No computers found"
         exit 1
     fi
     echo "Total computers found: $total_count"
 
-    # we need to run multiple loops to get all the devices if there are more than 1000
+    # we need to run multiple loops to get all the devices if there are more than 100
     # calculate how many loops we need
-    loop_count=$(( total_count / 1000 ))
-    if (( total_count % 1000 > 0 )); then
+    loop_count=$(( total_count / 100 )) 
+    if (( total_count % 100 > 0 )); then
         loop_count=$(( loop_count + 1 ))
     fi
     echo "Will loop through $loop_count times to get all computers."
 
     # now loop through
+    combined_output_file="$output_location/jamf_computer_list_combined.json"
+    echo '{"results":[]}' > "$combined_output_file"
     i=0
     while [[ $i -lt $loop_count ]]; do
         # set the page number
-        page_number=$(( i * 1000 ))
-        url_filter="?page=$page_number&page-size=1000&sort=id"
+        endpoint="api/preview/computers"
+        url_filter="?page=$i&page-size=100&sort=id"
         curl_url="$jss_url/$endpoint/$url_filter"
         curl_args=("--request")
         curl_args+=("GET")
         curl_args+=("--header")
         curl_args+=("Accept: application/json")
         send_curl_request
-        # append the results to the output file, ensuring only to append the results
-        # if this is the first loop, we need to create the file
-        combined_output_file="$output_location/jamf_computer_list_combined.json"
-        if [[ ! -f "$combined_output_file" ]]; then
-            touch "$combined_output_file"
-        fi
         # extract the results and append them to the combined output file
-        if [[ $i -eq 0 ]]; then
-            /usr/bin/plutil -extract results raw "$curl_output_file" > "$combined_output_file"
-        else
-            /usr/bin/plutil -extract results raw "$curl_output_file" >> "$combined_output_file"
-        fi
+        /usr/bin/jq -s '
+            {
+              results: (.[0].results + .[1].results)
+            }
+            ' "$combined_output_file" "$curl_output_file" > "$combined_output_file.tmp" && mv "$combined_output_file.tmp" "$combined_output_file"
         ((i++))
     done
 
@@ -1152,11 +1076,15 @@ generate_computer_list() {
     serials=()
     computer_choice=()
     echo
+    echo "Please wait while we process the list of computers..."
+    echo
     while [[ $i -lt $loopsize ]]; do
-        id_in_list=$(/usr/bin/plutil -extract results.$i.id raw "$combined_output_file")
-        computer_name_in_list=$(/usr/bin/plutil -extract results.$i.name raw "$combined_output_file")
-        management_id_in_list=$(/usr/bin/plutil -extract results.$i.managementId raw "$combined_output_file")
-        serial_in_list=$(/usr/bin/plutil -extract results.$i.serialNumber raw "$combined_output_file")
+        id_in_list=$(/usr/bin/jq -r .results.[$i].id "$combined_output_file")
+        computer_name_in_list=$(/usr/bin/jq -r .results.[$i].name "$combined_output_file")
+        management_id_in_list=$(/usr/bin/jq -r .results.[$i].managementId "$combined_output_file")
+        serial_in_list=$(/usr/bin/jq -r .results.[$i].serialNumber "$combined_output_file")
+
+        # echo "$computer_name_in_list ($id_in_list) - $serial_in_list" # TEMP
 
         computer_ids+=("$id_in_list")
         computer_names+=("$computer_name_in_list")
@@ -1227,7 +1155,7 @@ generate_mobile_device_list() {
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
     endpoint="api/v2/mobile-devices"
-    url_filter="?page=0&page-size=10"
+    url_filter="?page=0&page-size=1"
     curl_url="$jss_url/$endpoint/$url_filter"
     curl_args=("--request")
     curl_args+=("GET")
@@ -1236,27 +1164,28 @@ generate_mobile_device_list() {
     send_curl_request
 
     # how many devices are there?
-    total_count=$(/usr/bin/plutil -extract totalCount raw "$curl_output_file")
+    total_count=$(/usr/bin/jq -r .totalCount "$curl_output_file")
     if [[ $total_count -eq 0 ]]; then
-        echo "No mobile devices found"
+        echo "No computers found"
         exit 1
     fi
-    echo "Total mobile devices found: $total_count"
+    echo "Total computers found: $total_count"
 
-    # we need to run multiple loops to get all the devices if there are more than 1000
+    # we need to run multiple loops to get all the devices if there are more than 100
     # calculate how many loops we need
-    loop_count=$(( total_count / 1000 ))
-    if (( total_count % 1000 > 0 )); then
+    loop_count=$(( total_count / 100 )) 
+    if (( total_count % 100 > 0 )); then
         loop_count=$(( loop_count + 1 ))
     fi
-    echo "Will loop through $loop_count times to get all devices."
+    echo "Will loop through $loop_count times to get all computers."
 
     # now loop through
+    echo '{"results":[]}' > "$combined_output_file"
     i=0
     while [[ $i -lt $loop_count ]]; do
         # set the page number
-        page_number=$(( i * 1000 ))
-        url_filter="?page=$page_number&page-size=1000&sort=id"
+        page_number=$(( i * 100 ))
+        url_filter="?page=$page_number&page-size=100&sort=id"
         curl_url="$jss_url/$endpoint/$url_filter"
         curl_args=("--request")
         curl_args+=("GET")
@@ -1266,15 +1195,12 @@ generate_mobile_device_list() {
         # append the results to the output file, ensuring only to append the results
         # if this is the first loop, we need to create the file
         combined_output_file="$output_location/jamf_mobile_device_list_combined.json"
-        if [[ ! -f "$combined_output_file" ]]; then
-            touch "$combined_output_file"
-        fi
         # extract the results and append them to the combined output file
-        if [[ $i -eq 0 ]]; then
-            /usr/bin/plutil -extract results raw "$curl_output_file" > "$combined_output_file"
-        else
-            /usr/bin/plutil -extract results raw "$curl_output_file" >> "$combined_output_file"
-        fi
+        /usr/bin/jq -s '
+            {
+              results: (.[0].results + .[1].results)
+            }
+            ' "$combined_output_file" "$curl_output_file" > "$combined_output_file.tmp" && mv "$combined_output_file.tmp" "$combined_output_file"
         ((i++))
     done
 
@@ -1290,10 +1216,10 @@ generate_mobile_device_list() {
     mobile_device_choice=()
     echo
     while [[ $i -lt $loopsize ]]; do
-        id_in_list=$(/usr/bin/plutil -extract results.$i.id raw "$combined_output_file")
-        mobile_device_name_in_list=$(/usr/bin/plutil -extract results.$i.name raw "$combined_output_file")
-        management_id_in_list=$(/usr/bin/plutil -extract results.$i.managementId raw "$combined_output_file")
-        serial_in_list=$(/usr/bin/plutil -extract results.$i.serialNumber raw "$combined_output_file")
+        id_in_list=$(/usr/bin/jq -r .results.[$i].id "$combined_output_file")
+        mobile_device_name_in_list=$(/usr/bin/jq -r .results.[$i].name "$combined_output_file")
+        management_id_in_list=$(/usr/bin/jq -r .results.[$i].managementId "$combined_output_file")
+        serial_in_list=$(/usr/bin/jq -r .results.[$i].serialNumber "$combined_output_file")
 
         mobile_device_ids+=("$id_in_list")
         mobile_device_names+=("$mobile_device_name_in_list")
@@ -1414,20 +1340,4 @@ get_api_object_from_type() {
     esac
     echo "$api_xml_object"
 }
-
-
-
-# ljt section
-: <<-LICENSE_BLOCK
-ljt.min - Little JSON Tool (https://github.com/brunerd/ljt) Copyright (c) 2022 Joel Bruner (https://github.com/brunerd). Licensed under the MIT License. Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions: The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software. THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-LICENSE_BLOCK
-
-#v1.0.3 - use the minified function below to embed ljt into your shell script
-ljt() ( 
-	[ -n "${-//[^x]/}" ] && set +x; read -r -d '' JSCode <<-'EOT'
-	try {var query=decodeURIComponent(escape(arguments[0]));var file=decodeURIComponent(escape(arguments[1]));if (query[0]==='/'){ query = query.split('/').slice(1).map(function (f){return "["+JSON.stringify(f)+"]"}).join('')}if(/[^A-Za-z_$\d\.\[\]'"]/.test(query.split('').reverse().join('').replace(/(["'])(.*?)\1(?!\\)/g, ""))){throw new Error("Invalid path: "+ query)};if(query[0]==="$"){query=query.slice(1,query.length)};var data=JSON.parse(readFile(file));var result=eval("(data)"+query)}catch(e){printErr(e);quit()};if(result !==undefined){result!==null&&result.constructor===String?print(result): print(JSON.stringify(result,null,2))}else{printErr("Node not found.")}
-	EOT
-	queryArg="${1}"; fileArg="${2}";jsc=$(find "/System/Library/Frameworks/JavaScriptCore.framework/Versions/Current/" -name 'jsc');[ -z "${jsc}" ] && jsc=$(which jsc);{ [ -f "${queryArg}" ] && [ -z "${fileArg}" ]; } && fileArg="${queryArg}" && unset queryArg;if [ -f "${fileArg:=/dev/stdin}" ]; then { errOut=$( { { "${jsc}" -e "${JSCode}" -- "${queryArg}" "${fileArg}"; } 1>&3 ; } 2>&1); } 3>&1;else { errOut=$( { { "${jsc}" -e "${JSCode}" -- "${queryArg}" "/dev/stdin" <<< "$(cat)"; } 1>&3 ; } 2>&1); } 3>&1; fi;if [ -n "${errOut}" ]; then /bin/echo "$errOut" >&2; return 1; fi
-)
-
 
