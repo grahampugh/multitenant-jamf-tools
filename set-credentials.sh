@@ -98,7 +98,7 @@ for instance in "${instance_choice_array[@]}"; do
     echo "Checking credentials for $instance_base (user $inputted_username)"
     check_credentials
     # print out version
-    version=$( ljt /version < "$curl_output_file" )
+    version=$( jq -r '.version' < "$curl_output_file" )
     if [[ $version ]]; then
         echo "Connection successful. Jamf Pro version: $version"
     fi
