@@ -125,7 +125,7 @@ get_instance_list_files() {
             instance_list_files+=("$file")
             echo "[$i] $filename"
             ((i++))
-        done < <(find "$instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -not -name "display-name-prefix-list.txt" -not -name "script-name-prefix-list.txt" -print0)
+        done < <(find "$instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -not -name "display-name-prefix-list.txt" -not -name "script-name-prefix-list.txt" -not -name "pkg-name-prefix-list.txt" -print0)
     fi
 
     # repeat for the default in case we need to keep private lists
