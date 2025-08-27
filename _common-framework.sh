@@ -112,6 +112,14 @@ get_instance_list_files() {
 
     default_instance_list_for_dialogs="$(basename "$default_instance_list" | sed 's/\.txt//')"
 
+    # handle prefix and overrides files
+    if [[ -d "$instance_lists_folder" ]]; then
+        display_name_prefix_file="$instance_lists_folder/display-name-prefix-list.txt"
+        script_name_prefix_file="$instance_lists_folder/script-name-prefix-list.txt"
+        pkg_name_prefix_file="$instance_lists_folder/pkg-name-prefix-list.txt"
+        global_overrides_file="$instance_lists_folder/global-overrides-list.txt"
+    fi
+
     i=0
     instance_list_files=()
     chosen_instance_list_filepath=""
@@ -125,7 +133,7 @@ get_instance_list_files() {
             instance_list_files+=("$file")
             echo "[$i] $filename"
             ((i++))
-        done < <(find "$instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -not -name "display-name-prefix-list.txt" -not -name "script-name-prefix-list.txt" -not -name "pkg-name-prefix-list.txt" -print0)
+        done < <(find "$instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -not -name "display-name-prefix-list.txt" -not -name "script-name-prefix-list.txt" -not -name "pkg-name-prefix-list.txt" -not -name "global-overrides-list.txt" -print0)
     fi
 
     # repeat for the default in case we need to keep private lists
@@ -150,7 +158,7 @@ get_instance_list_files() {
                 echo "[$i] $filename"
                 ((i++))
             fi
-        done < <(find "$default_instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -not -name "display-name-prefix-list.txt" -not -name "script-name-prefix-list.txt" -print0)
+        done < <(find "$default_instance_lists_folder" -type f -name "*.txt" -not -name "default-instance-list.txt" -not -name "display-name-prefix-list.txt" -not -name "script-name-prefix-list.txt" -not -name "pkg-name-prefix-list.txt" -not -name "global-overrides-list.txt" -print0)
     fi
     if [[ $i -eq 0 ]]; then
         echo
