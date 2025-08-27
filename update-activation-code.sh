@@ -27,8 +27,9 @@ Usage:
 --i JSS_URL                   - perform action on a single instance
                                 (must exist in the relevant instance list)
 --all                         - perform action on ALL instances in the instance list
--x | --nointeraction             - run without checking instance is in an instance list 
-                                   (prevents interactive mode)
+-x | --nointeraction          - run without checking instance is in an instance list 
+                                (prevents interactive mode)
+--debug-log                   - Path to debug file
 -v                            - add verbose curl output
 USAGE
 }
@@ -100,6 +101,18 @@ write_activation_code() {
     curl_args+=("<activation_code><code>$activation_code</code></activation_code>")
     send_curl_request
 
+    # verify if successful
+    if [[ $http_response -lt 399 ]]; then
+        echo "Activation Code was updated successfully"
+        if [[ -f "$debug_log_path" ]]; then
+            echo "Success" > "$debug_log_path"
+        fi
+    else
+        echo "Activation Code update failed"
+        if [[ -f "$debug_log_path" ]]; then
+            echo "Failed" > "$debug_log_path"
+        fi
+fi
 
     # Send Slack notification
     slack_text="{'username': '$jss_url', 'text': '*update-activation-code.sh*\nUser: $jss_api_user\nInstance: $jss_url\nActivation Code: $activation_code'}"
@@ -132,6 +145,10 @@ while [[ "$#" -gt 0 ]]; do
         -i|--instance)
             shift
             chosen_instance="$1"
+        ;;
+        --debug-log)
+            shift
+            debug_log_path="$1"
         ;;
         -a|-ai|--all|--all-instances)
             all_instances=1
