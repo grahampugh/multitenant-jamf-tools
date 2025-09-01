@@ -212,14 +212,45 @@ choose_instance_list() {
         echo "Instance list $chosen_instance_list_file chosen"
         instance_list_file="$chosen_instance_list_filepath"
     else
-        echo "Choose the instance list from the list above"
+        echo "Choose the instance list(s) from the list above"
         if [[ -f "$default_instance_list" ]]; then
-            echo "or press ENTER to choose list $default_instance_list_for_dialogs"
+            echo "or press ENTER to choose list(s) $default_instance_list_for_dialogs"
         fi
-        read -r -p "Instance list : " instance_list
+        read -r -p "Instance list(s) : " instance_list_choice
         echo
-        if [[ $instance_list && -f "${instance_list_files[$instance_list]}" ]]; then
-            instance_list_file="${instance_list_files[$instance_list]}"
+        if [[ "$instance_list_choice" ]]; then
+            temp_instance_list=()
+            for choice in $instance_list_choice; do
+                if [[ -f "${instance_list_files[$choice]}" ]]; then
+                    # get all the lines from the file $choice and add to temp_instance_list
+                    while IFS= read -r line; do
+                        # check that the entry is not already in temp_instance_list
+                        if [[ ! " ${temp_instance_list[*]} " =~ " $line " ]]; then
+                            temp_instance_list+=("$line")
+                        fi
+                    done < "${instance_list_files[$choice]}"
+                fi
+            done
+            # sort the list alphabetically, but keeping the first entry first in the list
+            sorted_temp_instance_list=()
+            if [[ ${#temp_instance_list[@]} -gt 0 ]]; then
+                # Keep the first entry
+                sorted_temp_instance_list+=("${temp_instance_list[0]}")
+                
+                # Sort the remaining entries alphabetically
+                if [[ ${#temp_instance_list[@]} -gt 1 ]]; then
+                    while IFS= read -r line; do
+                        sorted_temp_instance_list+=("$line")
+                    done < <(printf '%s\n' "${temp_instance_list[@]:1}" | sort)
+                fi
+            fi
+
+            # create a temporary instance list file and populate with the entries of temp_instance_list with each entry as a single line
+            instance_list_file="$output_location/combo_instance_list.txt"
+            echo "" > "$instance_list_file"
+            for temp_instance in "${sorted_temp_instance_list[@]}"; do
+                echo "$temp_instance" >> "$instance_list_file"
+            done
         elif [[ -f "$default_instance_list" ]]; then
             instance_list_file="$default_instance_list"
         else
