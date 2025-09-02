@@ -211,6 +211,7 @@ choose_instance_list() {
     if [[ -f "$chosen_instance_list_filepath" ]]; then
         echo "Instance list $chosen_instance_list_file chosen"
         instance_list_file="$chosen_instance_list_filepath"
+        slack_instance_list="$instance_list_file"
     else
         echo "Choose the instance list(s) from the list above"
         if [[ -f "$default_instance_list" ]]; then
@@ -220,6 +221,9 @@ choose_instance_list() {
         echo
         if [[ "$instance_list_choice" ]]; then
             temp_instance_list=()
+            # set slack_instance_list to the first choice (choices are separated by spaces)
+            slack_instance_list="${instance_list_choice%% *}"
+
             for choice in $instance_list_choice; do
                 if [[ -f "${instance_list_files[$choice]}" ]]; then
                     # get all the lines from the file $choice and add to temp_instance_list
@@ -536,7 +540,7 @@ get_smb_credentials() {
 send_slack_notification() {
     local slack_text=$1
 
-    if get_slack_webhook "$instance_list_file"; then
+    if get_slack_webhook "$slack_instance_list"; then
         response=$(
             curl -s -o /dev/null -S -i -X POST -H "Content-Type: application/json" \
             --write-out '%{http_code}' \
