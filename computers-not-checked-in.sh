@@ -20,23 +20,32 @@ mkdir -p "$workdir"
 
 usage() {
     cat <<'USAGE'
+
+# Computers Not Checked In Script
+A script to count the number of computers that have not checked in for a specified number of days.
+
 NOTE: This script requires the following Smart Groups to exist on each server checked:
 
-   - "Computer not checked in DAYS days"
+   - "Computer not checked in for DAYS days"
 
 Where DAYS is the entered value of DAYS (e.g. 90)
 
-Usage:
-./set_credentials.sh          - set the Keychain credentials
+A Computer Group Template is provided for this in the templates folder. The group can be created in all required instances with the following jamfuploader-run.sh command (assuming 7 days):
 
+./jamfuploader-run.sh computergroup --template templates/SmartGroup-LastCheckIn.xml --name "Computer Not Checked in for %DAYS_AGO% Days" --key DAYS_AGO=7
+
+# Usage:
 [no arguments]                - interactive mode
-[DAYS] (30/90/180)            - show count of computers not checked in for DAYS days (default 90)
+[DAYS] (1-180)                - show count of computers not checked in for DAYS days 
+                                (default 90)
 [no arguments]                - interactive mode
 --il FILENAME (without .txt)  - provide an instance list filename
                                 (must exist in the instance-lists folder)
 --i JSS_URL                   - perform action on a single instance
                                 (must exist in the relevant instance list)
 --all                         - perform action on ALL instances in the instance list
+-x | --nointeraction          - run without checking instance is in an instance list 
+                                (prevents interactive mode)
 -v                            - add verbose curl output
 USAGE
 }
@@ -51,7 +60,8 @@ do_the_counting() {
     curl_args+=("Accept: application/xml")
     send_curl_request
 
-    if [[ $http_response -eq 404 ]]; then
+    if [[ $curl_failed == "true" ]]; then
+        echo
         echo "Smart group '$group_name' does not exist on this server"
         computers=0
     else
@@ -105,6 +115,9 @@ while [[ "$#" -gt 0 ]]; do
             shift
             output_file="$1"
         ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -v|--verbose)
             verbose=1
         ;;
@@ -122,16 +135,17 @@ done
 echo
 
 # set default
-if [[ $days -ne 30 && $days -ne 90 && $days -ne 180 ]]; then
-    read -r -p "Enter 30 or 90 : " days
+if [[ ($days -le 0 || $days -gt 180) && -z $no_interaction ]]; then
+    read -r -p "Enter a number between 1 and 180 : " days
 fi
-if [[ $days -ne 30 && $days -ne 90 && $days -ne 180 ]]; then
+if [[ $days -le 0 || $days -gt 180 ]]; then
+    echo "No valid number entered, using default of 90 days"
     days=90
 fi
 echo
 
 # encode the group name
-group_name="Computer not checked in $days days"
+group_name="Computer not checked in for $days days"
 encoded_group_name=$(encode_name "$group_name")
 
 # set default output file

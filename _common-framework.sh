@@ -880,8 +880,8 @@ send_curl_request() {
         (( try++ ))
     done
     if [[ $try -gt $max_tries ]]; then
-        echo "ERROR: fail response ($http_response) - maximum attempts reached - cannot continue."
-        # TODO - create a report of failed items
+        curl_failed="true"
+        echo "ERROR: fail response - maximum attempts reached - cannot continue."
     fi
 }
 

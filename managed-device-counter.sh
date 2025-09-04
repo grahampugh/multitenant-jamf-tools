@@ -11,20 +11,31 @@ source "_common-framework.sh"
 
 usage() {
     cat <<'USAGE'
-Usage:
-./set_credentials.sh            - set the Keychain credentials
+    
+# Managed Device Counter
+A script for counting managed and unmanaged devices and computers on one or more Jamf Pro instances.
 
-[no arguments]                  - interactive mode
---anonymous (or -a)             - output to shell with anonymous contexts
---csv (or -c)                   - output to shell as comma-separated list
---csv > /path/to/file.csv       - output to CSV file
---il FILENAME (without .txt)    - provide a server-list filename
-                                  (must exist in the instance-lists folder)
---i JSS_URL                     - perform action on a single instance
-                                  (must exist in the relevant instance list)
---all                           - perform action on ALL instances in the instance list
--v                              - add verbose curl output
-                  
+# Requirements
+- Credentials for the Jamf Pro instance(s) must be set in the AutoPkg preferences or in the Keychain (the script will prompt you to run the set_credentials.sh script if not found)
+- The _common-framework.sh script must be available in the same folder as this script.
+
+# Usage:
+[no arguments]                       - interactive mode
+-a | --anonymous (or -a)             - output to shell with anonymous contexts
+-o | --output /path/to/file.txt      - output to the specified text file (default is 
+                                       /tmp/managed-device-counter.txt)
+-c | --csv /path/to/file.csv         - output to the specified CSV file (default is 
+                                       /tmp/managed-device-counter.csv)
+-il | --instance-list FILENAME       - provide a server-list filename (without .txt)
+                                       (must exist in the instance-lists folder)
+-i | --instance JSS_URL              - perform action on a single instance
+                                       (must exist in the relevant instance list)
+--all                                - perform action on ALL instances in the instance list
+-x | --nointeraction                 - run without checking instance is in an instance list 
+                                       (prevents interactive mode)
+-v | --verbose                       - add verbose curl output
+-h | --help                          - Show this help message
+
 USAGE
 }
 
@@ -73,9 +84,12 @@ while [[ "$#" -gt 0 ]]; do
             shift
             chosen_instance="$1"
         ;;
-        -a|--all)
+        --all)
             all_instances=1
         ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -v|--verbose)
             verbose=1
         ;;

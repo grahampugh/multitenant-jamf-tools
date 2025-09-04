@@ -20,6 +20,14 @@ autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
 
 usage() {
     cat <<'USAGE'
+
+# AutoPkg-Run
+A script for running AutoPkg recipes on one or more Jamf Pro instances.
+
+# Requirements
+- AutoPkg must be installed and configured
+- Credentials for the Jamf Pro instance(s) must be set in the AutoPkg preferences or in the Keychain (the script will prompt you to run the set_credentials.sh script if not found)
+
 Usage:
 ./set_credentials.sh             - set the Keychain credentials
 
@@ -36,7 +44,8 @@ Usage:
                                    (prevents interactive choosing of instances)
 --report-plist                   - pass through the report-plist value
 --dp                             - filter DPs on DP name
--e                               - Force policy to enabled (--key POLICY_ENABLED=True)
+-e | --enabled                   - Force policy to enabled (--key POLICY_ENABLED=True)
+-p | --replace                   - Replace existing pkg in Jamf Pro (for pkg uploads)
 -v[vv]                           - add verbose output
 --[args]                         - Pass through any arguments for AutoPkg
 USAGE
