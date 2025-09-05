@@ -159,6 +159,8 @@ run_autopkg() {
         if ! "$autopkg_binary" run "$autopkg_verbosity" "$recipe" "${autopkg_run_options[@]}"; then
             echo "ERROR: AutoPkg run failed"
             exit 1
+        else
+            echo "AutoPkg run completed"
         fi
     else
         echo "ERROR: no recipe or recipe list supplied"
