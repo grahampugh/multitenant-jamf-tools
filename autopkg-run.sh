@@ -156,7 +156,10 @@ run_autopkg() {
     if [[ $recipe_list ]]; then
         "$autopkg_binary" run "$autopkg_verbosity" --recipe-list "$recipe_list" "${autopkg_run_options[@]}"
     elif  [[ $recipe ]]; then
-        "$autopkg_binary" run "$autopkg_verbosity" "$recipe" "${autopkg_run_options[@]}"
+        if ! "$autopkg_binary" run "$autopkg_verbosity" "$recipe" "${autopkg_run_options[@]}"; then
+            echo "ERROR: AutoPkg run failed"
+            exit 1
+        fi
     else
         echo "ERROR: no recipe or recipe list supplied"
         exit 1
