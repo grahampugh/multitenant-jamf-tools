@@ -17,6 +17,14 @@ instance_list_type="mac"
 
 usage() {
     echo "
+# jamf-api-tool.sh
+# A wrapper script for running the jamf_api_tool.py script
+#
+# Requirements:
+# - Python 3 - AutoPkg installation recommended as this includes a python3 distribution(
+#   required for other tools in the suite)
+# - jamf-api-tool.py - the main script for interacting with the Jamf API
+
 Usage:
 ./set_credentials.sh          - set the Keychain credentials
 
@@ -287,7 +295,8 @@ fi
 if [[ "${args[*]}" == *"--packages"* ]]; then
     if [[ ! "${args[*]}" == *"--all"* ]] && \
        [[ ! "${args[*]}" == *"--unused"* ]] && \
-       [[ ! "${args[*]}" == *"--search"* ]]; then
+       [[ ! "${args[*]}" == *"--search"* ]] && \
+       [[ ! "${args[*]}" == *"--from_csv"* ]]; then
         echo "Please choose the action to be performed on Packages:"
         echo "1) List all packages"
         echo "2) List all packages with additional details"
@@ -295,7 +304,8 @@ if [[ "${args[*]}" == *"--packages"* ]]; then
         echo "4) List and delete unused packages"
         echo "5) Search packages by name"
         echo "6) Search and delete packages by name"
-        read -r -p "(1-6): " action
+        echo "7) Delete packages from a CSV"
+        read -r -p "(1-7): " action
         case "$action" in
             1)
                 args+=("--all")
@@ -334,6 +344,18 @@ if [[ "${args[*]}" == *"--packages"* ]]; then
                 args+=("--search")
                 read -r -p "Enter search string: " search_string
                 args+=("$search_string")
+                if [[ ! "${args[*]}" == *"--delete"* ]]; then
+                    args+=("--delete")
+                fi
+                ;;
+            7)
+                args+=("--from_csv")
+                read -r -p "Enter the full path to the CSV file: " csv_path
+                args+=("$csv_path")
+                if [[ ! -f "$csv_path" ]]; then
+                    echo "   [main] Error: $csv_path not found. Exiting."
+                    exit 1
+                fi
                 if [[ ! "${args[*]}" == *"--delete"* ]]; then
                     args+=("--delete")
                 fi
