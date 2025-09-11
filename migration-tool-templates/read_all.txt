@@ -1,4 +1,4 @@
-## JSS-Config-In-A-Box category sync chooser - read from source
+## Migration-Tool-Endpoints - read from source
 ## COMMENT OUT LINES THAT YOU DO NOT WISH TO SYNC TO DESTINATION INSTANCES
 policies
 restrictedsoftware
@@ -10,7 +10,6 @@ advancedcomputersearches
 # patchpolicies
 macapplications
 computers
-departments
 # sites
 ldapservers
 # accounts

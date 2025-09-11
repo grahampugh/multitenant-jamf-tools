@@ -25,6 +25,9 @@ source "_common-framework.sh"
 if [[ ! -d "${this_script_dir}" ]]; then
     echo "ERROR: path to repo ambiguous. Aborting."
     exit 1
+else
+    echo
+    echo "   [main] Script running from ${this_script_dir}"
 fi
 
 # -------------------------------------------------------------------------
@@ -32,7 +35,7 @@ fi
 # -------------------------------------------------------------------------
 
 # Other fixed variables
-xmlloc_default="/Users/Shared/Jamf/jamf-api-archive"
+xmlloc_default="/Users/Shared/Jamf/Migration-Tool-Archive"
 log_file="$HOME/Library/Logs/JAMF/migration-tool.log"
 git_branch="tst-template"
 icons_folder="$xmlloc_default/icons"
@@ -51,7 +54,6 @@ templates_folder="${this_script_dir}/migration-tool-templates"
 readfile="${templates_folder}/read_all.txt"
 readlimitedfile="${templates_folder}/read_limited.txt"
 wipefile="${templates_folder}/wipe_all.txt"
-wipelimitedfile="${templates_folder}/wipe_limited.txt"
 writefile="${templates_folder}/write_all.txt"
 writelimitedfile="${templates_folder}/write_limited.txt"
 writeiosfile="${templates_folder}/write_ios.txt"
@@ -1041,7 +1043,7 @@ main_menu() {
                 echo
                 echo "Possible endpoints:"
                 echo
-                grep -v -e "^#" "${readfile}"
+                grep -v -e "^#" "${readfile}" | sort | uniq
                 echo
 
                 apiParameter=""
@@ -1090,7 +1092,7 @@ main_menu() {
                 # Do you want to change just a single endpoint or the standard list?
                 echo
                 echo "Possible endpoints"
-                grep -v -e "^#" "${writefile}"
+                grep -v -e "^#" "${writefile}" | sort | uniq
                 echo
                 read -r -p "If you only want to upload items of one specific API endpoint, enter it here : " apiParameter
 
@@ -1163,7 +1165,7 @@ main_menu() {
                 # Do you want to change just a single endpoint or the standard list?
                 echo
                 echo "Possible endpoints"
-                grep -v -e "^#" "${wipefile}"
+                grep -v -e "^#" "${wipefile}" | sort | uniq
                 echo
                 read -r -p "If you only want to wipe items of one specific API endpoint, enter it here : " apiParameter
 

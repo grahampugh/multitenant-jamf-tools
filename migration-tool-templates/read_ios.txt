@@ -1,58 +1,35 @@
-## Migration-Tool-Endpoints - write to destination
+## Migration-Tool-Endpoints - read from source
 ## COMMENT OUT LINES THAT YOU DO NOT WISH TO SYNC TO DESTINATION INSTANCES
+departments
 # sites
-categories
-# ldapservers
+ldapservers
 # accounts
-packages
-computerextensionattributes
-computergroups
-computergroups
-computergroups
-computergroups
-# buildings
-# departments
+buildings
 # directorybindings
 # removablemacaddresses
 # netbootservers
 # distributionpoints
-# softwareupdateservers
 # networksegments
 # healthcarelistener
 # ibeacons
 # infrastructuremanager
 # peripherals
 # peripheraltypes
-# smtpserver
+smtpserver
 # activationcode
-computerinventorycollection
 # vppaccounts
 # vppassignments
 # vppinvitations
 # webhooks
-# diskencryptionconfigurations
-# ebooks
-dockitems
-# printers
+ebooks
+printers
 # licensedsoftware
-scripts
-restrictedsoftware
-osxconfigurationprofiles
-# macapplications
 # managedpreferenceprofiles
-policies
-advancedcomputersearches
-# patches
-# patchexternalsources
-# patchinternalsources
-# patchpolicies
-mobiledeviceextensionattributes
 mobiledevicegroups
-mobiledevicegroups
-mobiledevicegroups
-# mobiledeviceapplications
+mobiledeviceapplications
 mobiledeviceconfigurationprofiles
 # mobiledeviceenrollmentprofiles
+mobiledeviceextensionattributes
 # mobiledeviceprovisioningprofiles
 # classes
 advancedmobiledevicesearches
@@ -60,3 +37,4 @@ userextensionattributes
 usergroups
 users
 advancedusersearches
+categories

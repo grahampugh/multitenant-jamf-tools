@@ -1,5 +1,42 @@
-## JSS-Config-In-A-Box category sync chooser - write to destination
+## Migration-Tool-Endpoints - write to destination
 ## COMMENT OUT LINES THAT YOU DO NOT WISH TO SYNC TO DESTINATION INSTANCES
-ldapservers
+# sites
+categories
+# ldapservers
 # accounts
-smtpserver
+# buildings
+# departments
+# directorybindings
+# removablemacaddresses
+# netbootservers
+# distributionpoints
+# networksegments
+# healthcarelistener
+# ibeacons
+# infrastructuremanager
+# peripherals
+# peripheraltypes
+# smtpserver
+# activationcode
+# vppaccounts
+# vppassignments
+# vppinvitations
+# webhooks
+# diskencryptionconfigurations
+# ebooks
+# printers
+# licensedsoftware
+mobiledeviceextensionattributes
+mobiledevicegroups
+mobiledevicegroups
+mobiledevicegroups
+# mobiledeviceapplications
+mobiledeviceconfigurationprofiles
+# mobiledeviceenrollmentprofiles
+# mobiledeviceprovisioningprofiles
+# classes
+advancedmobiledevicesearches
+userextensionattributes
+usergroups
+users
+advancedusersearches
