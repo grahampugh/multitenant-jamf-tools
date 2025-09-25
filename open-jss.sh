@@ -15,6 +15,9 @@ instance_list_type="ios"
 # don't strip failovers
 strip_failover="no"
 
+# get current user
+current_user=$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | /usr/bin/awk -F': ' '/[[:space:]]+Name[[:space:]]:/ { if ( $2 != "loginwindow" ) { print $2 }}')
+
 usage() {
     cat <<'USAGE'
 Usage:
@@ -36,7 +39,7 @@ list_browsers() {
     # list the browsers available
 
     # default browser
-    default_browser_idenfitier=$(plutil -p ~/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist | grep 'https' -b3 | awk 'NR==3 {split($4, arr, "\""); print arr[2]}')
+    default_browser_idenfitier=$(plutil -p "/Users/$current_user/Library/Preferences/com.apple.LaunchServices/com.apple.launchservices.secure.plist" | grep 'https' -b3 | awk 'NR==3 {split($4, arr, "\""); print arr[2]}')
     # fix for Safari bug
     if [[ "$default_browser_idenfitier" == "com.apple.safari" ]]; then
         default_browser_idenfitier="com.apple.Safari"
