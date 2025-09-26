@@ -140,17 +140,19 @@ run_autopkg() {
     esac
 
     # report to Slack
-    if get_slack_webhook "$instance_list_file"; then
-        if [[ $slack_webhook_url ]]; then
-            autopkg_run_options+=(
-                "--key"
-                "slack_webhook_url=${slack_webhook_url}"
-                "--post"
-                "com.github.grahampugh.jamf-upload.processors/JamfUploaderSlacker"
-            )
+    if [[ "$instance_list_file" ]]; then
+        if get_slack_webhook "$instance_list_file"; then
+            if [[ $slack_webhook_url ]]; then
+                autopkg_run_options+=(
+                    "--key"
+                    "slack_webhook_url=${slack_webhook_url}"
+                    "--post"
+                    "com.github.grahampugh.jamf-upload.processors/JamfUploaderSlacker"
+                )
+            fi
+        else
+            echo "No Slack webhook found for $instance_list_file"
         fi
-    else
-        echo "No Slack webhook found for $instance_list_file"
     fi
 
     if [[ $recipe_list ]]; then
