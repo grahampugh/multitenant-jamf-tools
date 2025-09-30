@@ -1,13 +1,29 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for changing policy names using AutoPkg
-USAGE:
-./replace-policy-names.sh JSON_FILE
-  JSON_FILE: Path to a JSON file containing an array of objects with "id" and "name" fields.
-EXAMPLE:
-./replace-policy-names.sh /path/to/policies.json
-DOC
+# --------------------------------------------------------------------------------
+# Script for changing policy names using AutoPkg
+# USAGE:
+# First download a list of policies using the DownloadPolicyList recipe, as follows:
+
+# ./autopkg-run.sh -r recipes/DownloadPolicyList.jamf.recipe.yaml
+
+# then edit the JSON file to contain only the policies you want to rename, 
+# with their new names. The JSON file should be an array of objects with 
+# "id" and "name" fields.
+
+# Tip: remove entries that don't need to be changed - this will speed things 
+# up considerably!
+
+# Then run this script with the path to the edited JSON file as an argument.
+
+# ./replace-policy-names.sh JSON_FILE
+
+#   JSON_FILE: Path to a JSON file containing an array of objects with 
+#   "id" and "name" fields.
+
+# EXAMPLE:
+# ./replace-policy-names.sh /path/to/policies.json
+# --------------------------------------------------------------------------------
 
 # Define the JSON file path
 JSON_FILE="$1"
