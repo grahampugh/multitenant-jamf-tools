@@ -294,8 +294,8 @@ get_computer_list() {
     # get a list of computers from the JSS
     echo "   [get_computer_list] Getting computer list from JSS instance: $jss_instance"
     jss_url="$jss_instance"
-    endpoint="api/preview/computers"
-    handle_jpapi_get_request "$endpoint"
+    endpoint="/api/preview/computers"
+    handle_jpapi_get_request "$endpoint" sort
     # create a variable containing the json output from $curl_output_file
     computer_results=$(echo "$combined_output" | jq -s '[.[].results[]]')
     echo "$computer_results" > /tmp/computer_results.json # TEMP
@@ -306,8 +306,8 @@ get_mobile_device_list() {
     # first get the device count so we can find out how many loops we need
     echo "   [get_mobile_device_list] Getting mobile device list from JSS instance: $jss_instance"
     jss_url="$jss_instance"
-    endpoint="api/v2/mobile-devices"
-    handle_jpapi_get_request "$endpoint"
+    endpoint="/api/v2/mobile-devices"
+    handle_jpapi_get_request "$endpoint" sort
 
     # create a variable containing the json output from $curl_output_file
     mobile_device_results=$(echo "$combined_output" | jq -s '[.[].results[]]')
@@ -326,9 +326,9 @@ msu_plan_status() {
     # get MSU Software Update plan status
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
-    endpoint="api/v1/managed-software-updates/plans"
+    endpoint="/api/v1/managed-software-updates/plans"
     sort_filter="planUuid"
-    handle_jpapi_get_request "$endpoint" "$sort_filter"
+    handle_jpapi_get_request "$endpoint" sort "$sort_filter"
 
     plan_output="$combined_output"
     echo "   [msu_plan_status] MSU Software Update plan statuses:"
@@ -523,9 +523,9 @@ msu_update_status() {
     # get MSU Software Update plan status
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
-    endpoint="api/v1/managed-software-updates/update-statuses"
+    endpoint="/api/v1/managed-software-updates/update-statuses"
     sort_filter="osUpdatesStatusId"
-    handle_jpapi_get_request "$endpoint" "$sort_filter"
+    handle_jpapi_get_request "$endpoint" sort "$sort_filter"
 
     status_output="$combined_output"
     echo "   [msu_update_status] MSU Software Update update statuses:"

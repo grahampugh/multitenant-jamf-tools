@@ -630,11 +630,11 @@ get_new_token() {
         fi
     fi
 
-    echo "${jss_url}" > "$server_check_file"
+    echo "$jss_url" > "$server_check_file"
     echo "$jss_api_user" > "$user_check_file"
 
     if [[ $verbose -gt 0 ]]; then
-        echo "Token for $jss_api_user on ${jss_url} written to $token_file"
+        echo "Token for $jss_api_user on $jss_url written to $token_file"
     fi
 }
 
@@ -651,7 +651,7 @@ check_token() {
         # check we are still querying the same server and with the same account
         server_check=$(cat "$server_check_file" 2>/dev/null)
         user_check=$(cat "$user_check_file" 2>/dev/null)
-        if [[ "$server_check" == "${jss_url}" && "$user_check" == "$jss_api_user" ]]; then
+        if [[ "$server_check" == "$jss_url" && "$user_check" == "$jss_api_user" ]]; then
             if [[ $cred_type == "client-id" ]]; then
                 if jq -e .access_token "$token_file" >/dev/null; then
                     token=$(jq -r .access_token "$token_file")
@@ -666,13 +666,16 @@ check_token() {
                     expiration_epoch="0"
                 fi
                 if [[ $expiration_epoch -gt $current_time_epoch ]]; then
-                    echo "Token valid until the following epoch time: $expiration_epoch"
+                    human_cutoff_time=$( /bin/date -r "$expiration_epoch" )
+                    if [[ $verbose -gt 0 ]]; then
+                        echo "Token is still valid (expires at $human_cutoff_time)"
+                    fi
                 else
                     if [[ $verbose -gt 0 ]]; then
-                        echo "token expired or invalid ($expiration_epoch v $cutoff_epoch). Grabbing a new one"
+                        echo "token expired or invalid ($expiration_epoch v $current_time_epoch). Grabbing a new one"
                     fi
                     sleep 1
-                    get_new_token "${jss_url}"
+                    get_new_token "$jss_url"
                 fi
             else
                 if jq -e .token "$token_file" >/dev/null; then
@@ -689,7 +692,6 @@ check_token() {
                     expiration_epoch="0"
                 fi
                 # set a cutoff of one minute in the future to prevent problems with mismatched expiration
-                # cutoff=$(date -v +1M -u +"%Y-%m-%dT%H:%M:%S")
                 cutoff_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "$(date -u +"%Y-%m-%dT%H:%M:%S")" +"%s")
 
                 if [[ $expiration_epoch -lt $cutoff_epoch ]]; then
@@ -697,14 +699,15 @@ check_token() {
                         echo "token expired or invalid ($expiration_epoch v $cutoff_epoch). Grabbing a new one"
                     fi
                     sleep 1
-                    get_new_token "${jss_url}"
+                    get_new_token "$jss_url"
                 else
+                    human_cutoff_time=$( /bin/date -r "$expiration_epoch" )
                     if [[ $verbose -gt 0 ]]; then
-                        echo "Existing token still valid"
+                        echo "Token is still valid (expires at $human_cutoff_time)"
                     fi
                 fi
             fi
-        elif [[ "$server_check" == "${jss_url}" ]]; then
+        elif [[ "$server_check" == "$jss_url" ]]; then
             if [[ $verbose -gt 0 ]]; then
                 echo "'$user_check' does not match '$jss_api_user'. Grabbing a new token"
             fi
@@ -712,13 +715,13 @@ check_token() {
             get_new_token "$1"
         elif [[ "$user_check" == "$jss_api_user" ]]; then
             if [[ $verbose -gt 0 ]]; then
-                echo "'$server_check' does not match '${jss_url}'. Grabbing a new token"
+                echo "'$server_check' does not match '$jss_url'. Grabbing a new token"
             fi
             sleep 1
             get_new_token "$1"
         else
             if [[ $verbose -gt 0 ]]; then
-                echo "'$user_check' does not match '$jss_api_user', and '$server_check' does not match '${jss_url}'. Grabbing a new token."
+                echo "'$user_check' does not match '$jss_api_user', and '$server_check' does not match '$jss_url'. Grabbing a new token."
             fi
             sleep 1
             get_new_token "$1"
@@ -737,66 +740,108 @@ handle_jpapi_get_request() {
 
     # local variables to pass in
     local endpoint="$1"
-    local sort_filter="$2"
+    local sort_or_filter="$2"
+    local key="$3"
+    local match="$4" 
 
     if [[ -z $endpoint ]]; then
         echo "   [handle_jpapi_get_request] No endpoint provided for handle_jpapi_get_request"
         return 1
     fi
 
-    if [[ -z $sort_filter ]]; then
-        echo "   [handle_jpapi_get_request] No sort_filter provided for handle_jpapi_get_request, using id as default"
-        sort_filter="id"
+    # if endpoint already includes a filter, we cannot add another one
+    if [[ "$endpoint" == *"/?"* ]]; then
+        echo "   [handle_jpapi_get_request] Endpoint already includes parameters, cannot add more"
+        filter_type="preset"
+    elif [[ "$sort_or_filter" == "sort" ]]; then
+            filter_type="sort"
+            if [[ -z $key ]]; then
+                echo "   [handle_jpapi_get_request] No sort key provided for handle_jpapi_get_request, using id as default sorting method"
+                key="id"
+            fi
+    elif [[ "$sort_or_filter" == "filter" ]]; then
+        if [[ ! "$key" || ! "$match" ]]; then
+            echo "   [handle_jpapi_get_request] ERROR: No filter key or match provided for handle_jpapi_get_request"
+            exit 1
+        fi
+    else
+        echo "   [handle_jpapi_get_request] No sort or filter type provided for handle_jpapi_get_request, using id as default sorting method"
+        filter_type="none"
     fi
 
-    set_credentials "$jss_instance"
-    jss_url="$jss_instance"
-    url_filter="?page=0&page-size=1"
-    curl_url="$jss_url/$endpoint/$url_filter"
-    curl_args=("--request")
-    curl_args+=("GET")
-    curl_args+=("--header")
-    curl_args+=("Accept: application/json")
-    send_curl_request
-
-    # how many items are in the list?
-    total_count=$(/usr/bin/jq -r .totalCount "$curl_output_file")
-    if [[ $total_count -eq 0 ]]; then
-        echo "   [handle_jpapi_get_request] No items found"
-        combined_output=""
-        return
-    fi
-
-    echo "   [handle_jpapi_get_request] Total items found: $total_count"
-
-    # we need to run multiple loops to get all the devices if there are more than 1000
-    # calculate how many loops we need
-    loop_count=$(( total_count / 100 ))
-    if (( total_count % 100 > 0 )); then
-        loop_count=$(( loop_count + 1 ))
-    fi
-    echo "   [handle_jpapi_get_request] Will loop through $loop_count times to get all items."
-
-    # now loop through
-    i=0
-    combined_output=""
-    while [[ $i -lt $loop_count ]]; do
-        echo "   [handle_jpapi_get_request] Processing page $i of $loop_count..."
-        # set the page number
-
-        url_filter="?page=$i&page-size=100&sort=$sort_filter%3Aasc"
-        curl_url="$jss_url/$endpoint/$url_filter"
+    if [[ $filter_type == "sort" || $filter_type == "none" ]]; then
+        set_credentials "$jss_instance"
+        jss_url="$jss_instance"
+        url_filter="?page=0&page-size=1"
+        curl_url="$jss_url$endpoint/$url_filter"
         curl_args=("--request")
         curl_args+=("GET")
         curl_args+=("--header")
         curl_args+=("Accept: application/json")
         send_curl_request
-        # cat "$curl_output_file" # TEMP
-        # append the results array to the combined_results array (do not export to a file)
-        combined_output+=$(cat "$curl_output_file")
-        # echo "$combined_output" > /tmp/combined_output.txt # TEMP
-        ((i++))
-    done
+
+        # how many items are in the list?
+        total_count=$(/usr/bin/jq -r .totalCount "$curl_output_file")
+        if [[ $total_count -eq 0 ]]; then
+            echo "   [handle_jpapi_get_request] No items found"
+            combined_output=""
+            return
+        fi
+
+        echo "   [handle_jpapi_get_request] Total items found: $total_count"
+
+        # we need to run multiple loops to get all the devices if there are more than 1000
+        # calculate how many loops we need
+        loop_count=$(( total_count / 100 ))
+        if (( total_count % 100 > 0 )); then
+            loop_count=$(( loop_count + 1 ))
+        fi
+        echo "   [handle_jpapi_get_request] Will loop through $loop_count times to get all items."
+
+        # now loop through
+        i=0
+        combined_output=""
+        while [[ $i -lt $loop_count ]]; do
+            echo "   [handle_jpapi_get_request] Processing page $i of $loop_count..."
+            # set the page number
+
+            url_filter="?page=$i&page-size=100"
+            if [[ "$filter_type" == "sort" && "$key" ]]; then
+                url_filter="$url_filter&sort=$key"
+            fi
+            curl_url="$jss_url$endpoint/$url_filter"
+            curl_args=("--request")
+            curl_args+=("GET")
+            curl_args+=("--header")
+            curl_args+=("Accept: application/json")
+            send_curl_request
+            # cat "$curl_output_file" # TEMP
+            # append the results array to the combined_results array (do not export to a file)
+            combined_output+=$(cat "$curl_output_file")
+            # echo "$combined_output" > /tmp/combined_output.txt # TEMP
+            ((i++))
+        done
+        echo "   [handle_jpapi_get_request] All pages processed."
+    else
+        # filter based on a key=match pair
+        set_credentials "$jss_instance"
+        jss_url="$jss_instance"
+        if [[ "$filter_type" == "preset" ]]; then
+            # if preset, the endpoint already includes the filter so we do not need to add anything
+            curl_url="$jss_url$endpoint"
+        else
+            # url-encode the key without using python3
+            match_encoded=$(printf "%s" "$match" | jq -s -R -r @uri)
+            url_filter="?filter=$key%3D%3D%22$match_encoded%22"
+            curl_url="$jss_url$endpoint/$url_filter"
+        fi
+        curl_args=("--request")
+        curl_args+=("GET")
+        curl_args+=("--header")
+        curl_args+=("Accept: application/json")
+        send_curl_request
+        combined_output=$(cat "$curl_output_file")
+    fi
 }
 
 send_curl_request() {
@@ -820,7 +865,10 @@ send_curl_request() {
     echo "" > "$curl_output_file"
 
     while [[ $try -le $max_tries ]]; do
-        check_token "$jss_url"
+        # skip token check for Platform API requests
+        if [[ "$api_base_url" != *".apigw.jamf.com" ]]; then
+            check_token "$jss_url"
+        fi
         # any additional curl_args must be defined before this request (even if empty). Normally the header and=/or request will be made there
         curl_standard_args+=("--location")
         curl_standard_args=("--header")
@@ -1417,5 +1465,163 @@ get_api_object_from_type() {
         *)                                  api_xml_object=$(sed 's|s$||' <<< "$api_object_type") ;; 
     esac
     echo "$api_xml_object"
+}
+
+set_platform_api_credentials() {
+    local api_base_url="$1"
+    if [[ $verbose -gt 0 ]]; then
+        echo "Setting credentials for $api_base_url"
+    fi
+
+    # check for Client ID entry in login keychain
+    platform_api_client_id=$(/usr/bin/security find-internet-password -s "$api_base_url" -g 2>/dev/null | /usr/bin/grep "acct" | /usr/bin/cut -d \" -f 4 )
+
+    if [[ ! $platform_api_client_id ]]; then
+        echo "No keychain entry for $api_base_url found. Please run the set_platformapi_credentials.sh script to add the Client ID to your keychain"
+        exit 1
+    fi
+
+    # check for secret entry in login keychain
+    # jss_api_password=$("${this_script_dir}/keychain.sh" -t internet -p -s "$jss_url")
+    platform_api_client_secret=$(/usr/bin/security find-internet-password -s "$api_base_url" -a "$platform_api_client_id" -w -g 2>&1 )
+
+    if [[ ! $platform_api_client_secret ]]; then
+        echo "No Client Secret for $platform_api_client_id found. Please run the set_platformapi_credentials.sh script to add the Client Secret to your keychain"
+        exit 1
+    fi
+
+    echo "$platform_api_client_id:$platform_api_client_secret"  # UNCOMMENT-TO-DEBUG
+}
+
+get_platform_api_token() {
+    # get a token from the Platform API
+    if ! http_response=$(curl \
+        --silent \
+        --request POST \
+        "$api_base_url/auth/token" \
+        --header 'Content-Type: application/x-www-form-urlencoded' \
+    	--data-urlencode 'grant_type=client_credentials' \
+    	--data-urlencode "client_id=$platform_api_client_id" \
+        --data-urlencode "client_secret=$platform_api_client_secret" \
+        --write-out "%{http_code}" \
+        --cookie-jar "$cookie_jar" \
+        --output "$token_file"); then
+        echo "ERROR: Failed to connect to the Platform API."
+        exit 1
+    fi
+    # extract the token from the response
+    if [[ "$http_response" -ne 200 ]]; then
+        echo "ERROR: Failed to get token from the Platform API. HTTP response code: $http_response"
+        if [[ -s "$token_file" ]]; then
+            echo "Response:"
+            cat "$token_file"
+            echo
+        fi
+        exit 1
+    fi
+
+    # check token is valid
+    token=$(cat "$token_file" | jq -r '.access_token')
+    if [[ "$token" == "null" || -z "$token" ]]; then
+        echo "ERROR: Failed to retrieve access token. Please check your credentials."
+        exit 1
+    fi
+    if [[ $verbose -eq 1 ]]; then
+        echo "Token: $token"
+    fi
+
+    # save the server and user to the check files
+    echo "$api_base_url" >"$server_check_file"
+    echo "$id" >"$user_check_file"
+}
+
+check_platform_api_token() {
+    instance_id=$(echo "$api_base_url" | sed 's|https://||' | sed 's|:|_|g' | sed 's|/|_|g' | sed 's|\.|_|g')
+    token_file="$output_location/jamf_api_token_$instance_id.txt"
+    server_check_file="$output_location/jamf_server_check_$instance_id.txt"
+    user_check_file="$output_location/jamf_user_check_$instance_id.txt"
+    cookie_jar="$output_location/jamf_cookie_jar_$instance_id.txt"
+    curl_output_file="$output_location/output_$instance_id.txt"
+    curl_headers_file="$output_location/headers_$instance_id.txt"
+
+    # is there a token file
+    if [[ -f "$token_file" ]]; then
+        # check we are still querying the same server and with the same account
+        server_check=$(cat "$server_check_file" 2>/dev/null)
+        user_check=$(cat "$user_check_file" 2>/dev/null)
+        if [[ "$server_check" == "$api_base_url" && "$user_check" == "$id" ]]; then
+            if jq -e .access_token "$token_file" >/dev/null; then
+                token=$(jq -r .access_token "$token_file")
+            else
+                token=""
+            fi
+            if jq -e .expires_in "$token_file" >/dev/null; then
+                expires=$(jq -r .expires_in "$token_file")
+                current_time_epoch=$(/bin/date +%s)
+                file_created_epoch=$(/usr/bin/stat -f %m "$token_file")
+                cutoff_epoch=$((file_created_epoch + expires - 1))
+            else
+                cutoff_epoch="0"
+            fi
+            if [[ $cutoff_epoch -gt $current_time_epoch ]]; then
+                # convert epoch to human readable
+                human_cutoff_time=$( /bin/date -r "$cutoff_epoch" )
+                if [[ $verbose -gt 0 ]]; then
+                    echo "Token is still valid (expires at $human_cutoff_time)"
+                fi
+            else
+                if [[ $verbose -gt 0 ]]; then
+                    echo "token expired or invalid ($cutoff_epoch v $current_time_epoch). Grabbing a new one"
+                fi
+                sleep 1
+                get_platform_api_token
+            fi
+        elif [[ "$server_check" == "$api_base_url" ]]; then
+            if [[ $verbose -gt 0 ]]; then
+                echo "'$user_check' does not match '$platform_api_client_id'. Grabbing a new token"
+            fi
+            sleep 1
+            get_platform_api_token
+        elif [[ "$user_check" == "$platform_api_client_id" ]]; then
+            if [[ $verbose -gt 0 ]]; then
+                echo "'$server_check' does not match '$api_base_url'. Grabbing a new token"
+            fi
+            sleep 1
+            get_platform_api_token
+        else
+            if [[ $verbose -gt 0 ]]; then
+                echo "'$user_check' does not match '$platform_api_client_id', and '$server_check' does not match '$api_base_url'. Grabbing a new token."
+            fi
+            sleep 1
+            get_platform_api_token
+        fi
+    else
+        if [[ $verbose -gt 0 ]]; then
+            echo "No token found. Grabbing a new one"
+        fi
+        get_platform_api_token
+    fi
+    export token
+}
+
+get_platform_api_region() {
+    echo "Instance: $chosen_instance"
+    # check for .txt files in the platform-api-instance-lists directory and 
+    # see if the chosen instance is in one of those files
+    finding_instance=0
+    for instance_list in platform-api-instance-lists/*.txt; do
+        if grep -q "^$chosen_instance$" "$instance_list"; then
+            finding_instance=1
+            # region is the name of the file without path or extension
+            chosen_region=$(basename "$instance_list" | cut -d'.' -f1)
+            break
+        fi
+    done
+    if [[ $finding_instance -eq 0 ]]; then
+        echo "ERROR: Chosen instance ($chosen_instance) not found in any platform-api-instance-lists/*.txt file."
+        exit 1
+    fi
+    echo "Region: $chosen_region"
+    echo
 }
 

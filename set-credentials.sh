@@ -17,6 +17,17 @@ source "_common-framework.sh"
 # reduce the curl tries
 max_tries_override=2
 
+# --------------------------------------------------------------------
+# Functions
+# --------------------------------------------------------------------
+
+usage() {
+    cat <<'USAGE'
+Usage:
+./set_credentials.sh          - set the Keychain Credentials
+USAGE
+}
+
 # ------------------------------------------------------------------------------------
 # 1. Ask for the instance list, show list, ask to apply to one, multiple or all
 # ------------------------------------------------------------------------------------

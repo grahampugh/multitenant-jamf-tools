@@ -1,7 +1,7 @@
 #!/bin/bash
 
 : <<'DOC'
-Script for updating the value of an extension attribute on computers
+Script for updating the value of a text-based extension attribute on computers
 DOC
 
 # source the _common-framework.sh file

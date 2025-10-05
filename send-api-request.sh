@@ -14,6 +14,10 @@ max_tries_override=2
 # set instance list type
 instance_list_type="ios"
 
+# --------------------------------------------------------------------
+# Functions
+# --------------------------------------------------------------------
+
 usage() {
     cat <<'USAGE'
 Usage:
@@ -28,10 +32,16 @@ Usage:
 -x | --nointeraction               - run without checking instance is in an instance list 
 -e | --endpoint ENDPOINT_URL       - perform action on a specific endpoint, e.g. /api/v1/engage
 -r | --request REQUEST_TYPE        - GET/POST/PUT/DELETE
---xml                              - use XML output instead of JSON 
+-s | --sortkey KEY                 - sort key for GET requests to Jamf Pro API
+-f | --filter KEY                  - filter key for GET requests to Jamf Pro API
+-m | --match VALUE                 - match value for filtering GET requests to Jamf Pro API
+--xml                              - use XML output instead of JSON
                                      (only for GET requests to Classic API)
 --data DATA                        - data to send with the request
 -v                                 - add verbose curl output
+
+Note: for the Classic API, filter directly using the endpoint URL, either with /name/ or /id/
+(e.g. /JSSResource/computergroups/name/All%20Computers or /JSSResource/computergroups/id/1)
 USAGE
 }
 
@@ -49,17 +59,33 @@ request() {
     else
         curl_args+=("Content-Type: application/json")
     fi
-    curl_args+=("--header")
     if [[ "$request_type" == "GET" && "$endpoint_url" == *"JSSResource"* && "$xml_output" -eq 1 ]]; then
+        curl_args+=("--header")
         curl_args+=("Accept: application/xml")
+        send_curl_request
+    elif [[ "$request_type" == "GET" && "$endpoint_url" != *"JSSResource"* ]]; then
+        if [[ "$filter_key" ]]; then
+            if [[ ! "$match" ]]; then
+                echo "ERROR: when using --filter, you must also provide a --match"
+                exit 1
+            fi
+            handle_jpapi_get_request "$endpoint_url" filter "$filter_key" "$match"
+        elif [[ "$sort_key" ]]; then
+            handle_jpapi_get_request "$endpoint_url" sort "$sort_key"
+        else
+            handle_jpapi_get_request "$endpoint_url"
+        fi
+        # write combined output to curl output file
+        echo "$combined_output" > "$curl_output_file"
     else
+        curl_args+=("--header")
         curl_args+=("Accept: application/json")
+        if [[ "$data" ]]; then
+            curl_args+=("--data")
+            curl_args+=("$data")
+        fi
+        send_curl_request
     fi
-    if [[ "$data" ]]; then
-        curl_args+=("--data")
-        curl_args+=("$data")
-    fi
-    send_curl_request
     echo "HTTP response: $http_response"
     if [[ "$http_response" -eq 200 ]]; then
         echo "Request successful."
@@ -119,6 +145,18 @@ while [[ "$#" -gt 0 ]]; do
             shift
             endpoint_url="$1"
         ;;
+        -f|--filter)
+            shift
+            filter_key="$1"
+        ;;
+        -s|--sortkey)
+            shift
+            sort_key="$1"
+        ;;
+        -m|--match)
+            shift
+            match="$1"
+        ;;
         -r|--request)
             shift
             request_type="$1"
@@ -159,6 +197,7 @@ if [[ -z "$endpoint_url" ]]; then
     echo "Exiting."
     exit 1
 fi
+
 # check if request_type is set
 if [[ -z "$request_type" ]]; then
     echo "Request type not set, so setting default as GET."
