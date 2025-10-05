@@ -2,7 +2,7 @@
 
 : <<'DOC'
 Script for counting devices on all instances
-Adapted from Anver Husseini (AnyKeyIT) by Graham Pugh
+Adapted from an idea by Anver Husseini (AnyKey IT) by Graham Pugh
 DOC
 
 # source the _common-framework.sh file
