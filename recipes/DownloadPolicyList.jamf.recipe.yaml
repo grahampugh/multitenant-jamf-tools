@@ -1,4 +1,4 @@
-Identifier: multitenant-jamf-tools..jamf.DownloadPolicyList
+Identifier: multitenant-jamf-tools.jamf.DownloadPolicyList
 MinimumVersion: "2.3"
 Input: {}
 
@@ -7,4 +7,4 @@ Process:
     Arguments:
       list_only: True
       object_type: policy
-      output_dir: /Users/Shared/Jamf/JamfUploaderTests
+      output_dir: /Users/Shared/Jamf/JamfUploader

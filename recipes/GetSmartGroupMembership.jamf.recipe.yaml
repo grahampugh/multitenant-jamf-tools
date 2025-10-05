@@ -1,0 +1,21 @@
+Identifier: multitenant-jamf-tools.jamf.GetSmartGroupMembership
+Description: |
+  Designed to work in a wrapper script, using an edited JSON file based on a list_only output from JamfObjectReader.
+  Requires:
+  - SMART_COMPUTER_GROUP_NAME
+MinimumVersion: "2.3"
+Input: {}
+
+Process:
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectReader
+    Arguments:
+      object_name: "%SMART_COMPUTER_GROUP_NAME%"
+      object_type: computer_group
+      output_dir: /Users/Shared/Jamf/JamfUploader
+
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectReader
+    Arguments:
+      object_id: "%object_id%"
+      object_name: "%SMART_COMPUTER_GROUP_NAME%"
+      object_type: smart_computer_group_membership
+      output_dir: /Users/Shared/Jamf/JamfUploader

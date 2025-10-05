@@ -17,18 +17,21 @@ instance_list_type="ios"
 usage() {
     cat <<'USAGE'
 Usage:
-./set_credentials.sh          - set the Keychain credentials
+./set_credentials.sh               - set the Keychain credentials
 
-[no arguments]                - interactive mode
---il FILENAME (without .txt)  - provide an instance list filename
-                                (must exist in the instance-lists folder)
---i JSS_URL                   - perform action on a single instance
-                                (must exist in the relevant instance list)
---all                         - perform action on ALL instances in the instance list
---endpoint ENDPOINT_URL       - perform action on a specific endpoint, e.g. /api/v1/engage
---request REQUEST_TYPE        - GET/POST/PUT/DELETE
---data DATA                   - data to send with the request
--v                            - add verbose curl output
+[no arguments]                     - interactive mode
+--il FILENAME (without .txt)       - provide an instance list filename
+                                    (must exist in the instance-lists folder)
+--i JSS_URL                        - perform action on a single instance
+                                     (must exist in the relevant instance list)
+--all                              - perform action on ALL instances in the instance list
+-x | --nointeraction               - run without checking instance is in an instance list 
+-e | --endpoint ENDPOINT_URL       - perform action on a specific endpoint, e.g. /api/v1/engage
+-r | --request REQUEST_TYPE        - GET/POST/PUT/DELETE
+--xml                              - use XML output instead of JSON 
+                                     (only for GET requests to Classic API)
+--data DATA                        - data to send with the request
+-v                                 - add verbose curl output
 USAGE
 }
 
@@ -47,7 +50,11 @@ request() {
         curl_args+=("Content-Type: application/json")
     fi
     curl_args+=("--header")
-    curl_args+=("Accept: application/json")
+    if [[ "$request_type" == "GET" && "$endpoint_url" == *"JSSResource"* && "$xml_output" -eq 1 ]]; then
+        curl_args+=("Accept: application/xml")
+    else
+        curl_args+=("Accept: application/json")
+    fi
     if [[ "$data" ]]; then
         curl_args+=("--data")
         curl_args+=("$data")
@@ -55,8 +62,27 @@ request() {
     send_curl_request
     echo "HTTP response: $http_response"
     if [[ "$http_response" -eq 200 ]]; then
-        echo "Output:"
-        cat "$curl_output_file"
+        echo "Request successful."
+        # if the output is valid JSON or XML, pretty print it and save it to file
+        if jq -e . >/dev/null 2>&1 <"$curl_output_file"; then
+            echo "Output:"
+            jq . "$curl_output_file"
+            # output pretty JSON to file
+            formatted_output_file="${curl_output_file%.txt}.json"
+            jq . "$curl_output_file" >"$formatted_output_file"
+        elif xmllint --noout "$curl_output_file" >/dev/null 2>&1; then
+            echo "Output:"
+            xmllint --format "$curl_output_file"
+            # output pretty XML to file
+            formatted_output_file="${curl_output_file%.txt}.xml"
+            xmllint --format "$curl_output_file" >"$formatted_output_file"
+        elif [[ -s "$curl_output_file" ]]; then
+            echo "Output:"
+            cat "$curl_output_file"
+        else
+            echo "No output returned."
+        fi
+        echo
     fi
 }
 
@@ -86,6 +112,9 @@ while [[ "$#" -gt 0 ]]; do
         -a|--all)
             all_instances=1
         ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -e|--endpoint)
             shift
             endpoint_url="$1"
@@ -97,6 +126,9 @@ while [[ "$#" -gt 0 ]]; do
         -d|--data)
             shift
             data="$1"
+        ;;
+        --xml)
+            xml_output=1
         ;;
         -v|--verbose)
             verbose=1
@@ -146,6 +178,11 @@ else
     done
 fi
 
-echo 
+echo
+echo "Output saved to $curl_output_file"
+if [[ -f "$formatted_output_file" ]]; then
+    echo "Formatted output saved to $formatted_output_file"
+fi
+echo
 echo "Finished"
 echo

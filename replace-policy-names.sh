@@ -29,13 +29,12 @@
 JSON_FILE="$1"
 
 # source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-mjt_repo_dir=$(mdfind -literal "kMDItemDisplayName == 'multitenant-jamf-tools'" 2>/dev/null)
-if [[ ! -d "$mjt_repo_dir" ]]; then
-    echo "ERROR: multitenant-jamf-tools not found"
+source "_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
     exit 1
 fi
-source "$mjt_repo_dir/_common-framework.sh"
 
 # check if autopkg is installed, otherwise this won't work
 autopkg_binary="/usr/local/bin/autopkg"
@@ -65,7 +64,7 @@ run_autopkg() {
         # Run the autopkg command with the extracted values
         echo OBJECT_ID="$id" 
         echo NEW_NAME="$name"
-        "$autopkg_binary" run -v "$mjt_repo_dir/recipes/ChangePolicyName.jamf.recipe.yaml" \
+        "$autopkg_binary" run -v "$this_script_dir/recipes/ChangePolicyName.jamf.recipe.yaml" \
             --key OBJECT_ID="$id" \
             --key NEW_NAME="$name" \
             --key "JSS_URL=$jss_instance"
