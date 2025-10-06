@@ -50,30 +50,30 @@ request() {
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
     # send request
-    curl_url="$jss_url$endpoint_url"
+    curl_url="$jss_url$endpoint"
     curl_args=("--request")
     curl_args+=("$request_type")
     curl_args+=("--header")
-    if [[ "$endpoint_url" == *"JSSResource"* ]]; then
+    if [[ "$endpoint" == *"JSSResource"* ]]; then
         curl_args+=("Content-Type: application/xml")
     else
         curl_args+=("Content-Type: application/json")
     fi
-    if [[ "$request_type" == "GET" && "$endpoint_url" == *"JSSResource"* && "$xml_output" -eq 1 ]]; then
+    if [[ "$request_type" == "GET" && "$endpoint" == *"JSSResource"* && "$xml_output" -eq 1 ]]; then
         curl_args+=("--header")
         curl_args+=("Accept: application/xml")
         send_curl_request
-    elif [[ "$request_type" == "GET" && "$endpoint_url" != *"JSSResource"* ]]; then
+    elif [[ "$request_type" == "GET" && "$endpoint" != *"JSSResource"* ]]; then
         if [[ "$filter_key" ]]; then
             if [[ ! "$match" ]]; then
-                echo "ERROR: when using --filter, you must also provide a --match"
+                echo "   [request] ERROR: when using --filter, you must also provide a --match"
                 exit 1
             fi
-            handle_jpapi_get_request "$endpoint_url" filter "$filter_key" "$match"
+            handle_jpapi_get_request "$endpoint" filter "$filter_key" "$match"
         elif [[ "$sort_key" ]]; then
-            handle_jpapi_get_request "$endpoint_url" sort "$sort_key"
+            handle_jpapi_get_request "$endpoint" sort "$sort_key"
         else
-            handle_jpapi_get_request "$endpoint_url"
+            handle_jpapi_get_request "$endpoint"
         fi
         # write combined output to curl output file
         echo "$combined_output" > "$curl_output_file"
@@ -86,27 +86,27 @@ request() {
         fi
         send_curl_request
     fi
-    echo "HTTP response: $http_response"
+    echo "   [request] HTTP response: $http_response"
     if [[ "$http_response" -eq 200 ]]; then
-        echo "Request successful."
+        echo "   [request] Request successful."
         # if the output is valid JSON or XML, pretty print it and save it to file
         if jq -e . >/dev/null 2>&1 <"$curl_output_file"; then
-            echo "Output:"
+            echo "   [request] Output:"
             jq . "$curl_output_file"
             # output pretty JSON to file
             formatted_output_file="${curl_output_file%.txt}.json"
             jq . "$curl_output_file" >"$formatted_output_file"
         elif xmllint --noout "$curl_output_file" >/dev/null 2>&1; then
-            echo "Output:"
+            echo "   [request] Output:"
             xmllint --format "$curl_output_file"
             # output pretty XML to file
             formatted_output_file="${curl_output_file%.txt}.xml"
             xmllint --format "$curl_output_file" >"$formatted_output_file"
         elif [[ -s "$curl_output_file" ]]; then
-            echo "Output:"
+            echo "   [request] Output:"
             cat "$curl_output_file"
         else
-            echo "No output returned."
+            echo "   [request] No output returned."
         fi
         echo
     fi
@@ -143,7 +143,7 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         -e|--endpoint)
             shift
-            endpoint_url="$1"
+            endpoint="$1"
         ;;
         -f|--filter)
             shift
@@ -186,42 +186,44 @@ done
 
 echo
 echo "This script will send an API request on the chosen instance(s)."
+echo
 
 # select the instances that will be changed
 choose_destination_instances
 
-# check if endpoint_url is set
-if [[ -z "$endpoint_url" ]]; then
+# check if endpoint is set
+if [[ -z "$endpoint" ]]; then
     echo "Please provide an endpoint URL using the --endpoint option."
     echo "Example: --endpoint /api/v1/engage"
-    echo "Exiting."
+    echo
+    echo "   [main] Exiting."
     exit 1
 fi
 
 # check if request_type is set
 if [[ -z "$request_type" ]]; then
-    echo "Request type not set, so setting default as GET."
+    echo "   [main] Request type not set, so setting default as GET."
     request_type="GET"
 fi
 
 # get specific instance if entered
 if [[ $chosen_instance ]]; then
     jss_instance="$chosen_instance"
-    echo "Sending $request_type request to $jss_instance$endpoint_url..."
+    echo "   [main] Sending $request_type request to $jss_instance$endpoint..."
     request
 else
     for instance in "${instance_choice_array[@]}"; do
         jss_instance="$instance"
-        echo "Sending $request_type request to $jss_instance$endpoint_url..."
+        echo "   [main] Sending $request_type request to $jss_instance$endpoint..."
         request
     done
 fi
 
 echo
-echo "Output saved to $curl_output_file"
+echo "   [main] Output saved to $curl_output_file"
 if [[ -f "$formatted_output_file" ]]; then
-    echo "Formatted output saved to $formatted_output_file"
+    echo "   [main] Formatted output saved to $formatted_output_file"
 fi
 echo
-echo "Finished"
+echo "   [main] Finished"
 echo

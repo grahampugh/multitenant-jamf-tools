@@ -39,21 +39,7 @@ get_platform_api_region
 
 # set the URL based on the chosen region
 if [[ $chosen_region ]]; then
-    case $chosen_region in
-        us)
-            api_base_url="https://us.apigw.jamf.com"
-            ;;
-        eu)
-            api_base_url="https://eu.apigw.jamf.com"
-            ;;
-        apac)
-            api_base_url="https://apac.apigw.jamf.com"
-            ;;
-        *)
-            echo "ERROR: Invalid region specified. Please use one of: us, eu, apac."
-            exit 1
-            ;;
-    esac
+    get_region_url
 else
     echo "ERROR: No region specified. Please provide a region using the --region option."
     exit 1
