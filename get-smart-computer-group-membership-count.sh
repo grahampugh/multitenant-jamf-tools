@@ -7,8 +7,9 @@
 #   SMART_COMPUTER_GROUP_NAME: Name of the smart computer group to check
 # --------------------------------------------------------------------------------
 
-# Define the smart computer group name
-SMART_COMPUTER_GROUP_NAME="$1"
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
 source "_common-framework.sh"
@@ -72,16 +73,57 @@ write_count_to_file() {
 # MAIN
 # --------------------------------------------------------------------------------
 
+# Command line override for the above settings
+while [[ "$#" -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -il|--instance-list)
+            shift
+            chosen_instance_list_file="$1"
+            ;;
+        -i|--instance)
+            shift
+            chosen_instances+=("$1")
+            ;;
+        -a|-ai|--all|--all-instances)
+            all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
+        -v|--verbose)
+            verbose=1
+        ;;
+        -g|--group)
+            shift
+            SMART_COMPUTER_GROUP_NAME="$1"
+            ;;
+        *)
+            usage
+            exit
+        ;;
+    esac
+    # Shift after checking all the cases to get the next option
+    shift
+done
+echo
+
 # ensure that parameter 1 is provided
 if [[ -z "$SMART_COMPUTER_GROUP_NAME" ]]; then
-    echo "Usage: $0 <smart_computer_group_name>"
-    echo "Example: $0 'My Smart Computer Group'"
+    echo "Usage: $0 -g <smart_computer_group_name>"
+    echo "Example: $0 -g 'My Smart Computer Group'"
     exit 1
+fi
+
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
 fi
 
 # select the instances that will be changed
 choose_destination_instances
-chosen_instance_list_file=$(basename "$instance_list_file" | cut -d'.' -f1)
 
 # create the CSV file
 output_csv_file="/Users/Shared/Jamf/JamfUploader/smart_computer_group_membership_counts-$SMART_COMPUTER_GROUP_NAME-$(date +%Y-%m-%d).csv"

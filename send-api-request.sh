@@ -15,7 +15,7 @@ max_tries_override=2
 instance_list_type="ios"
 
 # --------------------------------------------------------------------
-# Functions
+# FUNCTIONS
 # --------------------------------------------------------------------
 
 usage() {
@@ -117,11 +117,9 @@ if [[ ! -d "${this_script_dir}" ]]; then
     exit 1
 fi
 
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -130,14 +128,14 @@ while [[ "$#" -gt 0 ]]; do
         -il|--instance-list)
             shift
             chosen_instance_list_file="$1"
-        ;;
+            ;;
         -i|--instance)
             shift
-            chosen_instance="$1"
-        ;;
-        -a|--all)
+            chosen_instances+=("$1")
+            ;;
+        -a|-ai|--all|--all-instances)
             all_instances=1
-        ;;
+            ;;
         -x|--nointeraction)
             no_interaction=1
             ;;
@@ -180,17 +178,6 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
-
-echo
-echo "This script will send an API request on the chosen instance(s)."
-echo
-
-# select the instances that will be changed
-choose_destination_instances
-
 # check if endpoint is set
 if [[ -z "$endpoint" ]]; then
     echo "Please provide an endpoint URL using the --endpoint option."
@@ -200,30 +187,39 @@ if [[ -z "$endpoint" ]]; then
     exit 1
 fi
 
+echo
+echo "This script will send an API request on the chosen instance."
+echo
+
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
+# select the instances that will be changed
+choose_destination_instances
+
 # check if request_type is set
 if [[ -z "$request_type" ]]; then
     echo "   [main] Request type not set, so setting default as GET."
     request_type="GET"
 fi
 
-# get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
+# perform the request on all chosen instances
+for instance in "${instance_choice_array[@]}"; do
+    jss_instance="$instance"
     echo "   [main] Sending $request_type request to $jss_instance$endpoint..."
     request
-else
-    for instance in "${instance_choice_array[@]}"; do
-        jss_instance="$instance"
-        echo "   [main] Sending $request_type request to $jss_instance$endpoint..."
-        request
-    done
-fi
 
-echo
-echo "   [main] Output saved to $curl_output_file"
-if [[ -f "$formatted_output_file" ]]; then
-    echo "   [main] Formatted output saved to $formatted_output_file"
-fi
+    echo
+    echo "   [main] Output saved to $curl_output_file"
+    if [[ -f "$formatted_output_file" ]]; then
+        echo "   [main] Formatted output saved to $formatted_output_file"
+    fi
+done
+
 echo
 echo "   [main] Finished"
 echo

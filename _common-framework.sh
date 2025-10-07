@@ -1,42 +1,32 @@
 #!/bin/bash
 # shellcheck disable=SC2154
 
-: <<'DOC'
-This script is meant to be sourced in order to supply credentials and a token to Jamf Pro API scripts
+# --------------------------------------------------------------------------------
+# This script is meant to be sourced in order to supply credentials and a token 
+# to Jamf Pro API scripts
+# --------------------------------------------------------------------------------
 
-You should only need lines like this before each send_curl_request:
-
-    # Set the source server
-    set_credentials "${source_instance}"
-    # determine jss_url
-    jss_url="${source_instance}"
-
-    # send request
-    curl_url="$jss_url/JSSResource/SOME-URL"
-    curl_args=("--header")
-    curl_args+=("Accept: application/xml")
-    send_curl_request
-DOC
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
 
 # remove history expansion
 set +H
 
 # Path to here
 this_script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
-
-# variables
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
 
 # temp files for tokens, cookies and headers
 output_location="/tmp/mjt"
 mkdir -p "$output_location"
 
-# token_file="$output_location/jamf_api_token.txt"
-# server_check_file="$output_location/jamf_server_check.txt"
-# user_check_file="$output_location/jamf_user_check.txt"
-
-# cookie_jar="$output_location/jamf_cookie_jar.txt"
-# curl_output_file="$output_location/output.txt"
-# curl_headers_file="$output_location/headers.txt"
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 root_check() {
     # Check that the script is NOT running as root
@@ -602,10 +592,10 @@ get_api_token() {
             echo "   [get_api_token] Token request HTTP response: $http_response"
         fi
         if [[ $http_response -lt 400 ]]; then
-            token=$(jq -r .access_token "$token_file")
+            token=$(jq -r .access_token "$token_file" 2>/dev/null)
         else
-            echo "   [get_api_token] Token download failed"
-            exit 1
+            echo "   [get_api_token] Token download failed for $jss_url"
+            return 1
         fi
     else
         http_response=$(
@@ -621,10 +611,10 @@ get_api_token() {
             echo "   [get_api_token] Token request HTTP response: $http_response"
         fi
         if [[ $http_response -lt 400 ]]; then
-            token=$(jq -r .token "$token_file")
+            token=$(jq -r .token "$token_file" 2>/dev/null)
         else
-            echo "   [get_api_token] Token download failed"
-            exit 1
+            echo "   [get_api_token] Token download failed for $jss_url"
+            return 1
         fi
     fi
 
@@ -681,7 +671,9 @@ check_token() {
                         echo "   [check_token] Token expired or invalid ($expiration_epoch v $current_time_epoch). Grabbing a new one"
                     fi
                     sleep 1
-                    get_api_token
+                    if ! get_api_token; then
+                        return 1
+                    fi
                 fi
             else
                 if jq -e .token "$token_file" >/dev/null; then
@@ -705,7 +697,9 @@ check_token() {
                         echo "   [check_token] Token expired or invalid ($expiration_epoch v $cutoff_epoch). Grabbing a new one"
                     fi
                     sleep 1
-                    get_api_token
+                    if ! get_api_token; then
+                        return 1
+                    fi
                 else
                     human_cutoff_time=$( /bin/date -r "$expiration_epoch" )
                     if [[ $verbose -gt 0 ]]; then
@@ -718,25 +712,33 @@ check_token() {
                 echo "   [check_token] '$user_check' does not match '$jss_api_user'. Grabbing a new token"
             fi
             sleep 1
-            get_api_token
+            if ! get_api_token; then
+                return 1
+            fi
         elif [[ "$user_check" == "$jss_api_user" ]]; then
             if [[ $verbose -gt 0 ]]; then
                 echo "   [check_token] '$server_check' does not match '$jss_url'. Grabbing a new token"
             fi
             sleep 1
-            get_api_token
+            if ! get_api_token; then
+                return 1
+            fi
         else
             if [[ $verbose -gt 0 ]]; then
                 echo "   [check_token] '$user_check' does not match '$jss_api_user', and '$server_check' does not match '$jss_url'. Grabbing a new token."
             fi
             sleep 1
-            get_api_token
+            if ! get_api_token; then
+                return 1
+            fi
         fi
     else
         if [[ $verbose -gt 0 ]]; then
             echo "   [check_token] No token found. Grabbing a new one"
         fi
-            get_api_token
+        if ! get_api_token; then
+            return 1
+        fi
     fi
     export token
 }
@@ -879,11 +881,17 @@ send_curl_request() {
     while [[ $try -le $max_tries ]]; do
         # skip token check for Platform API requests
         if [[ "$api_base_url" == *".apigw.jamf.com" ]]; then
-            echo "   [send_curl_request] Detected Platform API endpoint."
+            if [[ $verbose -gt 0 ]]; then
+                echo "   [send_curl_request] Detected Platform API endpoint."
+            fi
             check_platform_api_token
         else
-            echo "   [send_curl_request] Detected Jamf Pro API endpoint."
-            check_token
+            if [[ $verbose -gt 0 ]]; then
+                echo "   [send_curl_request] Detected Jamf Pro API endpoint."
+            fi
+            if ! check_token; then
+                return 1
+            fi
         fi
         # any additional curl_args must be defined before this request (even if empty). Normally the header and=/or request will be made there
         curl_standard_args+=("--location")
@@ -1520,7 +1528,9 @@ check_if_paginated() {
         curl_url="$api_base_url/$endpoint"
     else
         echo "   [check_if_paginated] Detected Jamf Pro API endpoint."
-        check_token
+        if ! check_token; then
+            return 1
+        fi
         curl_url="$jss_instance/$endpoint"
     fi
 
@@ -1574,7 +1584,7 @@ get_platform_api_token() {
         --write-out "%{http_code}" \
         --output "$token_file"); then
         echo "   [get_platform_api_token] ERROR: Failed to connect to the Platform API."
-        exit 1
+        return 1
     fi
     # extract the token from the response
     if [[ "$http_response" -ne 200 ]]; then
@@ -1584,14 +1594,14 @@ get_platform_api_token() {
             cat "$token_file"
             echo
         fi
-        exit 1
+        return 1
     fi
 
     # check token is valid
     token=$(cat "$token_file" | jq -r '.access_token')
     if [[ "$token" == "null" || -z "$token" ]]; then
         echo "   [get_platform_api_token] ERROR: Failed to retrieve access token. Please check your credentials."
-        exit 1
+        return 1
     fi
     if [[ $verbose -eq 1 ]]; then
         echo "   [get_platform_api_token] Token: $token"

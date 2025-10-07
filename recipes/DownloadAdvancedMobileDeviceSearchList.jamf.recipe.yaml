@@ -1,0 +1,10 @@
+Identifier: multitenant-jamf-tools.jamf.DownloadAdvancedMobileDeviceSearchList
+MinimumVersion: "2.3"
+Input: {}
+
+Process:
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectReader
+    Arguments:
+      list_only: True
+      object_type: advanced_mobile_device_search
+      output_dir: /Users/Shared/Jamf/JamfUploader

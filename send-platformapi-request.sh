@@ -14,8 +14,13 @@ max_tries_override=2
 # set instance list type
 instance_list_type="ios"
 
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "   [main] ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
 # --------------------------------------------------------------------
-# Functions
+# FUNCTIONS
 # --------------------------------------------------------------------
 
 usage() {
@@ -102,15 +107,6 @@ request() {
 # MAIN BODY
 # -------------------------------------------------------------------------
 
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "   [main] ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
-
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
     key="$1"
@@ -118,11 +114,14 @@ while [[ "$#" -gt 0 ]]; do
         -il|--instance-list)
             shift
             chosen_instance_list_file="$1"
-        ;;
+            ;;
         -i|--instance)
             shift
-            chosen_instance="$1"
-        ;;
+            chosen_instances+=("$1")
+            ;;
+        -a|-ai|--all|--all-instances)
+            all_instances=1
+            ;;
         -x|--nointeraction)
             no_interaction=1
             ;;
@@ -175,58 +174,62 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
-
 echo
 echo "This script will send a Platform API request using the chosen region and credentials.
 The credentials must have the correct permissions for the chosen platform and endpoint."
 echo
 
-# get specific instance if entered
-if [[ ! $chosen_instance ]]; then
-    # select the instances that will be changed
-    choose_destination_instances
-    chosen_instance="${instance_choice_array[0]}"
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
 fi
 
-# set the region based on the chosen instance if not already set
+# select the instances that will be changed
+choose_destination_instances
+
+# set the region based on the chosen instances if not already set
 if [[ ! $chosen_region ]]; then
     get_platform_api_region
 fi
 
-# set the URL based on the chosen region
-if [[ $chosen_region ]]; then
-    get_region_url
-else
-    echo "   [main] ERROR: No region specified. Please provide a region using the --region option."
-    exit 1
-fi
+# perform the request on all chosen instances
+for instance in "${instance_choice_array[@]}"; do
 
-# check if endpoint is set
-if [[ -z "$endpoint" ]]; then
-    echo "Please provide an endpoint URL using the --endpoint option."
-    echo "Example: --endpoint /api/v1/engage"
+    # set the URL based on the chosen region
+    if [[ $chosen_region ]]; then
+        get_region_url
+    else
+        echo "   [main] ERROR: No region specified. Please provide a region using the --region option."
+        exit 1
+    fi
+
+    # check if endpoint is set
+    if [[ -z "$endpoint" ]]; then
+        echo "Please provide an endpoint URL using the --endpoint option."
+        echo "Example: --endpoint /api/v1/engage"
+        echo
+        echo "   [main] Exiting."
+        exit 1
+    fi
+
+    # check if request_type is set
+    if [[ -z "$request_type" ]]; then
+        echo "   [main] Request type not set, so setting default as GET."
+        request_type="GET"
+    fi
+
+    echo "   [main] Sending $request_type request to $api_base_url$endpoint..."
+    request
+
     echo
-    echo "   [main] Exiting."
-    exit 1
-fi
+    echo "   [main] Output saved to $curl_output_file"
+    if [[ -f "$formatted_output_file" ]]; then
+        echo "   [main] Formatted output saved to $formatted_output_file"
+    fi
+done
 
-# check if request_type is set
-if [[ -z "$request_type" ]]; then
-    echo "   [main] Request type not set, so setting default as GET."
-    request_type="GET"
-fi
-
-echo "   [main] Sending $request_type request to $api_base_url$endpoint..."
-request
-
-echo
-echo "   [main] Output saved to $curl_output_file"
-if [[ -f "$formatted_output_file" ]]; then
-    echo "   [main] Formatted output saved to $formatted_output_file"
-fi
 echo
 echo "   [main] Finished"
 echo

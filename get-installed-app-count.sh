@@ -1,13 +1,9 @@
 #!/bin/bash
 
-: <<DOC 
-Script for counting applications installed on computers in all instances
-This interrogates the inventory, not smart groups
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+# --------------------------------------------------------------------------------
+# Script for counting applications installed on computers in all instances
+# This interrogates the inventory, not smart groups
+# --------------------------------------------------------------------------------
 
 # set instance list type
 instance_list_type="mac"
@@ -15,9 +11,26 @@ instance_list_type="mac"
 # reduce the curl tries
 max_tries_override=2
 
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
+source "_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
 # prepare working directory
 workdir="/Users/Shared/Jamf/InstallAppsCount"
 mkdir -p "$workdir"
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -58,7 +71,7 @@ do_the_counting() {
 
     # temp dump to file
     working_file="$workdir/${app_name_capitalised} - Working.xml"
-    /usr/bin/xmllint --format "$curl_output_file" > "$working_file"
+    /usr/bin/xmllint --format "$curl_output_file" 2>/dev/null > "$working_file"
 
     # get version information
     if [[ $get_versions ]]; then
@@ -128,22 +141,29 @@ do_the_counting() {
     total_computers=$((total_computers + computers))
 }
 
-if [[ ! -d "$this_script_dir" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
 
-
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
+        -il|--instance-list)
+            shift
+            chosen_instance_list_file="$1"
+            ;;
+        -i|--instance)
+            shift
+            chosen_instances+=("$1")
+            ;;
+        -a|-ai|--all|--all-instances)
+            all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -t|--total)
             total_only="yes"
         ;;
@@ -157,17 +177,6 @@ while [[ "$#" -gt 0 ]]; do
         -o|--output)
             shift
             output_file="$1"
-        ;;
-        -il|--instance-list)
-            shift
-            chosen_instance_list_file="$1"
-        ;;
-        -i|--instance)
-            shift
-            chosen_instance="$1"
-        ;;
-        -a|--all)
-            all_instances=1
         ;;
         -v|--verbose)
             verbose=1
@@ -218,15 +227,24 @@ fi
 mkdir -p "$(dirname "$output_file")"
 echo "" > "$output_file"
 
-# select the instances that will be checked
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    get_versions="yes"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
+# select the instances that will be changed
 choose_destination_instances
 
+# start the count
 (
     echo "Timestamp: $( date )"
     echo "-----------------------------------------------------------"
     echo "Jamf Pro App Count - $app_name_capitalised"
     echo "-----------------------------------------------------------"
-    echo "Context ($instance_list_file)                                         Count"
+    echo "Context                                               Count"
     echo "-----------------------------------------------------------"
 ) > "$output_file"
 
@@ -234,21 +252,15 @@ choose_destination_instances
 summary_versions_counts=()
 
 # get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
-    get_versions="yes"
-    do_the_counting "$app_name" 
-else
-    for instance in "${instances_list[@]}"; do
-        jss_instance="$instance"
-        do_the_counting "$app_name"
-    done
-fi
+for instance in "${instance_choice_array[@]}"; do
+    jss_instance="$instance"
+    do_the_counting "$app_name"
+done
 
-if [[ ! $chosen_instance ]]; then
+if [[ ${#chosen_instances[@]} -gt 1 ]]; then
     (
         echo "-----------------------------------------------------------"
-        printf "Total contexts: %-38s %+4s\n" "${#instances_list[@]}" "$total_computers"
+        printf "%-54s %+4s\n" "Total across all contexts:" "$total_computers"
         echo "-----------------------------------------------------------"
     ) >> "$output_file"
 fi
@@ -289,4 +301,6 @@ cat "$output_file"
 echo
 echo "These results are saved to:"
 echo "   Text format: $output_file"
+echo
+echo "Finished"
 echo

@@ -1,18 +1,26 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for disabling "engage" on all instances
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+# --------------------------------------------------------------------------------
+# Script for disabling "engage" on all instances
+# --------------------------------------------------------------------------------
 
 # reduce the curl tries
 max_tries_override=2
 
 # set instance list type
 instance_list_type="ios"
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
+source "_common-framework.sh"
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -34,7 +42,7 @@ disable_engage() {
     set_credentials "$jss_instance"
     jss_url="$jss_instance"
     # send request
-    curl_url="$jss_url/api/v1/engage"
+    curl_url="$jss_url/api/v2/engage"
     curl_args=("--request")
     curl_args+=("PUT")
     curl_args+=("--header")
@@ -51,11 +59,9 @@ if [[ ! -d "${this_script_dir}" ]]; then
     exit 1
 fi
 
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -64,14 +70,17 @@ while [[ "$#" -gt 0 ]]; do
         -il|--instance-list)
             shift
             chosen_instance_list_file="$1"
-        ;;
+            ;;
         -i|--instance)
             shift
-            chosen_instance="$1"
-        ;;
-        -a|--all)
+            chosen_instances+=("$1")
+            ;;
+        -a|-ai|--all|--all-instances)
             all_instances=1
-        ;;
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -v|--verbose)
             verbose=1
         ;;
@@ -84,28 +93,27 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
+# Ask for the instance list, show list, ask to apply to one, multiple or all
 
 echo
 echo "This script will disable Engage on the chosen instance(s)."
 
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
 # select the instances that will be changed
 choose_destination_instances
 
-# get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
+# loop through the chosen instances and disable engage
+for instance in "${instance_choice_array[@]}"; do
+    jss_instance="$instance"
     echo "Disabling engage on $jss_instance..."
     disable_engage
-else
-    for instance in "${instance_choice_array[@]}"; do
-        jss_instance="$instance"
-        echo "Disabling engage on $jss_instance..."
-        disable_engage
-    done
-fi
+done
 
 echo 
 echo "Finished"

@@ -1,13 +1,24 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for doing a healthcheck on all instances
-by Graham Pugh
-DOC
+# --------------------------------------------------------------------------------
+# Script for doing a healthcheck on all instances
+# --------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
 source "_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -42,16 +53,28 @@ if [[ ! -d "${this_script_dir}" ]]; then
 fi
 
 
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
+        -il|--instance-list)
+            shift
+            chosen_instance_list_file="$1"
+            ;;
+        -i|--instance)
+            shift
+            chosen_instances+=("$1")
+            ;;
+        -a|-ai|--all|--all-instances)
+            all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -c|--csv)
             shift
             output_csv="$1"
@@ -59,17 +82,6 @@ while [[ "$#" -gt 0 ]]; do
         -o|--output)
             shift
             output_file="$1"
-        ;;
-        -il|--instance-list)
-            shift
-            chosen_instance_list_file="$1"
-        ;;
-        -i|--instance)
-            shift
-            chosen_instance="$1"
-        ;;
-        -a|--all)
-            all_instances=1
         ;;
         -v|--verbose)
             verbose=1
@@ -102,7 +114,14 @@ echo "" > "$output_file"
 mkdir -p "$(dirname "$output_csv")"
 echo "" > "$output_csv"
 
-# select the instances that will be checked
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
+# select the instances that will be changed
 choose_destination_instances
 
 # heading for csv
@@ -167,4 +186,6 @@ echo
 echo "These results are saved to:"
 echo "   Text format: $output_file"
 echo "   CSV format:  $output_csv"
+echo
+echo "Finished"
 echo

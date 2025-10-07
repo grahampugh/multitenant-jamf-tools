@@ -1,12 +1,26 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for addin Fileshare Distribution Point credentials on multiple instances.
-DOC
+# --------------------------------------------------------------------------------
+# A script for adding Fileshare Distribution Point credentials on multiple instances.
+# --------------------------------------------------------------------------------
 
-# source the _common-framework.sh file
-# shellcheck source-path=SCRIPTDIR source=_common-framework.sh
-source "_common-framework.sh"
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source _common-framework.sh file
+# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -22,16 +36,9 @@ NOTE: LDAP server is obtained automatically from the instance (must be configure
 USAGE
 }
 
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
-
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do

@@ -1,19 +1,52 @@
 #!/bin/bash
 
-: <<DOC
-A wrapper script for running the jamf_api_tool.py script
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+# --------------------------------------------------------------------------------
+# A wrapper script for running the jamf_api_tool.py script
+#
+# Requirements:
+# - Python 3 - AutoPkg installation recommended as this includes a python3 distribution(
+#   required for other tools in the suite)
+# - jamf-api-tool.py - the main script for interacting with the Jamf API
+# 
+# To obtain jamf-api-tool.py, clone or download the repository from:
+# https://github.com/grahampugh/jamf-api-tool
+# 
+# USAGE:
+# This script can be run with no parameters to enter interactive mode, or
+# with parameters to run in non-interactive mode.
+# 
+# See --help for command line options
+# --------------------------------------------------------------------------------
 
 # set instance list type
 instance_list_type="mac"
 
-###########
-## USAGE ##
-###########
+# path to the jamf-api-tool repo
+tool_directory="../jamf-api-tool"
+tool="jamf_api_tool.py"
+
+# paths to preference files
+tmp_prefs="${HOME}/Library/Preferences/jamf-api-tool.plist"
+autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
+
+# output directory
+output_dir="/Users/Shared/Jamf/Jamf-API-Tool"
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+source "_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     echo "
@@ -42,10 +75,6 @@ Usage:
 
 "
 }
-
-###############
-## FUNCTIONS ##
-###############
 
 run_api_tool(){
     instance_args=()
@@ -128,36 +157,28 @@ confirm() {
     fi
 }
 
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
-##############
-## DEFAULTS ##
-##############
-
-# source the _common-framework.sh file
-# this folder
-tool_directory="../jamf-api-tool"
-tool="jamf_api_tool.py"
-tmp_prefs="${HOME}/Library/Preferences/jamf-api-tool.plist"
-autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
-output_dir="/Users/Shared/Jamf/Jamf-API-Tool"
-
-
-###############
-## ARGUMENTS ##
-###############
-
+# get command line args
 args=()
-
 while test $# -gt 0 ; do
     case "$1" in
         -il|--instance-list)
             shift
             chosen_instance_list_file="$1"
-        ;;
+            ;;
         -i|--instance)
             shift
-            chosen_instance="$1"
-        ;;
+            chosen_instances+=("$1")
+            ;;
+        -ai|--all-instances)
+            all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -s|--share)
             shift
             smb_share="$1"
@@ -557,6 +578,13 @@ fi
 # Ask for the instance list, show list, ask to apply to one, multiple or all
 # ------------------------------------------------------------------------------------
 
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
 # select the instances that will be changed
 choose_destination_instances
 
@@ -569,9 +597,9 @@ if get_slack_webhook "$instance_list_file"; then
     fi
 fi
 
-# get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
+# loop through the chosen instances and run the jamf-api-tool.py script
+for instance in "${instance_choice_array[@]}"; do
+    jss_instance="$instance"
     # confirm if --delete in the args
     if [[ "${args[*]}" == *"--delete"* ]]; then
         confirm
@@ -579,18 +607,7 @@ if [[ $chosen_instance ]]; then
     set_credentials "$jss_instance"
     echo "Running jamf-api-tool.py ${args[*]} on $jss_instance..."
     run_api_tool
-else
-    for instance in "${instance_choice_array[@]}"; do
-        jss_instance="$instance"
-        # confirm if --delete in the args
-        if [[ "${args[*]}" == *"--delete"* ]]; then
-            confirm
-        fi
-        set_credentials "$jss_instance"
-        echo "Running jamf-api-tool.py ${args[*]} on $jss_instance..."
-        run_api_tool
-    done
-fi
+done
 
 echo 
 echo "Finished"

@@ -7,10 +7,7 @@
 # ./replace-policy-name.sh "Old Policy Name" "New Policy Name"
 # --------------------------------------------------------------------------------
 
-# Define the policy name
-POLICY_NAME_TO_REPLACE="$1"
-REPLACEMENT_NAME="$2"
-
+# get the common framework functions
 source "_common-framework.sh"
 
 if [[ ! -d "$this_script_dir" ]]; then
@@ -63,12 +60,51 @@ run_autopkg() {
         --key OBJECT_ID="$id" \
         --key NEW_NAME="$REPLACEMENT_NAME" \
         --replace \
-        -v
+        "$verbosity_mode"
 }
 
 # --------------------------------------------------------------------------------
 # MAIN
 # --------------------------------------------------------------------------------
+
+# Command line override for the above settings
+chosen_instances=()
+while [[ "$#" -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -il|--instance-list)
+            shift
+            chosen_instance_list_file="$1"
+            ;;
+        -i|--instance)
+            shift
+            chosen_instances+=("$1")
+            ;;
+        -a|-ai|--all|--all-instances)
+            all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
+        -v*)
+            verbosity_mode="$1"
+            ;;
+        -h|--help)
+            usage
+            exit
+            ;;
+        -o|--old-name)
+            shift
+            POLICY_NAME_TO_REPLACE="$1"
+            ;;
+        -n|--new-name)
+            shift
+            REPLACEMENT_NAME="$1"
+            ;;
+    esac
+    # Shift after checking all the cases to get the next option
+    shift
+done
 
 # ensure that parameters 1 and 2 are provided
 if [[ -z "$POLICY_NAME_TO_REPLACE" || -z "$REPLACEMENT_NAME" ]]; then
@@ -79,7 +115,13 @@ fi
 
 # select the instances that will be changed
 choose_destination_instances
-chosen_instance_list_file=$(basename "$instance_list_file" | cut -d'.' -f1)
+
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
 
 # run on all chosen instances
 for instance in "${instance_choice_array[@]}"; do
