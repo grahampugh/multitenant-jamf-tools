@@ -1,13 +1,8 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for opening the JSS web console in a browser
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-DIR=$(dirname "$0")
-source "$DIR/_common-framework.sh"
+# --------------------------------------------------------------------------------
+# Script for opening the JSS web console in a browser
+# --------------------------------------------------------------------------------
 
 # set instance list type
 instance_list_type="ios"
@@ -17,6 +12,22 @@ strip_failover="no"
 
 # get current user
 current_user=$(/usr/sbin/scutil <<< "show State:/Users/ConsoleUser" | /usr/bin/awk -F': ' '/[[:space:]]+Name[[:space:]]:/ { if ( $2 != "loginwindow" ) { print $2 }}')
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+source "_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -79,7 +90,32 @@ list_browsers() {
     fi
 }
 
+get_failover_address() {
+    # get the failover address for a given instance
+    # $1: jss_instance
+    local instance
+    instance="$1"
+    echo "   [get_failover_address] Getting failover address for $instance..."
+    # determine jss_url
+    set_credentials "$instance"
+    jss_url="$instance"
+    curl_url="$jss_url/api/v1/sso/failover"
+    curl_args=("--header")
+    curl_args+=("Accept: application/json")
+    curl_args=("--request")
+    curl_args+=("GET")
+    send_curl_request
+    failover_address=$(cat "$curl_output_file" | jq -r '.failoverUrl')
+    if [[ "$failover_address" == "null" ]] || [[ -z "$failover_address" ]]; then
+        failover_address=""
+    fi
+    export failover_address
+}
+
 open_jss() {
+    local jss_instance
+    jss_instance="$1"
+    # open the JSS in the selected browser
     echo  # weirdly, Safari crashes without this line
     sleep 0.1
     open -a "$browser_selected" "$jss_instance"
@@ -90,13 +126,11 @@ if [[ ! -d "${this_script_dir}" ]]; then
     exit 1
 fi
 
-## MAIN BODY
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
-
-# Command line override for the above settings
+# Get command line args
 chosen_instances=()
 while [[ "$#" -gt 0 ]]; do
     key="$1"
@@ -115,6 +149,9 @@ while [[ "$#" -gt 0 ]]; do
         -v|--verbose)
             verbose=1
         ;;
+        -f|--failover)
+            failover=1
+        ;;
         -a|--application)
             select_browser=1
         ;;
@@ -128,15 +165,12 @@ while [[ "$#" -gt 0 ]]; do
 done
 echo
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
-
+# Ask for the instance list, show list, ask to apply to one, multiple or all
 if [[ ${#chosen_instances[@]} -eq 1 ]]; then
     chosen_instance="${chosen_instances[0]}"
-    echo "Running on instance: $chosen_instance"
+    echo "   [main] Running on instance: $chosen_instance"
 elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
-    echo "Running on instances: ${chosen_instances[*]}"
+    echo "   [main] Running on instances: ${chosen_instances[*]}"
 fi
 
 # select the instances that will be changed
@@ -147,9 +181,26 @@ list_browsers
 
 # open each selected instance in the selected browser
 for instance in "${instance_choice_array[@]}"; do
-    jss_instance="$instance"
-    echo "Opening $jss_instance in $browser_selected..."
-    open_jss
+    # check if the URL already includes a failover address
+    if [[ "$instance" == *"?failover="* ]]; then
+        if [[ $verbose -gt 0 ]]; then
+            echo "   [main] Instance $instance already includes a failover address."
+        fi
+        jss_instance="$instance"
+    elif [[ $failover ]]; then
+        get_failover_address "$instance"
+        if [[ "$failover_address" ]]; then
+            echo "   [main] Using failover address $failover_address for $instance"
+            jss_instance="$failover_address"
+        else
+            echo "   [main] No failover address set for $instance, using primary address"
+            jss_instance="$instance"
+        fi
+    else
+        jss_instance="$instance"
+    fi
+    echo "   [main] Opening $jss_instance in $browser_selected..."
+    open_jss "$jss_instance"
 done
 
 echo 

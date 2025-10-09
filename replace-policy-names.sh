@@ -22,11 +22,12 @@
 #   "id" and "name" fields.
 
 # EXAMPLE:
-# ./replace-policy-names.sh /path/to/policies.json
+# ./replace-policy-names.sh -f /path/to/policies.json
 # --------------------------------------------------------------------------------
 
-# Define the JSON file path
-JSON_FILE="$1"
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
 source "_common-framework.sh"
@@ -38,6 +39,10 @@ fi
 
 # check if autopkg is installed, otherwise this won't work
 autopkg_binary="/usr/local/bin/autopkg"
+if [[ ! -x "$autopkg_binary" ]]; then
+    echo "ERROR: AutoPkg not found at $autopkg_binary. Aborting."
+    exit 1
+fi
 
 # --------------------------------------------------------------------------------
 # FUNCTIONS

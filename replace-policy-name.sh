@@ -4,7 +4,11 @@
 # Script for changing a specific policy name across multiple instances
 #
 # USAGE:
-# ./replace-policy-name.sh "Old Policy Name" "New Policy Name"
+# ./replace-policy-name.sh -o "Old Policy Name" -n "New Policy Name"
+# --------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
 # --------------------------------------------------------------------------------
 
 # get the common framework functions

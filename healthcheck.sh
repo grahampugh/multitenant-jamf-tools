@@ -52,12 +52,11 @@ if [[ ! -d "${this_script_dir}" ]]; then
     exit 1
 fi
 
-
 # --------------------------------------------------------------------------------
 # MAIN
 # --------------------------------------------------------------------------------
 
-# Command line override for the above settings
+# Get command line args
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in

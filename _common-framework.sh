@@ -556,6 +556,10 @@ set_credentials() {
     if [[ ! $jss_api_user ]]; then
         echo "No keychain entry for $jss_url found. Please run the set_credentials.sh script to add the user to your keychain"
         exit 1
+    else
+        if [[ $verbose -gt 0 ]]; then
+            echo "   [set_credentials] Found user $jss_api_user for $jss_url"
+        fi
     fi
 
     # check for password entry in login keychain
@@ -565,6 +569,10 @@ set_credentials() {
     if [[ ! $jss_api_password ]]; then
         echo "No password/Client ID for $jss_api_user found. Please run the set_credentials.sh script to add the password/Client ID to your keychain"
         exit 1
+    else
+        if [[ $verbose -gt 0 ]]; then
+            echo "   [set_credentials] Found password/Client ID for $jss_api_user"
+        fi
     fi
 
     # encode the credentials so we are not sending in plain text
