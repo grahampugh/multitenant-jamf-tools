@@ -1,22 +1,50 @@
 #!/bin/bash
 
-: <<DOC 
-Script for counting computers that have not checked in
-DOC
+# --------------------------------------------------------------------------------
+# A script to count the number of computers that have not checked in for a 
+# specified number of days.
 
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+# NOTE: This script requires the following Smart Groups to exist on each 
+# server checked:
 
-# reduce the curl tries
+#    - "Computer not checked in for DAYS days"
+
+# Where DAYS is the entered value of DAYS (e.g. 90)
+
+# A Computer Group Template is provided for this purpose in the templates folder. 
+# The group can be created in all required instances with the following 
+# jamfuploader-run.sh command (assuming 7 days):
+
+# ./jamfuploader-run.sh computergroup --template templates/SmartGroup-LastCheckIn.xml --name "Computer Not Checked in for %DAYS_AGO% Days" --key DAYS_AGO=7
+
+# --------------------------------------------------------------------------------
+
+# set the maximum number of the curl requests to try until success
 max_tries_override=2
 
 # set instance list type
 instance_list_type="mac"
 
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
+source "_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
 # prepare working directory
 workdir="/Users/Shared/Jamf/ComputersNotCheckedIn"
 mkdir -p "$workdir"
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -30,7 +58,9 @@ NOTE: This script requires the following Smart Groups to exist on each server ch
 
 Where DAYS is the entered value of DAYS (e.g. 90)
 
-A Computer Group Template is provided for this in the templates folder. The group can be created in all required instances with the following jamfuploader-run.sh command (assuming 7 days):
+A Computer Group Template is provided for this purpose in the templates folder. 
+The group can be created in all required instances with the following 
+jamfuploader-run.sh command (assuming 7 days):
 
 ./jamfuploader-run.sh computergroup --template templates/SmartGroup-LastCheckIn.xml --name "Computer Not Checked in for %DAYS_AGO% Days" --key DAYS_AGO=7
 
@@ -81,17 +111,9 @@ do_the_counting() {
     total_computers=$((total_computers + computers))
 }
 
-if [[ ! -d "$this_script_dir" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
-
-
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -161,7 +183,6 @@ echo "" > "$output_file"
 choose_destination_instances
 
 echo
-
 (
     echo "Timestamp: $( date )"
     echo "-----------------------------------------------------------"

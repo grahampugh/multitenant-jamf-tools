@@ -1,9 +1,20 @@
 #!/bin/bash
 
-# A script to check which policies, configuration profiles, restricted software, Mac App Store apps and eBooks are scoped to a specific computer group
+# --------------------------------------------------------------------------------
+# A script to check which policies, configuration profiles, restricted software, 
+# Mac App Store apps and eBooks are scoped to a specific computer group
+# 
+# Note that Jamf Pro now provides a built-in report for this, so this script 
+# may no longer be needed.
+#
+# NOTE: This script will not check scope of Blueprints, Compliance Benchmarks, 
+# or App Installers
+#
+# USAGE:
+# ./scoped-computergroups.sh -g "Group Name" [other options]
+# --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
 source "_common-framework.sh"
 
 # reduce the curl tries
@@ -21,8 +32,9 @@ fi
 workdir="/Users/Shared/Jamf/ScopedComputerGroups"
 mkdir -p "$workdir"
 
-
-## MAIN BODY
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -44,48 +56,7 @@ Note that Jamf Pro now provides a built-in report for this, so this script may n
 USAGE
 }
 
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
-
-# Command line override for the above settings
-while [[ "$#" -gt 0 ]]; do
-    key="$1"
-    case $key in
-        -il|--instance-list)
-            shift
-            chosen_instance_list_file="$1"
-        ;;
-        -i|--instance)
-            shift
-            chosen_instance="$1"
-        ;;
-        -a|--all)
-            all_instances=1
-        ;;
-        -g|--group)
-            shift
-            group_name="$1"
-        ;;
-        -v|--verbose)
-            verbose=1
-        ;;
-        -h|--help)
-            usage
-            exit
-        ;;
-    esac
-    # Shift after checking all the cases to get the next option
-    shift
-done
-echo
-
-
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-# FUNCTIONS
-# # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # # #
-
-prepareOutputFile() {
+prepare_output_file() {
     # prepare the output file
     jss_shortname=$( echo "$jss_instance" | sed 's|https://||' | sed 's|http://||' | sed 's|/$||' )
     output_file="$workdir/$jss_shortname-$group_name.txt"
@@ -101,7 +72,7 @@ prepareOutputFile() {
     ) > "$output_file"
 }
 
-printScopedObjects() {
+print_scoped_objects() {
     # print the scoped objects
     for obj in "${scoped_objects[@]}"; do
         printf "%-22s %s\n" "$object_printname" "$obj" >> "$output_file"
@@ -109,8 +80,7 @@ printScopedObjects() {
     echo
 }
 
-
-findScopedObjects() {
+find_scoped_objects() {
     # find scoped objects of a specific type
     # $1: Object Type (Policy, Configuration Profile, Restricted Software, Mac App Store App, eBook)
     # $2: xpath/XML Tree - Top Level Only (policy, os_x_configuration_profile, restricted_software, mac_application, ebook)
@@ -194,53 +164,84 @@ findScopedObjects() {
         done <<< "${group_names}"
     done <<< "${object_ids[@]}"
 
-    printScopedObjects
+    print_scoped_objects
 
+    if [[ ${#scoped_objects[@]} -eq 0 ]]; then
+        echo "No $object_printname objects found scoped to '$group_name'." >> "$output_file"
+        echo
+    fi
 }
 
-# ------------------------------------------------------------------------------------
-# 1. Ensure that a group name is provided
-# ------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
+# Command line override for the above settings
+while [[ "$#" -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -il|--instance-list)
+            shift
+            chosen_instance_list_file="$1"
+            ;;
+        -i|--instance)
+            shift
+            chosen_instances+=("$1")
+            ;;
+        -a|-ai|--all|--all-instances)
+            all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
+        -g|--group)
+            shift
+            group_name="$1"
+        ;;
+        -v|--verbose)
+            verbose=1
+        ;;
+        -h|--help)
+            usage
+            exit
+        ;;
+    esac
+    # Shift after checking all the cases to get the next option
+    shift
+done
+echo
+
+# Ensure that a group name is provided
 if [[ -z "$group_name" ]]; then
     echo "ERROR: No group name provided. Use the -g or --group option to specify a group name."
     usage
     exit 1
 fi
 
-# ------------------------------------------------------------------------------------
-# 2. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
 
 # select the instances that will be changed
 choose_destination_instances
 
-# get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
-    prepareOutputFile
+# run on all chosen instances
+for instance in "${instance_choice_array[@]}"; do
+    jss_instance="$instance"
+    prepare_output_file
     echo "Looking for scope of $group_name on $jss_instance..."
     ## Check Policies, Configuration Profiles, Restircted Software and Mac App Store Apps
-    findScopedObjects "Policy" "policy" "$group_name"
-    findScopedObjects "Configuration Profile" "os_x_configuration_profile" "$group_name"
-    findScopedObjects "Restricted Software" "restricted_software" "$group_name"
-    findScopedObjects "Mac App Store App" "mac_application" "$group_name"
-else
-    for instance in "${instance_choice_array[@]}"; do
-        jss_instance="$instance"
-        prepareOutputFile
-        echo "Looking for scope of $group_name on $jss_instance..."
-        ## Check Policies, Configuration Profiles, Restircted Software and Mac App Store Apps
-        findScopedObjects "Policy" "policy" "$group_name"
-        findScopedObjects "Configuration Profile" "os_x_configuration_profile" "$group_name"
-        findScopedObjects "Restricted Software" "restricted_software" "$group_name"
-        findScopedObjects "Mac App Store App" "mac_application" "$group_name"
-    done
-fi
+    find_scoped_objects "Policy" "policy" "$group_name"
+    find_scoped_objects "Configuration Profile" "os_x_configuration_profile" "$group_name"
+    find_scoped_objects "Restricted Software" "restricted_software" "$group_name"
+    find_scoped_objects "Mac App Store App" "mac_application" "$group_name"
+done
 
-    echo "-------------------------------------------------------------------------------" > "$output_file"
+echo "-------------------------------------------------------------------------------" > "$output_file"
 
-
-echo 
+echo
 echo "Finished"
 echo

@@ -11,7 +11,7 @@ password, and activation code.
 It also includes error handling and logging for better debugging and user feedback.
 
 Note: This script is designed to be run in a Python 3 environment.
-It requires the requests library.
+It also requires the requests library.
 It can be installed using pip:
 
 pip install requests
@@ -169,18 +169,20 @@ def generate_secure_password() -> str:
     password = [
         secrets.choice(lowercase),  # at least one lowercase
         secrets.choice(uppercase),  # at least one uppercase
-        secrets.choice(digits),     # at least one number
-        secrets.choice(symbols),    # at least one symbol
+        secrets.choice(digits),  # at least one number
+        secrets.choice(symbols),  # at least one symbol
     ]
 
     # Fill the rest of the password
     all_chars = lowercase + uppercase + digits + symbols
-    password.extend(secrets.choice(all_chars) for _ in range(60))  # 64 - 4 = 60 remaining chars
+    password.extend(
+        secrets.choice(all_chars) for _ in range(60)
+    )  # 64 - 4 = 60 remaining chars
 
     # Shuffle the password to avoid predictable character positions
     secrets.SystemRandom().shuffle(password)
 
-    return ''.join(password)
+    return "".join(password)
 
 
 def parse_arguments() -> argparse.Namespace:
@@ -213,7 +215,10 @@ Example usage:
     )
 
     parser.add_argument(
-        "-p", "--password", required=False, help="Admin password for initialization, random if not provided"
+        "-p",
+        "--password",
+        required=False,
+        help="Admin password for initialization, random if not provided",
     )
 
     parser.add_argument(

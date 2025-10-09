@@ -1,0 +1,23 @@
+Identifier: multitenant-jamf-tools.jamf.ChangeAdvancedComputerSearchName
+Comment: |
+  Designed to work in a wrapper script, using an edited JSON file based on a list_only output from JamfObjectReader.
+  Requires:
+  - OBJECT_ID
+  - NEW_NAME
+MinimumVersion: "2.3"
+Input: {}
+
+Process:
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectReader
+    Arguments:
+      object_id: "%OBJECT_ID%"
+      object_type: advanced_computer_search
+      output_dir: /Users/Shared/Jamf/JamfUploader
+
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectUploader
+    Arguments:
+      object_id: "%OBJECT_ID%"
+      object_name: "%NEW_NAME%"
+      object_type: advanced_computer_search
+      object_template: "%output_path%"
+      replace_object: True

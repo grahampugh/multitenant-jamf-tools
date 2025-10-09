@@ -1,16 +1,29 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for creating or updating an LDAP group on all instances.
-Requires a template XML file
-DOC
+# --------------------------------------------------------------------------------
+# Script for creating or updating an LDAP group on all instances.
+# Requires a template XML file
+# --------------------------------------------------------------------------------
+
+# set instance list type
+instance_list_type="ios"
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
 source "_common-framework.sh"
 
-# set instance list type
-instance_list_type="ios"
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -101,21 +114,28 @@ upload_data() {
     send_slack_notification "$slack_text"
 }
 
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
-
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
+        -il|--instance-list)
+            shift
+            chosen_instance_list_file="$1"
+            ;;
+        -i|--instance)
+            shift
+            chosen_instances+=("$1")
+            ;;
+        -a|-ai|--all|--all-instances)
+            all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -u|--user)
             shift
             chosen_user="$1"
@@ -127,17 +147,6 @@ while [[ "$#" -gt 0 ]]; do
         -t|--template)
             shift
             template="$1"
-        ;;
-        -il|--instance-list)
-            shift
-            chosen_instance_list_file="$1"
-        ;;
-        -i|--instance)
-            shift
-            chosen_instance="$1"
-        ;;
-        -a|--all)
-            all_instances=1
         ;;
         -v|--verbose)
             verbose=1
@@ -154,6 +163,13 @@ echo
 
 # get template
 choose_template_file
+
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
 
 # select the instances that will be changed
 choose_destination_instances

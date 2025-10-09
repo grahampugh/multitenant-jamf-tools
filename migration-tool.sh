@@ -1,5 +1,6 @@
 #!/bin/bash
 
+# --------------------------------------------------------------------------------
 # JAMF MIGRATION TOOL
 # A script to either save JSS config via api to XML and/or upload parsed XML to a JSS.
 #
@@ -12,29 +13,10 @@
 # Adapted for new purposes by Graham Pugh @ ETH Zurich.
 # 
 # Adapted again for integration in the multitenant-jamf-tools repo by Graham Pugh @ JAMF.
-# NOTE: unlike some of the other multitenant-jamf-tools, this script can only apply changes to one destination instance per run.
+# NOTE: unlike some of the other multitenant-jamf-tools, this script can only
+# apply changes to one destination instance per run.
+# --------------------------------------------------------------------------------
 
-# -------------------------------------------------------------------------
-# Source the file for obtaining the token and setting the server
-# -------------------------------------------------------------------------
-
-# source the _common-framework.sh file
-# shellcheck source-path=SCRIPTDIR source=_common-framework.sh
-source "_common-framework.sh"
-
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-else
-    echo
-    echo "   [main] Script running from ${this_script_dir}"
-fi
-
-# -------------------------------------------------------------------------
-# Set variables
-# -------------------------------------------------------------------------
-
-# Other fixed variables
 xmlloc_default="/Users/Shared/Jamf/Migration-Tool-Archive"
 log_file="$HOME/Library/Logs/JAMF/migration-tool.log"
 git_branch="tst-template"
@@ -43,9 +25,17 @@ icons_folder="$xmlloc_default/icons"
 # reduce the curl tries
 max_tries_override=2
 
-# -------------------------------------------------------------------------
-# Declare the API endpoints that will be used in read/wipe/write
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+source "_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
 
 # This script relies on the following files, which contain a list of all the API endpoints.
 # Each endpoint can be commented in or out, depending on what you wish to copy.
@@ -59,7 +49,7 @@ writelimitedfile="${templates_folder}/write_limited.txt"
 writeiosfile="${templates_folder}/write_ios.txt"
 
 # -------------------------------------------------------------------------
-# Functions
+# FUNCTIONS
 # -------------------------------------------------------------------------
 
 check_xml_folder() {
@@ -975,11 +965,7 @@ put_on_new_jss() {
 }
 
 main_menu() {
-    # -------------------------------------------------------------------------
     # Configure Logging
-    # -------------------------------------------------------------------------
-
-    # Logging
     log_file="$HOME/Library/Logs/JAMF/jamf-migration-tool.log"
     if [[ ! -f "$log_file" ]]; then
         mkdir -p "$( dirname "$log_file" )"
@@ -991,10 +977,7 @@ main_menu() {
     mkdir -p "$icons_folder"
 
 
-    # -------------------------------------------------------------------------
     # Set the source and destination server(s) and instance(s)
-    # -------------------------------------------------------------------------
-
     # These are the endpoints we're going to read
     readfiles=()
     while read -r line; do

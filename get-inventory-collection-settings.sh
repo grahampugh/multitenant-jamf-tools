@@ -1,18 +1,31 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for reading Inventory Collection Settings on all instances
-DOC
+# --------------------------------------------------------------------------------
+# Script for reading Inventory Collection Settings on all instances
+# --------------------------------------------------------------------------------
+
+# set instance list type
+instance_list_type="ios"
+
+# set the curl tries
+max_tries_override=2
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
 # TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
 source "_common-framework.sh"
 
-# set instance list type
-instance_list_type="ios"
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
 
-# reduce the curl tries
-max_tries_override=2
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
 
@@ -46,16 +59,10 @@ get_inventory_collection() {
     send_curl_request
 }
 
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
 
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -64,14 +71,17 @@ while [[ "$#" -gt 0 ]]; do
         -il|--instance-list)
             shift
             chosen_instance_list_file="$1"
-        ;;
+            ;;
         -i|--instance)
             shift
-            chosen_instance="$1"
-        ;;
-        -a|--all)
+            chosen_instances+=("$1")
+            ;;
+        -a|-ai|--all|--all-instances)
             all_instances=1
-        ;;
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -v|--verbose)
             verbose=1
         ;;
@@ -87,10 +97,10 @@ echo
 
 # set default output file
 if [[ ! $output_file ]]; then
-    output_file="/tmp/inventory-collection-settings.txt"
+    output_file="/Users/Shared/Jamf/MJT/inventory-collection-settings.txt"
 fi
 if [[ ! $csv ]]; then
-    output_csv="/tmp/inventory-collection-settings.csv"
+    output_csv="/Users/Shared/Jamf/MJT/inventory-collection-settings.csv"
 fi
 
 # ensure the directories can be written to, and empty the files
@@ -98,6 +108,13 @@ mkdir -p "$(dirname "$output_file")"
 echo "" > "$output_file"
 mkdir -p "$(dirname "$output_csv")"
 echo "" > "$output_csv"
+
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
 
 # select the instances that will be changed
 choose_destination_instances
@@ -140,7 +157,6 @@ for instance in "${instance_choice_array[@]}"; do
     printf "%-65s %+8s\n" \
     "$instance" "$includeSoftwareUpdates" >> "$output_file"
 done
-
 
 # end for text file
 (

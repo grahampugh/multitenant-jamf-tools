@@ -14,6 +14,11 @@ max_tries_override=2
 # set instance list type
 instance_list_type="ios"
 
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "   [main] ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
 # --------------------------------------------------------------------
 # FUNCTIONS
 # --------------------------------------------------------------------
@@ -24,60 +29,52 @@ Usage:
 ./set_credentials.sh               - set the Keychain credentials
 
 [no arguments]                     - interactive mode
---il FILENAME (without .txt)       - provide an instance list filename
-                                    (must exist in the instance-lists folder)
---i JSS_URL                        - perform action on a single instance
-                                     (must exist in the relevant instance list)
---all                              - perform action on ALL instances in the instance list
--x | --nointeraction               - run without checking instance is in an instance list 
+--region REGION                    - Platform API region (one of US, EU, APAC)
+--id ID                            - Platform API ID
+--secret SECRET                    - Platform API Secret
 -e | --endpoint ENDPOINT_URL       - perform action on a specific endpoint, e.g. /api/v1/engage
--r | --request REQUEST_TYPE        - GET/POST/PUT/DELETE
+-r | --request REQUEST_TYPE        - GET/POST/PUT/PATCH/DELETE
 -s | --sortkey KEY                 - sort key for GET requests to Jamf Pro API
 -f | --filter KEY                  - filter key for GET requests to Jamf Pro API
 -m | --match VALUE                 - match value for filtering GET requests to Jamf Pro API
---xml                              - use XML output instead of JSON
-                                     (only for GET requests to Classic API)
 --data DATA                        - data to send with the request
 -v                                 - add verbose curl output
-
-Note: for the Classic API, filter directly using the endpoint URL, either with /name/ or /id/
-(e.g. /JSSResource/computergroups/name/All%20Computers or /JSSResource/computergroups/id/1)
 USAGE
 }
 
 request() {
-    # determine jss_url
-    set_credentials "$jss_instance"
-    jss_url="$jss_instance"
-    # send request
-    curl_url="$jss_url$endpoint"
-    curl_args=("--request")
-    curl_args+=("$request_type")
-    curl_args+=("--header")
-    if [[ "$endpoint" == *"JSSResource"* ]]; then
-        curl_args+=("Content-Type: application/xml")
+    # get token
+    if [[ "$chosen_id" && "$chosen_secret" ]]; then
+        platform_api_client_id="$chosen_id"
+        platform_api_client_secret="$chosen_secret"
     else
-        curl_args+=("Content-Type: application/json")
+        set_platform_api_credentials "$api_base_url"
+        echo "   [request] Using stored credentials for $api_base_url"
     fi
-    if [[ "$request_type" == "GET" && "$endpoint" == *"JSSResource"* && "$xml_output" -eq 1 ]]; then
-        curl_args+=("--header")
-        curl_args+=("Accept: application/xml")
-        send_curl_request
-    elif [[ "$request_type" == "GET" && "$endpoint" != *"JSSResource"* ]]; then
+
+    # set url
+    curl_url="$api_base_url$endpoint"
+
+    if [[ $request_type == "GET" ]]; then
         if [[ "$filter_key" ]]; then
             if [[ ! "$match" ]]; then
                 echo "   [request] ERROR: when using --filter, you must also provide a --match"
                 exit 1
             fi
-            handle_jpapi_get_request "$endpoint" filter "$filter_key" "$match"
+            handle_platform_api_get_request "$endpoint" filter "$filter_key" "$match"
         elif [[ "$sort_key" ]]; then
-            handle_jpapi_get_request "$endpoint" sort "$sort_key"
+            handle_platform_api_get_request "$endpoint" sort "$sort_key"
         else
-            handle_jpapi_get_request "$endpoint"
+            handle_platform_api_get_request "$endpoint"
         fi
         # write combined output to curl output file
         echo "$combined_output" > "$curl_output_file"
     else
+        # send request
+        curl_args=("--request")
+        curl_args+=("$request_type")
+        curl_args+=("--header")
+        curl_args+=("Content-Type: application/json")
         curl_args+=("--header")
         curl_args+=("Accept: application/json")
         if [[ "$data" ]]; then
@@ -96,12 +93,6 @@ request() {
             # output pretty JSON to file
             formatted_output_file="${curl_output_file%.txt}.json"
             jq . "$curl_output_file" >"$formatted_output_file"
-        elif xmllint --noout "$curl_output_file" >/dev/null 2>&1; then
-            echo "   [request] Output:"
-            xmllint --format "$curl_output_file"
-            # output pretty XML to file
-            formatted_output_file="${curl_output_file%.txt}.xml"
-            xmllint --format "$curl_output_file" >"$formatted_output_file"
         elif [[ -s "$curl_output_file" ]]; then
             echo "   [request] Output:"
             cat "$curl_output_file"
@@ -112,14 +103,9 @@ request() {
     fi
 }
 
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
-
-# --------------------------------------------------------------------------------
-# MAIN
-# --------------------------------------------------------------------------------
+# -------------------------------------------------------------------------
+# MAIN BODY
+# -------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -139,6 +125,19 @@ while [[ "$#" -gt 0 ]]; do
         -x|--nointeraction)
             no_interaction=1
             ;;
+        --region)
+            shift
+            # Set the chosen region, convert to lowercase
+            chosen_region="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
+        ;;
+        --id)
+            shift
+            chosen_id="$1"
+        ;;
+        --secret)
+            shift
+            chosen_secret="$1"
+        ;;
         -e|--endpoint)
             shift
             endpoint="$1"
@@ -163,9 +162,6 @@ while [[ "$#" -gt 0 ]]; do
             shift
             data="$1"
         ;;
-        --xml)
-            xml_output=1
-        ;;
         -v|--verbose)
             verbose=1
         ;;
@@ -178,17 +174,9 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# check if endpoint is set
-if [[ -z "$endpoint" ]]; then
-    echo "Please provide an endpoint URL using the --endpoint option."
-    echo "Example: --endpoint /api/v1/engage"
-    echo
-    echo "   [main] Exiting."
-    exit 1
-fi
-
 echo
-echo "This script will send an API request on the chosen instance."
+echo "This script will send a Platform API request using the chosen region and credentials.
+The credentials must have the correct permissions for the chosen platform and endpoint."
 echo
 
 if [[ ${#chosen_instances[@]} -eq 1 ]]; then
@@ -201,16 +189,38 @@ fi
 # select the instances that will be changed
 choose_destination_instances
 
-# check if request_type is set
-if [[ -z "$request_type" ]]; then
-    echo "   [main] Request type not set, so setting default as GET."
-    request_type="GET"
+# set the region based on the chosen instances if not already set
+if [[ ! $chosen_region ]]; then
+    get_platform_api_region
 fi
 
 # perform the request on all chosen instances
 for instance in "${instance_choice_array[@]}"; do
-    jss_instance="$instance"
-    echo "   [main] Sending $request_type request to $jss_instance$endpoint..."
+
+    # set the URL based on the chosen region
+    if [[ $chosen_region ]]; then
+        get_region_url
+    else
+        echo "   [main] ERROR: No region specified. Please provide a region using the --region option."
+        exit 1
+    fi
+
+    # check if endpoint is set
+    if [[ -z "$endpoint" ]]; then
+        echo "Please provide an endpoint URL using the --endpoint option."
+        echo "Example: --endpoint /api/v1/engage"
+        echo
+        echo "   [main] Exiting."
+        exit 1
+    fi
+
+    # check if request_type is set
+    if [[ -z "$request_type" ]]; then
+        echo "   [main] Request type not set, so setting default as GET."
+        request_type="GET"
+    fi
+
+    echo "   [main] Sending $request_type request to $api_base_url$endpoint..."
     request
 
     echo

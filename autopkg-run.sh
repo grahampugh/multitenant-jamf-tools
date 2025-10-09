@@ -1,15 +1,10 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for running an autopkg recipe or recipe list on all instances
-DOC
+# --------------------------------------------------------------------------------
+# A script for running an autopkg recipe or recipe list on multiple instances
+# --------------------------------------------------------------------------------
 
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-DIR=$(dirname "$0")
-source "$DIR/_common-framework.sh"
-
-# reduce the curl tries
+# set the maximum number of the curl requests to try until success
 max_tries_override=2
 
 # set instance list type
@@ -17,6 +12,40 @@ instance_list_type="mac"
 
 # define autopkg_prefs
 autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
+
+# define autopkg binary
+autopkg_binary="/usr/local/bin/autopkg"
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+# Check if the script directory is set
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# check for autopkg
+if [[ ! -f "$autopkg_binary" ]]; then
+    echo "ERROR: AutoPkg is not installed on this device"
+    exit 1
+fi
+
+# ensure pillow module is installed, this is required for recipes that use IconGenerator
+if ! /usr/local/autopkg/python -m pip show pillow &>/dev/null; then
+    echo "Installing Pillow module..."
+    /usr/local/autopkg/python -m pip install --upgrade pillow
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -171,30 +200,9 @@ run_autopkg() {
 }
 
 
-## MAIN BODY
-
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
-
-# check if autopkg is installed, otherwise this won't work
-autopkg_binary="/usr/local/bin/autopkg"
-
-if [[ ! -f "$autopkg_binary" ]]; then
-    echo "ERROR: AutoPkg is not installed on this device"
-    exit 1
-fi
-
-# ensure pillow module is installed, this is required for recipes that use IconGenerator
-if ! /usr/local/autopkg/python -m pip show pillow &>/dev/null; then
-    echo "Installing Pillow module..."
-    /usr/local/autopkg/python -m pip install --upgrade pillow
-fi
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 args=()
@@ -203,17 +211,6 @@ recipes=()
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
-        -r|--recipe)
-            shift
-            recipes+=("$1")
-            ;;
-        -l|--recipe-list)
-            shift
-            recipe_list="$1"
-            ;;
-        -p|--replace)
-            replace_pkg=1
-            ;;
         -il|--instance-list)
             shift
             chosen_instance_list_file="$1"
@@ -224,6 +221,20 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         -a|-ai|--all|--all-instances)
             all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
+        -r|--recipe)
+            shift
+            recipes+=("$1")
+            ;;
+        -l|--recipe-list)
+            shift
+            recipe_list="$1"
+            ;;
+        -p|--replace)
+            replace_pkg=1
             ;;
         -d|--dp)
             shift
@@ -236,9 +247,6 @@ while [[ "$#" -gt 0 ]]; do
                 echo "ERROR: prefs file not found"
                 exit 1
             fi
-            ;;
-        -x|--nointeraction)
-            no_interaction=1
             ;;
         --report-plist)
             shift
@@ -272,9 +280,7 @@ elif [[ ! $quiet_mode ]]; then
     args+=("$verbosity_mode")
 fi
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
+# Ask for the instance list, show list, ask to apply to one, multiple or all
 
 echo
 echo "This script will run autopkg recipes on the instance(s) you choose."

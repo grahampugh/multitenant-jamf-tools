@@ -1,25 +1,120 @@
 #!/bin/bash
 
-: <<DOC
-Script for running various MDM commands
+# --------------------------------------------------------------------------------
+# Script for running various MDM commands
 
-Actions:
-- Checks if we already have a token
-- Grabs a new token if required using basic auth
-- Works out the Jamf Pro version, quits if less than 10.36
-- Posts the MDM command request
-DOC
+# Actions:
+# - Checks if we already have a token
+# - Grabs a new token if required using basic auth
+# - Works out the Jamf Pro version, quits if less than 10.36
+# - Posts the MDM command request
+# --------------------------------------------------------------------------------
+
+# reduce the curl tries
+max_tries_override=2
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
 # shellcheck source-path=SCRIPTDIR source=_common-framework.sh
 source "_common-framework.sh"
 
-# reduce the curl tries
-max_tries_override=2
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
-# --------------------------------------------------------------------
-# Functions
-# --------------------------------------------------------------------
+usage() {
+    echo "
+./mdm-commands.sh options
+
+./set_credentials.sh            - set the Keychain credentials
+
+[no arguments]                  - interactive mode
+-il | --instance-list FILENAME  - provide an instance list filename (without .txt)
+                                  (must exist in the instance-lists folder)
+-i | --instance JSS_URL         - perform action on a specific instance
+                                  (must exist in the relevant instance list)
+                                  (multiple values can be provided)
+-x | --nointeraction            - run without checking instance is in an instance list 
+                                  (prevents interactive choosing of instances)
+-v                              - add verbose curl output
+
+MDM command type:
+
+--erase                         - Erase the device
+--redeploy                      - Redeploy the Management Framework
+--recovery                      - Set the recovery lock password
+                                  Recovery lock password will be random unless set
+                                  with --recovery-lock-password
+--removemdm                     - Remove the MDM Enrollment Profile (Unmanage)
+--deleteusers                   - Delete all users from a device (Shared iPad)
+--restart                       - Restart device (mobile devices only)
+--logout                        - Log out user from a device (mobile devices only)
+--flushmdm                      - Flush MDM commands
+--bluetooth-off                 - Disable Bluetooth (mobile devices only)
+--bluetooth-on                  - Enable Bluetooth (mobile devices only)
+--toggle                        - Toggle Software Update Plan Feature
+                                  This will toggle the feature on or off, clearing any plans
+                                  that may be set.
+--msuplanstatus                 - Get MSU Software Update plan status for individual devices
+--msuupdatestatus               - Get MSU Software Update update status for individual devices
+--msucreateplan                 - Create an MSU Software Update plan for a group of devices
+                                  Requires --group and --version-type options
+                                  (see below for more details)
+
+Options for the --recovery type:
+
+--random-lock-password          - Create a random recovery lock password (this is the default)
+--recovery-lock-password        - Define a recovery lock password
+--clear-recovery-lock-password  - Clear the recovery lock password
+
+Options for the --deleteusers type:
+--force                         - Force user deletion
+--noforce                       - Do not force deletion
+--group                         - Predefine devices to those in a specified group
+
+Options for the --restart and --logout types:
+--group                         - Predefine devices to those in a specified group
+
+Options for the --msucreateplan type:
+--computers                     - Device type is computers
+--devices                       - Device type is mobile devices
+--appletv                       - Device type is Apple TV
+--group                         - Predefine devices to those in a specified group (required)
+--version-type                  - Specify the version type to use for the plan
+                                  (one of 'LATEST_ANY', 'LATEST_MINOR', 'LATEST_MAJOR', 'SPECIFIC_VERSION')
+--version                       - Specify a specific version to use for the plan, if version-type is missing
+                                  or set to 'SPECIFIC_VERSION'
+                                  (e.g. 14.6, 15.0.1)
+--days-until-force-install      - Specify the number of days until the plan will force install
+                                  (default is 7)
+
+Options for the --msuplanstatus type:
+--events                      - Include event details in the output (default is false)
+--open                        - Open the output CSV file in the default application (default is false)
+
+Options for the --msuupdatestatus type:
+--open                        - Open the output CSV file in the default application (default is false)
+
+Options for the --flushmdm type:
+--pending                       - Flush pending commands only (default is pending+failed)
+--failed                        - Flush failed commands only (default is pending+failed)
+--computers                     - Device type is computers (default)
+--devices                       - Devices type is devices (default is computers)
+--group                         - Flush commands based on a group rather than individual computers or devices
+
+Define the target clients:
+
+--id                            - Predefine an ID (from Jamf) to search for
+--serial                        - Predefine a computer's Serial Number to search for. 
+                                  Can be a CSV list,
+                                  e.g. ABCD123456,ABDE234567,XWSA123456
+
+You can clear the recovery lock password with --clear-recovery-lock-password
+"
+}
 
 redeploy_framework() {
     # This function will redeploy the Management Framework to the selected devices
@@ -182,10 +277,10 @@ msu_create_plan() {
             L|l)
                 version_type="LATEST_ANY"
                 ;;
-            M|m)
+            M)
                 version_type="LATEST_MAJOR"
                 ;;
-            m|M)
+            m)
                 version_type="LATEST_MINOR"
                 ;;
         esac
@@ -1016,97 +1111,6 @@ flush_mdm() {
     send_slack_notification "$slack_text"
 }
 
-usage() {
-    echo "
-./mdm-commands.sh options
-
-./set_credentials.sh            - set the Keychain credentials
-
-[no arguments]                  - interactive mode
--il | --instance-list FILENAME  - provide an instance list filename (without .txt)
-                                  (must exist in the instance-lists folder)
--i | --instance JSS_URL         - perform action on a specific instance
-                                  (must exist in the relevant instance list)
-                                  (multiple values can be provided)
--x | --nointeraction            - run without checking instance is in an instance list 
-                                  (prevents interactive choosing of instances)
--v                              - add verbose curl output
-
-MDM command type:
-
---erase                         - Erase the device
---redeploy                      - Redeploy the Management Framework
---recovery                      - Set the recovery lock password
-                                  Recovery lock password will be random unless set
-                                  with --recovery-lock-password
---removemdm                     - Remove the MDM Enrollment Profile (Unmanage)
---deleteusers                   - Delete all users from a device (Shared iPad)
---restart                       - Restart device (mobile devices only)
---logout                        - Log out user from a device (mobile devices only)
---flushmdm                      - Flush MDM commands
---bluetooth-off                 - Disable Bluetooth (mobile devices only)
---bluetooth-on                  - Enable Bluetooth (mobile devices only)
---toggle                        - Toggle Software Update Plan Feature
-                                  This will toggle the feature on or off, clearing any plans
-                                  that may be set.
---msuplanstatus                 - Get MSU Software Update plan status for individual devices
---msuupdatestatus               - Get MSU Software Update update status for individual devices
---msucreateplan                 - Create an MSU Software Update plan for a group of devices
-                                  Requires --group and --version-type options
-                                  (see below for more details)
-
-Options for the --recovery type:
-
---random-lock-password          - Create a random recovery lock password (this is the default)
---recovery-lock-password        - Define a recovery lock password
---clear-recovery-lock-password  - Clear the recovery lock password
-
-Options for the --deleteusers type:
---force                         - Force user deletion
---noforce                       - Do not force deletion
---group                         - Predefine devices to those in a specified group
-
-Options for the --restart and --logout types:
---group                         - Predefine devices to those in a specified group
-
-Options for the --msucreateplan type:
---computers                     - Device type is computers
---devices                       - Device type is mobile devices
---appletv                       - Device type is Apple TV
---group                         - Predefine devices to those in a specified group (required)
---version-type                  - Specify the version type to use for the plan
-                                  (one of 'LATEST_ANY', 'LATEST_MINOR', 'LATEST_MAJOR', 'SPECIFIC_VERSION')
---version                       - Specify a specific version to use for the plan, if version-type is missing
-                                  or set to 'SPECIFIC_VERSION'
-                                  (e.g. 14.6, 15.0.1)
---days-until-force-install      - Specify the number of days until the plan will force install
-                                  (default is 7)
-
-Options for the --msuplanstatus type:
---events                      - Include event details in the output (default is false)
---open                        - Open the output CSV file in the default application (default is false)
-
-Options for the --msuupdatestatus type:
---open                        - Open the output CSV file in the default application (default is false)
-
-Options for the --flushmdm type:
---pending                       - Flush pending commands only (default is pending+failed)
---failed                        - Flush failed commands only (default is pending+failed)
---computers                     - Device type is computers (default)
---devices                       - Devices type is devices (default is computers)
---group                         - Flush commands based on a group rather than individual computers or devices
-
-Define the target clients:
-
---id                            - Predefine an ID (from Jamf) to search for
---serial                        - Predefine a computer's Serial Number to search for. 
-                                  Can be a CSV list,
-                                  e.g. ABCD123456,ABDE234567,XWSA123456
-
-You can clear the recovery lock password with --clear-recovery-lock-password
-"
-}
-
 are_you_sure() {
     echo
     read -r -p "Are you sure you want to proceed? (Y/N) : " sure
@@ -1124,7 +1128,7 @@ are_you_sure() {
 
 
 # --------------------------------------------------------------------
-# Main Body
+# MAIN
 # --------------------------------------------------------------------
 
 mdm_command=""
@@ -1256,19 +1260,21 @@ while test $# -gt 0 ; do
     shift
 done
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
+# Ask for the instance list, show list, ask to apply to one, multiple or all
+
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Only one instance may be selected. Selecting the first: ${chosen_instances[0]}"
+    chosen_instance="${chosen_instances[0]}"
+fi
 
 # select the instances that will be changed
 choose_destination_instances
 
-# get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
-else
-    jss_instance="${instance_choice_array[0]}"
-fi
+# get first intance from the list
+jss_instance="${instance_choice_array[0]}"
 
 if [[ $mdm_command ]]; then
     echo "MDM command preselected: $mdm_command"
@@ -1436,3 +1442,7 @@ case "$mdm_command" in
         msu_create_plan
         ;;
 esac
+
+echo 
+echo "Finished"
+echo

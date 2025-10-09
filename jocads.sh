@@ -1,17 +1,28 @@
 #!/bin/bash
 
-: <<'DOC' 
-JOCADS - the Jamf Object Copier and Deleter script for multiple Jamf instances
-by Graham Pugh
+# --------------------------------------------------------------------------------
+# JOCADS - the Jamf Object Copier and Deleter script for multiple Jamf instances
+# by Graham Pugh
+#
+# This script can copy and delete a range of API objects between Jamf instances across multiple servers
+#
+# Prerequisites:
+# Requires Jamf Pro 10.35 or greater
+# --------------------------------------------------------------------------------
 
-This script can copy and delete a range of API objects between Jamf instances across multiple servers
+# Fixed variables
+xml_folder_default="/Users/Shared/Jamf/JOCADS"
+log_file="$HOME/Library/Logs/JAMF/JOCADS.log"
+policy_testing_category="Untested"
 
-Prerequisites:
-Requires Jamf Pro 10.35 or greater
-DOC
+# Reset group action before reading command line flags
+api_obj_action=""
+
+# reduce the curl tries
+max_tries_override=4
 
 # -------------------------------------------------------------------------
-# Source the file for obtaining the token and setting the server
+# ENVIRONMENT CHECKS
 # -------------------------------------------------------------------------
 
 # source the _common-framework.sh file
@@ -24,22 +35,7 @@ if [[ ! -d "${this_script_dir}" ]]; then
 fi
 
 # -------------------------------------------------------------------------
-# Set variables
-# -------------------------------------------------------------------------
-
-# Other fixed variables
-xml_folder_default="/Users/Shared/Jamf/JOCADS"
-log_file="$HOME/Library/Logs/JAMF/JOCADS.log"
-policy_testing_category="Untested"
-
-# Reset group action before reading command line flags
-api_obj_action=""
-
-# reduce the curl tries
-max_tries_override=4
-
-# -------------------------------------------------------------------------
-# Functions
+# FUNCTIONS
 # -------------------------------------------------------------------------
 
 usage() {

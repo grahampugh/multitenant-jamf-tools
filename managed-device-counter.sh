@@ -1,13 +1,25 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for counting devices on all instances
-Adapted from an idea by Anver Husseini (AnyKey IT) by Graham Pugh
-DOC
+# --------------------------------------------------------------------------------
+# Script for counting devices on all instances
+# Adapted from an idea by Anver Husseini (AnyKey IT) by Graham Pugh
+# --------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
 source "_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -55,16 +67,28 @@ if [[ ! -d "${this_script_dir}" ]]; then
 fi
 
 
-## MAIN BODY
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
-
-# Command line override for the above settings
+# get command line arguments
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
+        -il|--instance-list)
+            shift
+            chosen_instance_list_file="$1"
+        ;;
+        -i|--instance)
+            shift
+            chosen_instances+=("$1")
+            ;;
+        --all)
+            all_instances=1
+        ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -a|--anonymous)
             anonymous="yes"
         ;;
@@ -76,20 +100,6 @@ while [[ "$#" -gt 0 ]]; do
             shift
             output_file="$1"
         ;;
-        -il|--instance-list)
-            shift
-            chosen_instance_list_file="$1"
-        ;;
-        -i|--instance)
-            shift
-            chosen_instance="$1"
-        ;;
-        --all)
-            all_instances=1
-        ;;
-        -x|--nointeraction)
-            no_interaction=1
-            ;;
         -v|--verbose)
             verbose=1
         ;;
@@ -108,10 +118,10 @@ echo
 
 # set default output file
 if [[ ! $output_file ]]; then
-    output_file="/tmp/managed-device-counter.txt"
+    output_file="/Users/Shared/MJT/managed-device-counter.txt"
 fi
 if [[ ! $csv ]]; then
-    output_csv="/tmp/managed-device-counter.csv"
+    output_csv="/Users/Shared/MJT/managed-device-counter.csv"
 fi
 
 # ensure the directories can be written to, and empty the files
@@ -120,7 +130,14 @@ echo "" > "$output_file"
 mkdir -p "$(dirname "$output_csv")"
 echo "" > "$output_csv"
 
-# select the instances that will be checked
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
+# select the instances that will be changed
 choose_destination_instances
 
 # clear any existing values
@@ -208,4 +225,6 @@ echo
 echo "These results are saved to:"
 echo "   Text format: $output_file"
 echo "   CSV format:  $output_csv"
+echo
+echo "Finished"
 echo

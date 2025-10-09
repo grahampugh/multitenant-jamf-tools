@@ -1,13 +1,8 @@
 #!/bin/bash
 
-: <<DOC
-A wrapper script for running the jamf-upload.sh script
-DOC
-
-# source _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-DIR=$(dirname "$0")
-source "$DIR/_common-framework.sh"
+# --------------------------------------------------------------------------------
+# A wrapper script for running the jamf-upload.sh script
+# --------------------------------------------------------------------------------
 
 # set instance list type
 instance_list_type="mac"
@@ -15,9 +10,23 @@ instance_list_type="mac"
 # define autopkg_prefs
 autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
 
-###########
-## USAGE ##
-###########
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source _common-framework.sh file
+# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     echo "
@@ -61,9 +70,9 @@ The --dp argument can be bypassed by setting the environment variable 'dp_url_fi
 "
 }
 
-##############
-## DEFAULTS ##
-##############
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 if [[ ! -f "$jamf_upload_path" ]]; then
     # default path to jamf-upload.sh
@@ -75,10 +84,7 @@ if [[ ! -f "$jamf_upload_path" ]]; then
     jamf_upload_path="../jamf-upload/jamf-upload.sh"
 fi
 
-###############
-## ARGUMENTS ##
-###############
-
+# get command line args
 args=()
 chosen_instances=()
 while test $# -gt 0 ; do
@@ -90,7 +96,13 @@ while test $# -gt 0 ; do
         -i|--instance)
             shift
             chosen_instances+=("$1")
-        ;;
+            ;;
+        -a|-ai|--all|--all-instances)
+            all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
         -s|--share)
             shift
             smb_url="$1"
@@ -99,13 +111,7 @@ while test $# -gt 0 ; do
             shift
             dp_url_filter="$1"
             ;;
-        -a|-ai|--all-instances)
-            all_instances=1
-            ;;
-        -x|--nointeraction)
-            no_interaction=1
-            ;;
-        -j)
+        -j|--jamf-upload-path)
             shift
             jamf_upload_path="$1"
             if [[ ! -f "$jamf_upload_path" ]]; then
@@ -160,10 +166,6 @@ elif [[ ! $quiet_mode ]]; then
     args+=("$verbosity_mode")
 fi
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
-
 echo "This script will run grahampugh/jamf-upload/jamf-upload.sh on the instance(s) you choose."
 
 if [[ ${#chosen_instances[@]} -eq 1 ]]; then
@@ -188,7 +190,3 @@ done
 echo 
 echo "Finished"
 echo
-
-
-echo 
-
