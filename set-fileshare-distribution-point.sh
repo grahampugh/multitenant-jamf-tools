@@ -1,13 +1,26 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for setting the Fileshare Distribution Point on all instances.
-Requires a template XML file
-DOC
+# --------------------------------------------------------------------------------
+# Script for setting the Fileshare Distribution Point on all instances.
+# Requires a template XML file
+# --------------------------------------------------------------------------------
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
-# shellcheck source-path=SCRIPTDIR source=_common-framework.sh
-source "_common-framework.sh"
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "   [main] ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -74,16 +87,9 @@ upload_data() {
     send_curl_request
 }
 
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
-
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -135,6 +141,13 @@ echo
 
 # get template
 choose_template_file
+
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
 
 # select the instances that will be changed
 choose_destination_instances
@@ -272,18 +285,12 @@ if [[ $verbose == 1 ]]; then
     echo "$parsed_template"
 fi
 
-# get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
+# loop through the chosen instances
+for instance in "${instance_choice_array[@]}"; do
+    jss_instance="$instance"
     echo "Setting the FileShare DP on $jss_instance..."
     upload_data
-else
-    for instance in "${instance_choice_array[@]}"; do
-        jss_instance="$instance"
-        echo "Setting the FileShare DP on $jss_instance..."
-        upload_data
-    done
-fi
+done
 
 echo 
 echo "Finished"

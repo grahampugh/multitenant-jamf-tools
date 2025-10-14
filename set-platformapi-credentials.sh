@@ -1,25 +1,34 @@
 #!/bin/bash
 
-: <<DOC
-Script to add the required credentials into your login keychain to allow repeated use.
-
-1. Ask for the instance list, show list, ask to apply to one, multiple or all
-2. Ask for the username (show any existing value of first instance in list as default)
-3. Ask for the password (show the associated user if already existing)
-4. Loop through each selected instance, check for an existing keychain entry, create or overwrite
-5. Check the credentials are working using the API
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+# --------------------------------------------------------------------------------
+# Script to add the required credentials into your login keychain to allow repeated use.
+# This script can only operate on one instance at a time, since each API client is unique.
+# 1. Ask for the instance list, show list, ask to apply to one
+# 2. Ask for the API client ID 
+# 3. Ask for the API client password
+# 4. Check the credentials are working using the API
+# --------------------------------------------------------------------------------
 
 # reduce the curl tries
 max_tries_override=2
 
-# --------------------------------------------------------------------
-# Functions
-# --------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "   [main] ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
+
 usage() {
     cat <<'USAGE'
 Usage:
@@ -27,10 +36,18 @@ Usage:
 USAGE
 }
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, get region
-# ------------------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on first chosen instance: ${chosen_instances[0]}"
+fi
+
+# select the instances that will be changed
 choose_destination_instances
 chosen_instance="${instance_choice_array[0]}"
 
@@ -45,10 +62,7 @@ else
     exit 1
 fi
 
-# ------------------------------------------------------------------------------------
-# 2. Ask for the Client ID
-# ------------------------------------------------------------------------------------
-
+# Ask for the Client ID
 echo "Enter Client ID for $api_base_url"
 read -r -p "Client ID : " inputted_client_id
 if [[ ! $inputted_client_id ]]; then
@@ -86,22 +100,17 @@ elif [[ ! $client_secret ]]; then
     exit 1
 fi
 
-# ------------------------------------------------------------------------------------
-# 3. Apply to selected instance
-# ------------------------------------------------------------------------------------
+# Apply to selected instance
 echo
 echo
 security add-internet-password -U -s "$api_base_url" -l "$region_base ($inputted_client_id)" -a "$inputted_client_id" -w "$client_secret"
 echo "Credentials for $api_base_url (user $inputted_client_id) added to keychain"
 
-# ------------------------------------------------------------------------------------
-# 4. Verify the credentials
-# ------------------------------------------------------------------------------------
-
+# Verify the credentials
 echo
 echo "Checking credentials for $api_base_url (user $inputted_client_id)"
 check_platform_api_token
 
 echo
-echo "Script complete"
+echo "Finished"
 echo

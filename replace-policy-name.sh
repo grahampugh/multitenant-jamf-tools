@@ -11,8 +11,9 @@
 # ENVIRONMENT CHECKS
 # --------------------------------------------------------------------------------
 
-# get the common framework functions
-source "_common-framework.sh"
+# source the _common-framework.sh file
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
 
 if [[ ! -d "$this_script_dir" ]]; then
     echo "ERROR: path to repo ambiguous. Aborting."

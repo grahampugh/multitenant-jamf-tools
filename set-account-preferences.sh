@@ -1,18 +1,34 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for setting account preferences on all instances
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+# --------------------------------------------------------------------------------
+# Script for setting account preferences on all instances
+# 
+# Note: these account preferences reflect the account making the request. Therefore
+# it can't be run using an API Client
+# --------------------------------------------------------------------------------
 
 # reduce the curl tries
 max_tries_override=2
 
 # set instance list type
 instance_list_type="ios"
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "   [main] ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -91,15 +107,8 @@ set_prefs() {
     cat "$curl_output_file"
 }
 
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
-
-## MAIN BODY
-
 # -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
+# MAIN
 # -------------------------------------------------------------------------
 
 # Command line override for the above settings
@@ -138,25 +147,23 @@ while [[ "$#" -gt 0 ]]; do
 done
 echo
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
+# Ask for the instance list, show list, ask to apply to one, multiple or all
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
 
 # select the instances that will be changed
 choose_destination_instances
 
-# get specific instance if entered
-if [[ $chosen_instance ]]; then
-    jss_instance="$chosen_instance"
+# loop through the chosen instances
+for instance in "${instance_choice_array[@]}"; do
+    jss_instance="$instance"
     echo "Setting preferences on $jss_instance..."
     set_prefs
-else
-    for instance in "${instance_choice_array[@]}"; do
-        jss_instance="$instance"
-        echo "Setting preferences on $jss_instance..."
-        set_prefs
-    done
-fi
+done
 
 echo 
 echo "Finished"

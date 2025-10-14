@@ -1,19 +1,32 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for creating or updating an LDAP group on all instances.
-Requires a template XML file
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+# --------------------------------------------------------------------------------
+# Script for creating or updating an LDAP group on all instances.
+# Requires a template XML file
+# --------------------------------------------------------------------------------
 
 # reduce the curl tries
 max_tries_override=2
 
 # set instance list type
 instance_list_type="ios"
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -102,16 +115,10 @@ upload_data() {
     send_slack_notification "$slack_text"
 }
 
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
 
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -156,7 +163,6 @@ echo
 # Set default instance list
 default_instance_list_file="instance-lists/default-instance-list.txt"
 [[ -f "$default_instance_list_file" ]] && default_instance_list=$(cat "$default_instance_list_file") || default_instance_list="prd"
-
 
 # get template
 choose_template_file

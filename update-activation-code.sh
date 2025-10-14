@@ -1,19 +1,31 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for updating the activation code on all instances
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-DIR=$(dirname "$0")
-source "$DIR/_common-framework.sh"
+# --------------------------------------------------------------------------------
+# Script for updating the activation code on all instances
+# --------------------------------------------------------------------------------
 
 # reduce the curl tries
 max_tries_override=2
 
 # set instance list type
 instance_list_type="ios"
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "   [main] ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -124,11 +136,9 @@ if [[ ! -d "${this_script_dir}" ]]; then
     exit 1
 fi
 
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -172,6 +182,13 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 echo
+
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
 
 # select the instances that will be changed
 choose_destination_instances

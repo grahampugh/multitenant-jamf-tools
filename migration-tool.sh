@@ -30,7 +30,8 @@ max_tries_override=2
 # --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
-source "_common-framework.sh"
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
 
 if [[ ! -d "${this_script_dir}" ]]; then
     echo "ERROR: path to repo ambiguous. Aborting."

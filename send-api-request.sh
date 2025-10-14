@@ -1,18 +1,22 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for sending a non-specific request to the Jamf Pro API
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+# --------------------------------------------------------------------------------
+# Script for sending a non-specific request to the Jamf Pro API
+# --------------------------------------------------------------------------------
 
 # reduce the curl tries
 max_tries_override=2
 
 # set instance list type
 instance_list_type="ios"
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
 
 # --------------------------------------------------------------------
 # FUNCTIONS

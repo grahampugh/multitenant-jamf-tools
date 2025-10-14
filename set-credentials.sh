@@ -1,25 +1,34 @@
 #!/bin/bash
 
-: <<DOC
-Script to add the required credentials into your login keychain to allow repeated use.
-
-1. Ask for the instance list, show list, ask to apply to one, multiple or all
-2. Ask for the username (show any existing value of first instance in list as default)
-3. Ask for the password (show the associated user if already existing)
-4. Loop through each selected instance, check for an existing keychain entry, create or overwrite
-5. Check the credentials are working using the API
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+# --------------------------------------------------------------------------------
+# Script to add the required credentials into your login keychain to allow repeated use.
+# 
+# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
+# 2. Ask for the username (show any existing value of first instance in list as default)
+# 3. Ask for the password (show the associated user if already existing)
+# 4. Loop through each selected instance, check for an existing keychain entry, create or overwrite
+# 5. Check the credentials are working using the API
+# --------------------------------------------------------------------------------
 
 # reduce the curl tries
 max_tries_override=2
 
-# --------------------------------------------------------------------
-# Functions
-# --------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "   [main] ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -28,16 +37,35 @@ Usage:
 USAGE
 }
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
+check_credentials() {
+    # grab the Jamf Pro version to check that communication is working.
+    jss_url="$instance"
+    set_credentials "$jss_url"
+    # send request
+    curl_url="$jss_url/api/v1/jamf-pro-version"
+    curl_args=("--request")
+    curl_args+=("GET")
+    curl_args+=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+}
 
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
+
+# Ask for the instance list, show list, ask to apply to one, multiple or all
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
+# Ask for the instance list, show list, ask to apply to one, multiple or all
 choose_destination_instances
 
-# ------------------------------------------------------------------------------------
-# 2. Ask for the username (show any existing value of first instance in list as default)
-# ------------------------------------------------------------------------------------
-
+# Ask for the username (show any existing value of first instance in list as default)
 echo "Enter username or Client ID for ${instance_choice_array[0]}"
 read -r -p "User/Client ID : " inputted_username
 if [[ ! $inputted_username ]]; then
@@ -75,9 +103,7 @@ elif [[ ! $instance_pass ]]; then
     exit 1
 fi
 
-# ------------------------------------------------------------------------------------
-# 3. Loop through each selected instance
-# ------------------------------------------------------------------------------------
+# Loop through each selected instance
 echo
 echo
 for instance in "${instance_choice_array[@]}"; do
@@ -85,23 +111,6 @@ for instance in "${instance_choice_array[@]}"; do
     security add-internet-password -U -s "$instance" -l "$instance_base ($inputted_username)" -a "$inputted_username" -w "$instance_pass"
     echo "Credentials for $instance_base (user $inputted_username) added to keychain"
 done
-
-# ------------------------------------------------------------------------------------
-# 4. Verify the credentials
-# ------------------------------------------------------------------------------------
-
-check_credentials() {
-    # grab the Jamf Pro version to check that communication is working.
-    jss_url="$instance"
-    set_credentials "$jss_url"
-    # send request
-    curl_url="$jss_url/api/v1/jamf-pro-version"
-    curl_args=("--request")
-    curl_args+=("GET")
-    curl_args+=("--header")
-    curl_args+=("Accept: application/json")
-    send_curl_request
-}
 
 echo
 for instance in "${instance_choice_array[@]}"; do

@@ -1,18 +1,31 @@
 #!/bin/bash
 
-: <<'DOC'
-Script for updating the value of a text-based extension attribute on computers
-DOC
-
-# source the _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
-source "_common-framework.sh"
+# --------------------------------------------------------------------------------
+# Script for updating the value of a text-based extension attribute on computers
+# --------------------------------------------------------------------------------
 
 # reduce the curl tries
 max_tries_override=2
 
 # set instance list type
 instance_list_type="ios"
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "   [main] ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
 
 usage() {
     cat <<'USAGE'
@@ -98,16 +111,9 @@ update_ea() {
 
 }
 
-if [[ ! -d "${this_script_dir}" ]]; then
-    echo "ERROR: path to repo ambiguous. Aborting."
-    exit 1
-fi
-
-## MAIN BODY
-
-# -------------------------------------------------------------------------
-# Command line options (presets to avoid interaction)
-# -------------------------------------------------------------------------
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -168,9 +174,12 @@ while [[ "$#" -gt 0 ]]; do
 done
 echo
 
-# ------------------------------------------------------------------------------------
-# 1. Ask for the instance list, show list, ask to apply to one, multiple or all
-# ------------------------------------------------------------------------------------
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on first chosen instance: ${chosen_instances[0]}"
+fi
 
 # select the instances that will be changed
 choose_destination_instances
@@ -225,7 +234,6 @@ for instance in "${instance_choice_array[@]}"; do
 
     # we need to find out the computer/mobile device id, 
     generate_computer_list
-
 
     # are we sure to proceed?
     are_you_sure

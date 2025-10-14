@@ -18,8 +18,8 @@ max_tries_override=2
 # --------------------------------------------------------------------------------
 
 # source the _common-framework.sh file
-# shellcheck source-path=SCRIPTDIR source=_common-framework.sh
-source "_common-framework.sh"
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
 
 # --------------------------------------------------------------------------------
 # FUNCTIONS

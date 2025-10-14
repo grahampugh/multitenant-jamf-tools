@@ -8,8 +8,7 @@
 # ENVIRONMENT CHECKS
 # --------------------------------------------------------------------------------
 
-# source _common-framework.sh file
-# TIP for Visual Studio Code - Add Custom Arg '-x' to the Shellcheck extension settings
+# source the _common-framework.sh file
 DIR=$(dirname "$0")
 source "$DIR/_common-framework.sh"
 
