@@ -1583,6 +1583,8 @@ get_platform_api_token() {
     # get a token from the Platform API
     if ! http_response=$(curl \
         --silent \
+        --show-error \
+        --dump-header "$curl_headers_file" \
         --request POST \
         "$api_base_url/auth/token" \
         --header 'Content-Type: application/x-www-form-urlencoded' \
@@ -1600,6 +1602,10 @@ get_platform_api_token() {
         if [[ -s "$token_file" ]]; then
             echo "   [get_platform_api_token] Response:"
             cat "$token_file"
+            rm -f "$token_file"
+            echo
+            echo "   [get_platform_api_token] Curl command used:"
+            echo "curl --request POST $api_base_url/auth/token --header 'Content-Type: application/x-www-form-urlencoded' --data-urlencode 'grant_type=client_credentials' --data-urlencode 'client_id=$platform_api_client_id' --data-urlencode 'client_secret=********' --output $token_file"
             echo
         fi
         return 1
@@ -1632,35 +1638,37 @@ check_platform_api_token() {
 
     # is there a token file
     if [[ -f "$token_file" ]]; then
-        echo "   [check_platform_api_token] Using stored token for $api_base_url at $token_file"
         # check we are still querying the same server and with the same account
         server_check=$(cat "$server_check_file" 2>/dev/null)
         user_check=$(cat "$user_check_file" 2>/dev/null)
         if [[ "$server_check" == "$api_base_url" && "$user_check" == "$id" ]]; then
             if jq -e .access_token "$token_file" >/dev/null; then
                 token=$(jq -r .access_token "$token_file")
-            else
-                token=""
-            fi
-            if jq -e .expires_in "$token_file" >/dev/null; then
-                expires=$(jq -r .expires_in "$token_file")
-                current_time_epoch=$(/bin/date +%s)
-                file_created_epoch=$(/usr/bin/stat -f %m "$token_file")
-                cutoff_epoch=$((file_created_epoch + expires - 1))
-            else
-                cutoff_epoch="0"
-            fi
-            if [[ $cutoff_epoch -gt $current_time_epoch ]]; then
-                # convert epoch to human readable
-                human_cutoff_time=$( /bin/date -r "$cutoff_epoch" )
-                if [[ $verbose -gt 0 ]]; then
-                    echo "   [check_platform_api_token] Token is still valid (expires at $human_cutoff_time)"
+                echo "   [check_platform_api_token] Using stored token for $api_base_url at $token_file"
+                if jq -e .expires_in "$token_file" >/dev/null; then
+                    expires=$(jq -r .expires_in "$token_file")
+                    current_time_epoch=$(/bin/date +%s)
+                    file_created_epoch=$(/usr/bin/stat -f %m "$token_file")
+                    cutoff_epoch=$((file_created_epoch + expires - 1))
+                else
+                    echo "   [check_platform_api_token] No expiry date found in $token_file. Grabbing a new one"
+                    cutoff_epoch="0"
+                fi
+                if [[ $cutoff_epoch -gt $current_time_epoch ]]; then
+                    # convert epoch to human readable
+                    human_cutoff_time=$( /bin/date -r "$cutoff_epoch" )
+                    if [[ $verbose -gt 0 ]]; then
+                        echo "   [check_platform_api_token] Token is still valid (expires at $human_cutoff_time)"
+                    fi
+                else
+                    if [[ $verbose -gt 0 ]]; then
+                        echo "   [check_platform_api_token] Token expired or invalid ($cutoff_epoch v $current_time_epoch). Grabbing a new one"
+                    fi
+                    sleep 1
+                    get_platform_api_token
                 fi
             else
-                if [[ $verbose -gt 0 ]]; then
-                    echo "   [check_platform_api_token] Token expired or invalid ($cutoff_epoch v $current_time_epoch). Grabbing a new one"
-                fi
-                sleep 1
+                echo "   [check_platform_api_token] No token found in $token_file. Grabbing a new one"
                 get_platform_api_token
             fi
         elif [[ "$server_check" == "$api_base_url" ]]; then

@@ -57,9 +57,9 @@ check_credentials() {
 # Ask for the instance list, show list, ask to apply to one, multiple or all
 if [[ ${#chosen_instances[@]} -eq 1 ]]; then
     chosen_instance="${chosen_instances[0]}"
-    echo "Running on instance: $chosen_instance"
+    echo "   [main] Running on instance: $chosen_instance"
 elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
-    echo "Running on instances: ${chosen_instances[*]}"
+    echo "   [main] Running on instances: ${chosen_instances[*]}"
 fi
 
 # Ask for the instance list, show list, ask to apply to one, multiple or all
@@ -69,7 +69,7 @@ choose_destination_instances
 echo "Enter username or Client ID for ${instance_choice_array[0]}"
 read -r -p "User/Client ID : " inputted_username
 if [[ ! $inputted_username ]]; then
-    echo "No username/Client ID supplied"
+    echo "   [main] No username/Client ID supplied"
     exit 1
 fi
 
@@ -78,9 +78,9 @@ instance_base="${instance_choice_array[0]/*:\/\//}"
 kc_check=$(security find-internet-password -s "${instance_choice_array[0]}" -l "$instance_base ($inputted_username)" -a "$inputted_username" -g 2>/dev/null)
 
 if [[ $kc_check ]]; then
-    echo "Keychain entry for $inputted_username found on $instance_base"
+    echo "   [main] Keychain entry for $inputted_username found on $instance_base"
 else
-    echo "Keychain entry for $inputted_username not found on $instance_base"
+    echo "   [main] Keychain entry for $inputted_username not found on $instance_base"
 fi
 
 echo
@@ -88,9 +88,9 @@ echo
 instance_pass=$(security find-internet-password -s "${instance_choice_array[0]}" -l "$instance_base ($inputted_username)" -a "$inputted_username" -w -g 2>&1)
 
 if [[ ${#instance_pass} -gt 0 && $instance_pass != "security: "* ]]; then
-    echo "Password/Client Secret for $inputted_username found on $instance_base"
+    echo "   [main] Password/Client Secret for $inputted_username found on $instance_base"
 else
-    echo "Password/Client Secret for $inputted_username not found on $instance_base"
+    echo "   [main] Password/Client Secret for $inputted_username not found on $instance_base"
 fi
 
 echo "Enter password/Client Secret for $inputted_username on $instance_base"
@@ -99,7 +99,7 @@ read -r -s -p "Pass : " inputted_password
 if [[ "$inputted_password" ]]; then
     instance_pass="$inputted_password"
 elif [[ ! $instance_pass ]]; then
-    echo "No password/Client Secret supplied"
+    echo "   [main] No password/Client Secret supplied"
     exit 1
 fi
 
@@ -109,21 +109,21 @@ echo
 for instance in "${instance_choice_array[@]}"; do
     instance_base="${instance/*:\/\//}"
     security add-internet-password -U -s "$instance" -l "$instance_base ($inputted_username)" -a "$inputted_username" -w "$instance_pass"
-    echo "Credentials for $instance_base (user $inputted_username) added to keychain"
+    echo "   [main] Credentials for $instance_base (user $inputted_username) added to keychain"
 done
 
 echo
 for instance in "${instance_choice_array[@]}"; do
     instance_base="${instance/*:\/\//}"
-    echo "Checking credentials for $instance_base (user $inputted_username)"
+    echo "   [main] Checking credentials for $instance_base (user $inputted_username)"
     check_credentials
     # print out version
     version=$( jq -r '.version' < "$curl_output_file" )
     if [[ $version ]]; then
-        echo "Connection successful. Jamf Pro version: $version"
+        echo "   [main] Connection successful. Jamf Pro version: $version"
     fi
 done
 
 echo
-echo "Script complete"
+echo "Finished"
 echo
