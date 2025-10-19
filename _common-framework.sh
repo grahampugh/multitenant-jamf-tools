@@ -572,7 +572,7 @@ set_credentials() {
             exit 1
         fi
         jss_api_user="$chosen_account"
-        echo "   [set_credentials] Using user/client ID: $jss_api_user" # TEMP
+        # echo "   [set_credentials] Using user/client ID: $jss_api_user" # TEMP
     fi
 
     if [[ ! $jss_api_user ]]; then
@@ -1683,7 +1683,7 @@ set_platform_api_credentials() {
 }
 
 check_if_paginated() {
-    echo "   [check_if_paginated] API base URL: $api_base_url" # TEMP
+    # echo "   [check_if_paginated] API base URL: $api_base_url" # TEMP
     # do a call to see if the endpoint is paginated
 
     if [[ $api_base_url == *".apigw.jamf.com"* ]]; then
@@ -1762,7 +1762,7 @@ get_platform_api_token() {
         return 1
     fi
     # get the HTTP response code
-    echo "HTTP response: $http_response" # TEMP
+    # echo "HTTP response: $http_response" # TEMP
 
     if [[ "$http_response" -ne 200 ]]; then
         echo "   [get_platform_api_token] ERROR: Failed to get token from the Platform API. HTTP response code: $http_response"
