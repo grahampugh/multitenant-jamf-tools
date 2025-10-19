@@ -40,7 +40,13 @@ USAGE
 check_credentials() {
     # grab the Jamf Pro version to check that communication is working.
     jss_url="$instance"
-    set_credentials "$jss_url"
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_url" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
+    else
+        set_credentials "$jss_url"
+        echo "   [request] Using stored credentials for $jss_url ($jss_api_user)"
+    fi
     # send request
     curl_url="$jss_url/api/v1/jamf-pro-version"
     curl_args=("--request")

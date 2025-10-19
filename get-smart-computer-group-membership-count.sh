@@ -24,6 +24,14 @@ fi
 # FUNCTIONS
 # --------------------------------------------------------------------------------
 
+usage() {
+    cat <<'USAGE'
+Usage:
+./get-smart-computer-group-membership-count.sh -g "SMART_COMPUTER_GROUP_NAME"
+  -g | --group "SMART_COMPUTER_GROUP_NAME"   - Name of the smart computer group to check
+USAGE
+}   
+
 run_autopkg() {
     # Extract subdomain from jss_instance (e.g., "https://myinstance.jamfcloud.com" -> "myinstance")
     subdomain=$(echo "$jss_instance" | awk -F[/:] '{print $4}' | cut -d'.' -f1)
@@ -89,6 +97,10 @@ while [[ "$#" -gt 0 ]]; do
         -a|-ai|--all|--all-instances)
             all_instances=1
             ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -x|--nointeraction)
             no_interaction=1
             ;;
@@ -134,7 +146,14 @@ create_csv_file "$output_csv_file"
 for instance in "${instance_choice_array[@]}"; do
     # set the instance variable
     jss_instance="$instance"
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     echo "Running AutoPkg on $jss_instance..."
     run_autopkg
     write_count_to_file "$output_file" "$output_csv_file"

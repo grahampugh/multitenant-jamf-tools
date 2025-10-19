@@ -48,16 +48,17 @@ Usage:
 A script to check which policies, configuration profiles, restricted software, Mac App Store apps and eBooks are scoped to a specific computer group
 Note that Jamf Pro now provides a built-in report for this, so this script may no longer be needed.
 
-./set_credentials.sh          - set the Keychain credentials
+./set_credentials.sh               - set the Keychain credentials
 
-[no arguments]                - interactive mode
---il FILENAME (without .txt)  - provide an instance list filename
-                                (must exist in the instance-lists folder)
---i JSS_URL                   - perform action on a single instance
-                                (must exist in the relevant instance list)
---all                         - perform action on ALL instances in the instance list
---group GROUP_NAME            - specify the group name to search for
--v                            - add verbose curl output
+[no arguments]                     - interactive mode
+--il FILENAME (without .txt)       - provide an instance list filename
+                                     (must exist in the instance-lists folder)
+--i JSS_URL                        - perform action on a single instance
+                                     (must exist in the relevant instance list)
+--all                              - perform action on ALL instances in the instance list
+--group GROUP_NAME                 - specify the group name to search for
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+-v                                 - add verbose curl output
 USAGE
 }
 
@@ -98,7 +99,13 @@ find_scoped_objects() {
     echo "Retrieving List of All $object_printname IDs..."
     unset object_ids
 
-    set_credentials "$jss_instance"
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
     # send request
     curl_url="$jss_url/JSSResource/$api_object_type"
@@ -196,6 +203,10 @@ while [[ "$#" -gt 0 ]]; do
         -a|-ai|--all|--all-instances)
             all_instances=1
             ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -x|--nointeraction)
             no_interaction=1
             ;;

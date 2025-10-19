@@ -436,7 +436,14 @@ choose_destination_instances() {
 get_instance_distribution_point() {
     # find out if there is a file share distribution point in this instance
     # determine jss_url
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="${jss_instance}"
 
     # Check for DPs
@@ -544,14 +551,24 @@ send_slack_notification() {
 }
 
 set_credentials() {
-    local jss_url="$1"
+    jss_url="$1"
+    jss_api_user="$2"
+
     if [[ $verbose -gt 0 ]]; then
         echo "Setting credentials for $jss_url"
     fi
 
+    instance_base="${jss_url/*:\/\//}"
+
     # check for username entry in login keychain
-    # jss_api_user=$("${this_script_dir}/keychain.sh" -t internet -u -s "$jss_url")
-    jss_api_user=$(/usr/bin/security find-internet-password -s "$jss_url" -g 2>/dev/null | /usr/bin/grep "acct" | /usr/bin/cut -d \" -f 4 )
+    if [[ ! $jss_api_user ]]; then
+        # jss_api_user=$("${this_script_dir}/keychain.sh" -t internet -u -s "$jss_url")
+        # jss_api_user=$(/usr/bin/security find-internet-password -s "$jss_url" -g 2>/dev/null | /usr/bin/grep "acct" | /usr/bin/cut -d \" -f 4 )
+                # check for Client ID entry in login keychain
+        find_all_internet_passwords "$jss_url"
+        jss_api_user="$chosen_account"
+        echo "   [set_credentials] Using user/client ID: $jss_api_user" # TEMP
+    fi
 
     if [[ ! $jss_api_user ]]; then
         echo "No keychain entry for $jss_url found. Please run the set_credentials.sh script to add the user to your keychain"
@@ -564,7 +581,7 @@ set_credentials() {
 
     # check for password entry in login keychain
     # jss_api_password=$("${this_script_dir}/keychain.sh" -t internet -p -s "$jss_url")
-    jss_api_password=$(/usr/bin/security find-internet-password -s "$jss_url" -a "$jss_api_user" -w -g 2>&1 )
+    jss_api_password=$(/usr/bin/security find-internet-password -s "$jss_url" -l "$instance_base ($jss_api_user)" -a "$jss_api_user" -w -g 2>&1 )
 
     if [[ ! $jss_api_password ]]; then
         echo "No password/Client ID for $jss_api_user found. Please run the set_credentials.sh script to add the password/Client ID to your keychain"
@@ -636,12 +653,12 @@ get_api_token() {
 
 check_token() {
     instance_id=$(echo "$jss_url" | sed 's|https://||' | sed 's|:|_|g' | sed 's|/|_|g' | sed 's|\.|_|g')
-    token_file="$output_location/jamf_api_token_$instance_id.txt"
-    server_check_file="$output_location/jamf_server_check_$instance_id.txt"
-    user_check_file="$output_location/jamf_user_check_$instance_id.txt"
-    curl_output_file="$output_location/output_$instance_id.txt"
-    curl_headers_file="$output_location/headers_$instance_id.txt"
-    cookie_jar="$output_location/jamf_cookie_jar_$instance_id.txt"
+    token_file="$output_location/jamf_api_token_${instance_id}_${jss_api_user}.txt"
+    server_check_file="$output_location/jamf_server_check_${instance_id}_${jss_api_user}.txt"
+    user_check_file="$output_location/jamf_user_check_${instance_id}_${jss_api_user}.txt"
+    curl_output_file="$output_location/output_${instance_id}_${jss_api_user}.txt"
+    curl_headers_file="$output_location/headers_${instance_id}_${jss_api_user}.txt"
+    cookie_jar="$output_location/jamf_cookie_jar_${instance_id}_${jss_api_user}.txt"
     
     # determine account type
     if [[ $jss_api_user =~ ^\{?[A-F0-9a-f]{8}-[A-F0-9a-f]{4}-[A-F0-9a-f]{4}-[A-F0-9a-f]{4}-[A-F0-9a-f]{12}\}?$ ]]; then
@@ -780,7 +797,7 @@ handle_jpapi_get_request() {
         slash_count=$(grep -o "/" <<< "$endpoint" | wc -l)
     fi
     if [[ $slash_count -gt 1 ]]; then
-        echo "   [handle_jpapi_get_request] Endpoint already includes an ID, cannot add sort or filter"
+        echo "   [handle_jpapi_get_request] Endpoint already includes an ID or other subfilter, cannot add sort or filter"
         filter_type="preset"
     # if there are parameters already in the endpoint, we cannot add more
     # we check for /? in the endpoint
@@ -807,7 +824,14 @@ handle_jpapi_get_request() {
         # first check if the endpoint is paginated
         # we do this by requesting a single item and checking the totalCount value
         echo "   [handle_jpapi_get_request] Checking if endpoint is paginated..."
-        set_credentials "$jss_instance"
+        # get token
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_instance" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+        else
+            set_credentials "$jss_instance"
+            echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        fi
         check_if_paginated
         if [[ $paginated == "true" ]]; then
             # we need to run multiple loops to get all the devices if there are more than 1000
@@ -848,7 +872,14 @@ handle_jpapi_get_request() {
         fi
     else
         # filter based on a key=match pair
-        set_credentials "$jss_instance"
+        # get token
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_instance" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+        else
+            set_credentials "$jss_instance"
+            echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        fi
         jss_url="$jss_instance"
         if [[ "$filter_type" == "preset" ]]; then
             # if preset, the endpoint already includes the filter so we do not need to add anything
@@ -869,11 +900,7 @@ handle_jpapi_get_request() {
 }
 
 send_curl_request() {
-    # use separate config files for each instance
-    cookie_jar="$output_location/jamf_cookie_jar_$instance_id.txt"
-    curl_output_file="$output_location/output_$instance_id.txt"
-    curl_headers_file="$output_location/headers_$instance_id.txt"
-
+    # send a curl request with retries
     max_tries=3
     if [[ -n $max_tries_override ]]; then
         max_tries=$max_tries_override
@@ -884,7 +911,6 @@ send_curl_request() {
     fi
 
     try=1
-    echo "" > "$curl_output_file"
 
     while [[ $try -le $max_tries ]]; do
         # skip token check for Platform API requests
@@ -964,6 +990,7 @@ send_curl_request() {
     done
     if [[ $try -gt $max_tries ]]; then
         curl_failed="true"
+        export curl_failed
         echo "   [send_curl_request] ERROR: fail response - maximum attempts reached - cannot continue."
     fi
 }
@@ -1074,7 +1101,14 @@ encode_name() {
 }
 
 get_object_id_from_name() {
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
 
     api_object_type=$(get_api_object_type "$api_xml_object")
@@ -1098,7 +1132,14 @@ get_object_id_from_name() {
 
 
 get_computers_in_group() {
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
 
     # send request to get each version
@@ -1136,7 +1177,14 @@ get_computers_in_group() {
 
 
 get_mobile_devices_in_group() {
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
 
     # send request to get each version
@@ -1176,7 +1224,14 @@ get_mobile_devices_in_group() {
 generate_computer_list() {
     # The Jamf Pro API returns a list of all computers.
     # first get the device count so we can find out how many loops we need
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
     endpoint="api/preview/computers"
     url_filter="?page=0&page-size=1"
@@ -1313,7 +1368,14 @@ generate_mobile_device_list() {
     # The Jamf Pro API returns a list of all mobile devices.
 
     # first get the device count so we can find out how many loops we need
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
     endpoint="api/v2/mobile-devices"
     url_filter="?page=0&page-size=1"
@@ -1502,14 +1564,93 @@ get_api_object_from_type() {
     echo "$api_xml_object"
 }
 
+find_all_internet_passwords() {
+    local server="$1"
+    local count=0
+    local in_inet_entry=false
+    local matching_entries=()
+    
+    echo "   [find_all_internet_passwords] Searching for all internet passwords with server: $server"
+    
+    # Get raw keychain data and process it
+    while IFS= read -r line; do
+        if [[ "$line" =~ keychain: ]]; then
+            # current_keychain="$line"  # Not used, but kept for potential debugging
+            :
+        elif [[ "$line" =~ class:.*inet ]]; then
+            in_inet_entry=true
+            current_entry=""
+        elif [[ "$in_inet_entry" == true ]]; then
+            current_entry+="$line"$'\n'
+            
+            if [[ "$line" =~ srvr.*"$server" ]]; then
+                ((count++))
+                # echo "Entry #$count found in $current_keychain"
+                matching_entries+=("$(echo "$current_entry" | grep -E 'acct.*<blob>=' | sed 's/.*<blob>="\([^"]*\)".*/\1/')")
+            fi
+            
+            if [[ -z "$line" ]]; then
+                in_inet_entry=false
+                current_entry=""
+            fi
+        fi
+    done < <(/usr/bin/security dump-keychain)
+    
+    echo "   [find_all_internet_passwords] Total entries found: $count"
+    # if [ $count -gt 0 ]; then
+    #     echo
+    #     echo "   [find_all_internet_passwords] Accounts associated with server $server:"
+    #     for account in "${matching_entries[@]}"; do
+    #         echo " - $account"
+    #     done
+    # fi
+    # Set chosen_account based on the number of matches
+    chosen_account=""
+    if [ $count -eq 0 ]; then
+        echo "   [find_all_internet_passwords] No entries found for server: $server" 
+        return 1
+    elif [ $count -eq 1 ]; then
+        chosen_account="${matching_entries[0]}"
+        echo "   [find_all_internet_passwords] Single entry found, using account: $chosen_account"
+    elif [ $count -gt 1 ]; then
+        echo "   [find_all_internet_passwords] Multiple entries found for server $server."
+        echo
+        echo "Please choose an account to use:"
+        select chosen_account in "${matching_entries[@]}"; do
+            if [[ -n "$chosen_account" ]]; then
+                echo
+                echo "   [find_all_internet_passwords] You selected: $chosen_account"
+                break
+            else
+                echo "   [find_all_internet_passwords] Invalid selection. Please try again."
+            fi
+        done
+    fi
+}
+
 set_platform_api_credentials() {
-    local api_base_url="$1"
+    api_base_url="$1"
+    platform_api_client_id="$2"
+
     if [[ $verbose -gt 0 ]]; then
         echo "   [set_platform_api_credentials] Setting credentials for $api_base_url"
     fi
 
-    # check for Client ID entry in login keychain
-    platform_api_client_id=$(/usr/bin/security find-internet-password -s "$api_base_url" -g 2>/dev/null | /usr/bin/grep "acct" | /usr/bin/cut -d \" -f 4 )
+    instance_base="${api_base_url/*:\/\//}"
+
+    if [[ $platform_api_client_id ]]; then
+        # use supplied Client ID
+        if [[ $verbose -gt 0 ]]; then
+            echo "   [set_platform_api_credentials] Using supplied Client ID: $platform_api_client_id"
+        fi
+    else
+        if [[ $verbose -gt 0 ]]; then
+            echo "   [set_platform_api_credentials] No Client ID supplied, checking keychain for entry for $api_base_url (you will be prompted if multiple entries exist)"
+        fi
+        # check for Client ID entry in login keychain
+        find_all_internet_passwords "$api_base_url"
+        platform_api_client_id="$chosen_account"
+    fi
 
     if [[ ! $platform_api_client_id ]]; then
         echo "   [set_platform_api_credentials] No keychain entry for $api_base_url found. Please run the set_platformapi_credentials.sh script to add the Client ID to your keychain"
@@ -1517,10 +1658,13 @@ set_platform_api_credentials() {
     fi
 
     # check for secret entry in login keychain
-    # jss_api_password=$("${this_script_dir}/keychain.sh" -t internet -p -s "$jss_url")
-    platform_api_client_secret=$(/usr/bin/security find-internet-password -s "$api_base_url" -a "$platform_api_client_id" -w -g 2>&1 )
+    platform_api_client_secret=$(/usr/bin/security find-internet-password -s "$api_base_url" -l "$instance_base ($platform_api_client_id)" -a "$platform_api_client_id" -w -g 2>&1 )
 
-    if [[ ! $platform_api_client_secret ]]; then
+    if [[ $platform_api_client_secret ]]; then
+        if [[ $verbose -gt 0 ]]; then
+            echo "   [set_platform_api_credentials] Found Client Secret for $platform_api_client_id"
+        fi
+    else
         echo "   [set_platform_api_credentials] No Client Secret for $platform_api_client_id found. Please run the set_platformapi_credentials.sh script to add the Client Secret to your keychain"
         exit 1
     fi
@@ -1529,8 +1673,10 @@ set_platform_api_credentials() {
 }
 
 check_if_paginated() {
+    echo "   [check_if_paginated] API base URL: $api_base_url" # TEMP
     # do a call to see if the endpoint is paginated
-    if [[ $api_base_url == *".apigw.jamf.com" ]]; then
+
+    if [[ $api_base_url == *".apigw.jamf.com"* ]]; then
         echo "   [check_if_paginated] Detected Platform API endpoint."
         check_platform_api_token
         curl_url="$api_base_url/$endpoint"
@@ -1542,19 +1688,28 @@ check_if_paginated() {
         curl_url="$jss_instance/$endpoint"
     fi
 
-    if ! http_response=$(curl \
-        --location \
-        --silent \
-        --show-error \
-        --dump-header "$curl_headers_file" \
-        --request GET \
-        "$curl_url" \
-        --header "authorization: Bearer $token" \
-        --header 'Accept: application/json' \
-        --write-out "%{http_code}" \
-        --cookie "$cookie_jar" \
-        --cookie-jar "$cookie_jar" \
-        --output "$curl_output_file"); then
+    curl_cmd=(curl
+        --location
+        --silent
+        --show-error
+        --dump-header "$curl_headers_file"
+        --request GET
+        "$curl_url"
+        --header "authorization: Bearer $token"
+        --header 'Accept: application/json'
+        --write-out "%{http_code}"
+        --cookie "$cookie_jar"
+        --cookie-jar "$cookie_jar"
+        --output "$curl_output_file")
+
+    echo "   [check_if_paginated] Curl command sent:"
+    printf 'curl'
+    for arg in "${curl_cmd[@]:1}"; do
+        printf ' %q' "$arg"
+    done
+    printf '\n'
+
+    if ! http_response=$("${curl_cmd[@]}"); then
         echo "   [check_if_paginated] ERROR: Failed to connect to the Platform API."
         exit 1
     fi
@@ -1596,7 +1751,9 @@ get_platform_api_token() {
         echo "   [get_platform_api_token] ERROR: Failed to connect to the Platform API."
         return 1
     fi
-    # extract the token from the response
+    # get the HTTP response code
+    echo "HTTP response: $http_response" # TEMP
+
     if [[ "$http_response" -ne 200 ]]; then
         echo "   [get_platform_api_token] ERROR: Failed to get token from the Platform API. HTTP response code: $http_response"
         if [[ -s "$token_file" ]]; then
@@ -1624,24 +1781,24 @@ get_platform_api_token() {
 
     # save the server and user to the check files
     echo "$api_base_url" >"$server_check_file"
-    echo "$id" >"$user_check_file"
+    echo "$platform_api_client_id" >"$user_check_file"
 }
 
 check_platform_api_token() {
     instance_id=$(echo "$api_base_url" | sed 's|https://||' | sed 's|:|_|g' | sed 's|/|_|g' | sed 's|\.|_|g')
-    token_file="$output_location/jamf_platform_api_token_$instance_id.txt"
-    server_check_file="$output_location/jamf_server_check_$instance_id.txt"
-    user_check_file="$output_location/jamf_user_check_$instance_id.txt"
-    curl_output_file="$output_location/output_$instance_id.txt"
-    curl_headers_file="$output_location/headers_$instance_id.txt"
-    cookie_jar="$output_location/jamf_cookie_jar_$instance_id.txt"
+    token_file="$output_location/jamf_platform_api_token_${instance_id}_${platform_api_client_id}.txt"
+    server_check_file="$output_location/jamf_server_check_${instance_id}_${platform_api_client_id}.txt"
+    user_check_file="$output_location/jamf_user_check_${instance_id}_${platform_api_client_id}.txt"
+    curl_output_file="$output_location/output_${instance_id}_${platform_api_client_id}.txt"
+    curl_headers_file="$output_location/headers_${instance_id}_${platform_api_client_id}.txt"
+    cookie_jar="$output_location/jamf_cookie_jar_${instance_id}_${platform_api_client_id}.txt"
 
     # is there a token file
     if [[ -f "$token_file" ]]; then
         # check we are still querying the same server and with the same account
         server_check=$(cat "$server_check_file" 2>/dev/null)
         user_check=$(cat "$user_check_file" 2>/dev/null)
-        if [[ "$server_check" == "$api_base_url" && "$user_check" == "$id" ]]; then
+        if [[ "$server_check" == "$api_base_url" && "$user_check" == "$platform_api_client_id" ]]; then
             if jq -e .access_token "$token_file" >/dev/null; then
                 token=$(jq -r .access_token "$token_file")
                 echo "   [check_platform_api_token] Using stored token for $api_base_url at $token_file"
@@ -1700,12 +1857,13 @@ check_platform_api_token() {
 }
 
 get_platform_api_region() {
-    echo "   [get_platform_api_region] Instance: $chosen_instance"
+    local instance_url="$1"
+    echo "   [get_platform_api_region] Instance: $instance_url"
     # check for .txt files in the platform-api-instance-lists directory and 
     # see if the chosen instance is in one of those files
     finding_instance=0
     for instance_list in platform-api-instance-lists/*.txt; do
-        if grep -q "^$chosen_instance$" "$instance_list"; then
+        if grep -q "^$instance_url$" "$instance_list"; then
             finding_instance=1
             # region is the name of the file without path or extension
             chosen_region=$(basename "$instance_list" | cut -d'.' -f1)
@@ -1713,7 +1871,7 @@ get_platform_api_region() {
         fi
     done
     if [[ $finding_instance -eq 0 ]]; then
-        echo "   [get_platform_api_region] ERROR: Chosen instance ($chosen_instance) not found in any platform-api-instance-lists/*.txt file."
+        echo "   [get_platform_api_region] ERROR: Chosen instance ($instance_url) not found in any platform-api-instance-lists/*.txt file."
         exit 1
     fi
     echo "   [get_platform_api_region] Region: $chosen_region"
@@ -1770,7 +1928,7 @@ handle_platform_api_get_request() {
         slash_count=$(grep -o "/" <<< "$endpoint" | wc -l)
     fi
     if [[ $slash_count -gt 1 ]]; then
-        echo "   [handle_platform_api_get_request] Endpoint already includes an ID, cannot add sort or filter"
+        echo "   [handle_platform_api_get_request] Endpoint already includes an ID or other subfilter, cannot add sort or filter"
         filter_type="preset"
     # if there are parameters already in the endpoint, we cannot add more
     # we check for /? in the endpoint
@@ -1795,11 +1953,11 @@ handle_platform_api_get_request() {
 
     if [[ $filter_type == "sort" || $filter_type == "none" ]]; then
         # first check if the endpoint is paginated
-        set_platform_api_credentials "$api_base_url"
+        set_platform_api_credentials "$api_base_url" "$platform_api_client_id"
         check_if_paginated
         if [[ "$paginated" == "true" ]]; then
             url_filter="?page=0&page-size=1"
-            curl_url="$api_base_url$endpoint/$url_filter"
+            curl_url="$api_base_url$endpoint$url_filter"
             curl_args=("--request")
             curl_args+=("GET")
             curl_args+=("--header")
@@ -1825,7 +1983,7 @@ handle_platform_api_get_request() {
                 if [[ "$filter_type" == "sort" && "$key" ]]; then
                     url_filter="$url_filter&sort=$key"
                 fi
-                curl_url="$api_base_url$endpoint/$url_filter"
+                curl_url="$api_base_url$endpoint$url_filter"
                 curl_args=("--request")
                 curl_args+=("GET")
                 curl_args+=("--header")
@@ -1852,7 +2010,7 @@ handle_platform_api_get_request() {
             # url-encode the key without using python3
             match_encoded=$(printf "%s" "$match" | jq -s -R -r @uri)
             url_filter="?filter=$key%3D%3D%22$match_encoded%22"
-            curl_url="$api_base_url$endpoint/$url_filter"
+            curl_url="$api_base_url$endpoint$url_filter"
         fi
         curl_args=("--request")
         curl_args+=("GET")

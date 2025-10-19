@@ -32,6 +32,7 @@ Usage:
                                     (must exist in the instance-lists folder)
 --i JSS_URL                        - perform action on a single instance
                                      (must exist in the relevant instance list)
+--user | --client-id CLIENT_ID     - use the specified client ID or username
 --all                              - perform action on ALL instances in the instance list
 -x | --nointeraction               - run without checking instance is in an instance list 
 -e | --endpoint ENDPOINT_URL       - perform action on a specific endpoint, e.g. /api/v1/engage
@@ -50,8 +51,14 @@ USAGE
 }
 
 request() {
-    # determine jss_url
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
     # send request
     curl_url="$jss_url$endpoint"
@@ -140,6 +147,10 @@ while [[ "$#" -gt 0 ]]; do
         -a|-ai|--all|--all-instances)
             all_instances=1
             ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -x|--nointeraction)
             no_interaction=1
             ;;

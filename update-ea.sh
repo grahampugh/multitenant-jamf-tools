@@ -30,22 +30,23 @@ fi
 usage() {
     cat <<'USAGE'
 Usage:
-./set_credentials.sh          - set the Keychain credentials
+./set_credentials.sh                - set the Keychain credentials
 
-[no arguments]                - interactive mode
---name EA-NAME                - provide extension attribute name
---value EA-VALUE              - provide extension attribute value to be set
---group                       - Predefine devices to those in a specified group
---id                          - Predefine an ID (from Jamf) to search for
---serial                      - Predefine a computer's Serial Number to search for. 
-                                Can be a CSV list,
-                                e.g. ABCD123456,ABDE234567,XWSA123456
---il FILENAME (without .txt)  - provide an instance list filename
-                                (must exist in the instance-lists folder)
---i JSS_URL                   - perform action on a single instance
-                                (must exist in the relevant instance list)
---all                         - perform action on ALL instances in the instance list
--v                            - add verbose curl output
+[no arguments]                     - interactive mode
+--name EA-NAME                     - provide extension attribute name
+--value EA-VALUE                   - provide extension attribute value to be set
+--group                            - Predefine devices to those in a specified group
+--id                               - Predefine an ID (from Jamf) to search for
+--serial                           - Predefine a computer's Serial Number to search for.
+                                     Can be a CSV list,
+                                     e.g. ABCD123456,ABDE234567,XWSA123456
+--il FILENAME (without .txt)       - provide an instance list filename
+                                     (must exist in the instance-lists folder)
+--i JSS_URL                        - perform action on a single instance
+                                     (must exist in the relevant instance list)
+--all                              - perform action on ALL instances in the instance list
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+-v                                 - add verbose curl output
 USAGE
 }
 
@@ -77,7 +78,14 @@ update_ea() {
         echo
 
         # set EA value
-        set_credentials "$jss_instance"
+        # get token
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_instance" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+        else
+            set_credentials "$jss_instance"
+            echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        fi
         jss_url="$jss_instance"
         endpoint="/api/v1/computers-inventory-detail"
         curl_url="$jss_url/$endpoint/$computer_id"
@@ -138,6 +146,10 @@ while [[ "$#" -gt 0 ]]; do
             shift
             chosen_instance="$1"
         ;;
+        --client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -id|--id)
             shift
             id="$1"
@@ -150,12 +162,6 @@ while [[ "$#" -gt 0 ]]; do
             shift
             group_name="$1"
             encode_name "$group_name"
-            ;;
-        --computers)
-            device_type="computers"
-            ;;
-        --devices)
-            device_type="devices"
             ;;
         --confirm)
             echo "   [main] CLI: Action: auto-confirm copy or delete, for non-interactive use."

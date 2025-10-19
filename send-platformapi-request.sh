@@ -34,7 +34,7 @@ Usage:
 
 [no arguments]                     - interactive mode
 --region REGION                    - Platform API region (one of US, EU, APAC)
---id ID                            - Platform API ID
+--id | --client-id CLIENT_ID       - use the specified client ID or username
 --secret SECRET                    - Platform API Secret
 -e | --endpoint ENDPOINT_URL       - perform action on a specific endpoint, e.g. /api/v1/engage
 -r | --request REQUEST_TYPE        - GET/POST/PUT/PATCH/DELETE
@@ -49,11 +49,15 @@ USAGE
 request() {
     # get token
     if [[ "$chosen_id" && "$chosen_secret" ]]; then
+        echo "   [request] Using provided Client ID and supplied secret for $api_base_url ($platform_api_client_id)"
         platform_api_client_id="$chosen_id"
         platform_api_client_secret="$chosen_secret"
+    elif [[ "$chosen_id" ]]; then
+        set_platform_api_credentials "$api_base_url" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $api_base_url ($platform_api_client_id)"
     else
         set_platform_api_credentials "$api_base_url"
-        echo "   [request] Using stored credentials for $api_base_url"
+        echo "   [request] Using stored credentials for $api_base_url ($platform_api_client_id)"
     fi
 
     # set url
@@ -129,12 +133,7 @@ while [[ "$#" -gt 0 ]]; do
         -x|--nointeraction)
             no_interaction=1
             ;;
-        --region)
-            shift
-            # Set the chosen region, convert to lowercase
-            chosen_region="$(echo "$1" | tr '[:upper:]' '[:lower:]')"
-        ;;
-        --id)
+        --id|--client-id)
             shift
             chosen_id="$1"
         ;;
@@ -193,19 +192,17 @@ fi
 # select the instances that will be changed
 choose_destination_instances
 
-# set the region based on the chosen instances if not already set
-if [[ ! $chosen_region ]]; then
-    get_platform_api_region
-fi
-
 # perform the request on all chosen instances
 for instance in "${instance_choice_array[@]}"; do
+
+    # set the region based on the chosen instances if not already set
+    get_platform_api_region "$instance"
 
     # set the URL based on the chosen region
     if [[ $chosen_region ]]; then
         get_region_url
     else
-        echo "   [main] ERROR: No region specified. Please provide a region using the --region option."
+        echo "   [main] ERROR: No region specified. Ensure the instance has been added to the relevant list in the platform-api-instance-lists directory."
         exit 1
     fi
 

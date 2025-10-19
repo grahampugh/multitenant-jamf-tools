@@ -29,81 +29,82 @@ usage() {
     echo "
 ./mdm-commands.sh options
 
-./set_credentials.sh            - set the Keychain credentials
+./set_credentials.sh               - set the Keychain credentials
 
-[no arguments]                  - interactive mode
--il | --instance-list FILENAME  - provide an instance list filename (without .txt)
-                                  (must exist in the instance-lists folder)
--i | --instance JSS_URL         - perform action on a specific instance
-                                  (must exist in the relevant instance list)
-                                  (multiple values can be provided)
--x | --nointeraction            - run without checking instance is in an instance list 
-                                  (prevents interactive choosing of instances)
--v                              - add verbose curl output
+[no arguments]                     - interactive mode
+-il | --instance-list FILENAME     - provide an instance list filename (without .txt)
+                                     (must exist in the instance-lists folder)
+-i | --instance JSS_URL            - perform action on a specific instance
+                                     (must exist in the relevant instance list)
+                                     (multiple values can be provided)
+-x | --nointeraction               - run without checking instance is in an instance list
+                                     (prevents interactive choosing of instances)
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+-v | --verbose                     - add verbose curl output
 
 MDM command type:
 
---erase                         - Erase the device
---redeploy                      - Redeploy the Management Framework
---recovery                      - Set the recovery lock password
-                                  Recovery lock password will be random unless set
-                                  with --recovery-lock-password
---removemdm                     - Remove the MDM Enrollment Profile (Unmanage)
---deleteusers                   - Delete all users from a device (Shared iPad)
---restart                       - Restart device (mobile devices only)
---logout                        - Log out user from a device (mobile devices only)
---flushmdm                      - Flush MDM commands
---bluetooth-off                 - Disable Bluetooth (mobile devices only)
---bluetooth-on                  - Enable Bluetooth (mobile devices only)
---toggle                        - Toggle Software Update Plan Feature
-                                  This will toggle the feature on or off, clearing any plans
-                                  that may be set.
---msuplanstatus                 - Get MSU Software Update plan status for individual devices
---msuupdatestatus               - Get MSU Software Update update status for individual devices
---msucreateplan                 - Create an MSU Software Update plan for a group of devices
-                                  Requires --group and --version-type options
-                                  (see below for more details)
+--erase                            - Erase the device
+--redeploy                         - Redeploy the Management Framework
+--recovery                         - Set the recovery lock password
+                                     Recovery lock password will be random unless set
+                                     with --recovery-lock-password
+--removemdm                        - Remove the MDM Enrollment Profile (Unmanage)
+--deleteusers                      - Delete all users from a device (Shared iPad)
+--restart                          - Restart device (mobile devices only)
+--logout                           - Log out user from a device (mobile devices only)
+--flushmdm                         - Flush MDM commands
+--bluetooth-off                    - Disable Bluetooth (mobile devices only)
+--bluetooth-on                     - Enable Bluetooth (mobile devices only)
+--toggle                           - Toggle Software Update Plan Feature
+                                     This will toggle the feature on or off, clearing any plans
+                                     that may be set.
+--msuplanstatus                    - Get MSU Software Update plan status for individual devices
+--msuupdatestatus                  - Get MSU Software Update update status for individual devices
+--msucreateplan                    - Create an MSU Software Update plan for a group of devices
+                                     Requires --group and --version-type options
+                                     (see below for more details)
 
 Options for the --recovery type:
 
---random-lock-password          - Create a random recovery lock password (this is the default)
---recovery-lock-password        - Define a recovery lock password
---clear-recovery-lock-password  - Clear the recovery lock password
+--random-lock-password             - Create a random recovery lock password (this is the default)
+--recovery-lock-password           - Define a recovery lock password
+--clear-recovery-lock-password     - Clear the recovery lock password
 
 Options for the --deleteusers type:
---force                         - Force user deletion
---noforce                       - Do not force deletion
---group                         - Predefine devices to those in a specified group
+--force                            - Force user deletion
+--noforce                          - Do not force deletion
+--group                            - Predefine devices to those in a specified group
 
 Options for the --restart and --logout types:
---group                         - Predefine devices to those in a specified group
+--group                            - Predefine devices to those in a specified group
 
 Options for the --msucreateplan type:
---computers                     - Device type is computers
---devices                       - Device type is mobile devices
---appletv                       - Device type is Apple TV
---group                         - Predefine devices to those in a specified group (required)
---version-type                  - Specify the version type to use for the plan
-                                  (one of 'LATEST_ANY', 'LATEST_MINOR', 'LATEST_MAJOR', 'SPECIFIC_VERSION')
---version                       - Specify a specific version to use for the plan, if version-type is missing
-                                  or set to 'SPECIFIC_VERSION'
-                                  (e.g. 14.6, 15.0.1)
---days-until-force-install      - Specify the number of days until the plan will force install
-                                  (default is 7)
+--computers                        - Device type is computers
+--devices                          - Device type is mobile devices
+--appletv                          - Device type is Apple TV
+--group                            - Predefine devices to those in a specified group (required)
+--version-type                     - Specify the version type to use for the plan
+                                     (one of 'LATEST_ANY', 'LATEST_MINOR', 'LATEST_MAJOR', 'SPECIFIC_VERSION')
+--version                          - Specify a specific version to use for the plan, if version-type is missing
+                                     or set to 'SPECIFIC_VERSION'
+                                     (e.g. 14.6, 15.0.1)
+--days-until-force-install         - Specify the number of days until the plan will force install
+                                     (default is 7)
 
 Options for the --msuplanstatus type:
---events                      - Include event details in the output (default is false)
---open                        - Open the output CSV file in the default application (default is false)
+--events                           - Include event details in the output (default is false)
+--open                             - Open the output CSV file in the default application (default is false)
 
 Options for the --msuupdatestatus type:
---open                        - Open the output CSV file in the default application (default is false)
+--open                             - Open the output CSV file in the default application (default is false)
 
 Options for the --flushmdm type:
---pending                       - Flush pending commands only (default is pending+failed)
---failed                        - Flush failed commands only (default is pending+failed)
---computers                     - Device type is computers (default)
---devices                       - Devices type is devices (default is computers)
---group                         - Flush commands based on a group rather than individual computers or devices
+--pending                          - Flush pending commands only (default is pending+failed)
+--failed                           - Flush failed commands only (default is pending+failed)
+--computers                        - Device type is computers (default)
+--devices                          - Devices type is devices (default is computers)
+--group                            - Flush commands based on a group rather than individual computers or devices
 
 Define the target clients:
 
@@ -128,7 +129,14 @@ redeploy_framework() {
         echo
 
         # redeploy Management Framework
-        set_credentials "$jss_instance"
+        # get token
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_instance" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+        else
+            set_credentials "$jss_instance"
+            echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        fi
         jss_url="$jss_instance"
         endpoint="api/v1/jamf-management-framework/redeploy"
         curl_url="$jss_url/$endpoint/$computer_id"
@@ -146,7 +154,14 @@ redeploy_framework() {
 
 get_software_update_feature_status() {
     # grab current value
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
     endpoint="api/v1/managed-software-updates/plans/feature-toggle"
     curl_url="$jss_url/$endpoint"
@@ -165,7 +180,14 @@ get_software_update_feature_status() {
     echo "   [toggle_software_update_feature] Current toggle value is '$toggle_value'. "
 
     # grab current background status
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
     endpoint="api/v1/managed-software-updates/plans/feature-toggle/status"
     curl_url="$jss_url/$endpoint"
@@ -191,7 +213,14 @@ toggle_software_update_feature() {
     echo
 
     # toggle software update feature
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
     endpoint="api/v1/managed-software-updates/plans/feature-toggle"
     curl_url="$jss_url/$endpoint"
@@ -350,7 +379,14 @@ msu_create_plan() {
         exit 1
     fi
 
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
     endpoint="api/v1/managed-software-updates/plans/group"
     curl_url="$jss_url/$endpoint"
@@ -419,7 +455,14 @@ msu_plan_status() {
     # cat "$computer_output" # TEMP
 
     # get MSU Software Update plan status
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
     endpoint="/api/v1/managed-software-updates/plans"
     sort_filter="planUuid"
@@ -515,7 +558,14 @@ get_event() {
         # now run the command and output the results to a file
 
         # grab current background status
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
         set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
         jss_url="$jss_instance"
         endpoint="api/v1/managed-software-updates/plans/$event/events"
         curl_url="$jss_url/$endpoint"
@@ -616,7 +666,14 @@ msu_update_status() {
     # cat "$computer_output" # TEMP
 
     # get MSU Software Update plan status
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
     endpoint="/api/v1/managed-software-updates/update-statuses"
     sort_filter="osUpdatesStatusId"
@@ -708,7 +765,14 @@ delete_users() {
         echo
 
         # redeploy Management Framework
-        set_credentials "$jss_instance"
+        # get token
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_instance" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+        else
+            set_credentials "$jss_instance"
+            echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        fi
         jss_url="$jss_instance"
         endpoint="api/v2/mdm/commands"
         curl_url="$jss_url/$endpoint"
@@ -752,7 +816,14 @@ logout_users() {
         echo
 
         # redeploy Management Framework
-        set_credentials "$jss_instance"
+        # get token
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_instance" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+        else
+            set_credentials "$jss_instance"
+            echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        fi
         jss_url="$jss_instance"
         endpoint="api/v2/mdm/commands"
         curl_url="$jss_url/$endpoint"
@@ -797,7 +868,14 @@ send_settings_command() {
         echo
 
         # redeploy Management Framework
-        set_credentials "$jss_instance"
+        # get token
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_instance" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+        else
+            set_credentials "$jss_instance"
+            echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        fi
         jss_url="$jss_instance"
         endpoint="api/v2/mdm/commands"
         curl_url="$jss_url/$endpoint"
@@ -845,7 +923,14 @@ restart() {
         echo
 
         # redeploy Management Framework
-        set_credentials "$jss_instance"
+        # get token
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_instance" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+        else
+            set_credentials "$jss_instance"
+            echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        fi
         jss_url="$jss_instance"
         endpoint="api/v2/mdm/commands"
         curl_url="$jss_url/$endpoint"
@@ -1012,7 +1097,14 @@ remove_mdm() {
         echo
 
         # Unmanage device
-        set_credentials "$jss_instance"
+        # get token
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_instance" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+        else
+            set_credentials "$jss_instance"
+            echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        fi
         jss_url="$jss_instance"
         endpoint="JSSResource/computercommands/command/UnmanageDevice/id"
         curl_url="$jss_url/$endpoint/$computer_id"
@@ -1055,7 +1147,14 @@ flush_mdm() {
             echo
 
             # perform MDM flush command - endpoint uses api object type (computergroups/mobiledevicegroups)
-            set_credentials "$jss_instance"
+            # get token
+            if [[ "$chosen_id" ]]; then
+                set_credentials "$jss_instance" "$chosen_id"
+                echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+            else
+                set_credentials "$jss_instance"
+                echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+            fi
             jss_url="$jss_instance"
             endpoint="JSSResource/commandflush"
             curl_url="$jss_url/$endpoint/$api_object_type/id/$existing_id/status/$status_option"
@@ -1095,7 +1194,14 @@ flush_mdm() {
                 echo
 
                 # perform MDM flush command
-                set_credentials "$jss_instance"
+                # get token
+                if [[ "$chosen_id" ]]; then
+                    set_credentials "$jss_instance" "$chosen_id"
+                    echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+                else
+                    set_credentials "$jss_instance"
+                    echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+                fi
                 jss_url="$jss_instance"
                 endpoint="JSSResource/commandflush"
                 curl_url="$jss_url/$endpoint/$device_type/id/$mobile_device_id/status/$status_option"
@@ -1145,6 +1251,10 @@ while test $# -gt 0 ; do
             shift
             chosen_instance="$1"
             ;;
+        --client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -x|--nointeraction)
             no_interaction=1
             ;;

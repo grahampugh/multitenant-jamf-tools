@@ -31,16 +31,17 @@ fi
 usage() {
     cat <<'USAGE'
 Usage:
-./set_credentials.sh                - set the Keychain credentials
+./set_credentials.sh               - set the Keychain credentials
 
-[no arguments]                      - interactive mode
---template /path/to/Template.xml    - template to use (must be a .xml file)
---il FILENAME (without .txt)        - provide an instance list filename
-                                        (must exist in the instance-lists folder)
---i JSS_URL                         - perform action on a single instance
-                                        (must exist in the relevant instance list)
---all                               - perform action on ALL instances in the instance list
--v                                  - add verbose curl output
+[no arguments]                     - interactive mode
+--template /path/to/Template.xml   - template to use (must be a .xml file)
+--il FILENAME (without .txt)       - provide an instance list filename
+                                     (must exist in the instance-lists folder)
+--i JSS_URL                        - perform action on a single instance
+                                     (must exist in the relevant instance list)
+--all                              - perform action on ALL instances in the instance list
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+-v                                 - add verbose curl output
 
 NOTE: the SMTP server name, sender name, email address and any other specifics should be added directly to the XML template file.
 USAGE
@@ -48,7 +49,14 @@ USAGE
 
 upload_smtpserver_data() {
     # determine jss_url
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="${jss_instance}"
     # send request
     curl_url="$jss_url/JSSResource/smtpserver"
@@ -83,6 +91,10 @@ while [[ "$#" -gt 0 ]]; do
         ;;
         -a|--all)
             all_instances=1
+        ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
         ;;
         -v|--verbose)
             verbose=1
