@@ -562,13 +562,13 @@ set_credentials() {
 
     # check for username entry in login keychain
     if [[ ! $jss_api_user ]]; then
-        find_all_internet_passwords "$api_base_url"
+        find_all_internet_passwords "$jss_url"
         find_result=$?
         if [[ $find_result -eq 1 ]]; then
-            echo "   [set_credentials] No username or Client ID found for $api_base_url in keychain"
+            echo "   [set_credentials] No username or Client ID found for $jss_url in keychain"
             exit 1
         elif [[ $find_result -eq 2 ]]; then
-            echo "   [set_credentials] Multiple usernames/Client IDs found for $api_base_url in keychain, but no interaction allowed"
+            echo "   [set_credentials] Multiple usernames/Client IDs found for $jss_url in keychain, but no interaction allowed"
             exit 1
         fi
         jss_api_user="$chosen_account"
