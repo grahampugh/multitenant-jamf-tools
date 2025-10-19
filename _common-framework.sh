@@ -562,20 +562,25 @@ set_credentials() {
 
     # check for username entry in login keychain
     if [[ ! $jss_api_user ]]; then
-        # jss_api_user=$("${this_script_dir}/keychain.sh" -t internet -u -s "$jss_url")
-        # jss_api_user=$(/usr/bin/security find-internet-password -s "$jss_url" -g 2>/dev/null | /usr/bin/grep "acct" | /usr/bin/cut -d \" -f 4 )
-                # check for Client ID entry in login keychain
-        find_all_internet_passwords "$jss_url"
+        find_all_internet_passwords "$api_base_url"
+        find_result=$?
+        if [[ $find_result -eq 1 ]]; then
+            echo "   [set_credentials] No username or Client ID found for $api_base_url in keychain"
+            exit 1
+        elif [[ $find_result -eq 2 ]]; then
+            echo "   [set_credentials] Multiple usernames/Client IDs found for $api_base_url in keychain, but no interaction allowed"
+            exit 1
+        fi
         jss_api_user="$chosen_account"
         echo "   [set_credentials] Using user/client ID: $jss_api_user" # TEMP
     fi
 
     if [[ ! $jss_api_user ]]; then
-        echo "No keychain entry for $jss_url found. Please run the set_credentials.sh script to add the user to your keychain"
+        echo "No keychain entry for $jss_url found. Please run the set_credentials.sh script to add the username/Client ID to your keychain"
         exit 1
     else
         if [[ $verbose -gt 0 ]]; then
-            echo "   [set_credentials] Found user $jss_api_user for $jss_url"
+            echo "   [set_credentials] Found username/Client ID: $jss_api_user for $jss_url"
         fi
     fi
 
@@ -584,11 +589,11 @@ set_credentials() {
     jss_api_password=$(/usr/bin/security find-internet-password -s "$jss_url" -l "$instance_base ($jss_api_user)" -a "$jss_api_user" -w -g 2>&1 )
 
     if [[ ! $jss_api_password ]]; then
-        echo "No password/Client ID for $jss_api_user found. Please run the set_credentials.sh script to add the password/Client ID to your keychain"
+        echo "No password/Client Secret for $jss_api_user found. Please run the set_credentials.sh script to add the password/Client Secret to your keychain"
         exit 1
     else
         if [[ $verbose -gt 0 ]]; then
-            echo "   [set_credentials] Found password/Client ID for $jss_api_user"
+            echo "   [set_credentials] Found password/Client Secret for $jss_api_user"
         fi
     fi
 
@@ -1597,13 +1602,6 @@ find_all_internet_passwords() {
     done < <(/usr/bin/security dump-keychain)
     
     echo "   [find_all_internet_passwords] Total entries found: $count"
-    # if [ $count -gt 0 ]; then
-    #     echo
-    #     echo "   [find_all_internet_passwords] Accounts associated with server $server:"
-    #     for account in "${matching_entries[@]}"; do
-    #         echo " - $account"
-    #     done
-    # fi
     # Set chosen_account based on the number of matches
     chosen_account=""
     if [ $count -eq 0 ]; then
@@ -1615,6 +1613,10 @@ find_all_internet_passwords() {
     elif [ $count -gt 1 ]; then
         echo "   [find_all_internet_passwords] Multiple entries found for server $server."
         echo
+        if [[ $no_interaction -eq 1 ]]; then
+            echo "   [find_all_internet_passwords] No interaction mode enabled, cannot choose between multiple entries."
+            return 2
+        fi
         echo "Please choose an account to use:"
         select chosen_account in "${matching_entries[@]}"; do
             if [[ -n "$chosen_account" ]]; then
@@ -1649,6 +1651,14 @@ set_platform_api_credentials() {
         fi
         # check for Client ID entry in login keychain
         find_all_internet_passwords "$api_base_url"
+        find_result=$?
+        if [[ $find_result -eq 1 ]]; then
+            echo "   [set_platform_api_credentials] No Client ID found for $api_base_url in keychain"
+            exit 1
+        elif [[ $find_result -eq 2 ]]; then
+            echo "   [set_platform_api_credentials] Multiple Client IDs found for $api_base_url in keychain, but no interaction allowed"
+            exit 1
+        fi
         platform_api_client_id="$chosen_account"
     fi
 

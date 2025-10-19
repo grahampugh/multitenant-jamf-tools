@@ -42,6 +42,7 @@ Usage:
 -f | --filter KEY                  - filter key for GET requests to Jamf Pro API
 -m | --match VALUE                 - match value for filtering GET requests to Jamf Pro API
 --data DATA                        - data to send with the request
+--datafile FILENAME                - file containing data to send with the request
 -v                                 - add verbose curl output
 USAGE
 }
@@ -88,6 +89,14 @@ request() {
         if [[ "$data" ]]; then
             curl_args+=("--data")
             curl_args+=("$data")
+        elif [[ "$datafile" ]]; then
+            if [[ -f "$datafile" ]]; then
+                curl_args+=("--data")
+                curl_args+=("@$datafile")
+            else
+                echo "   [request] ERROR: datafile $datafile not found. Aborting."
+                exit 1
+            fi
         fi
         send_curl_request
     fi
@@ -164,6 +173,10 @@ while [[ "$#" -gt 0 ]]; do
         -d|--data)
             shift
             data="$1"
+        ;;
+        --datafile)
+            shift
+            datafile="$1"
         ;;
         -v|--verbose)
             verbose=1

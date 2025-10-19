@@ -43,6 +43,7 @@ Usage:
 --xml                              - use XML output instead of JSON
                                      (only for GET requests to Classic API)
 --data DATA                        - data to send with the request
+--datafile FILENAME                - file containing data to send with the request
 -v                                 - add verbose curl output
 
 Note: for the Classic API, filter directly using the endpoint URL, either with /name/ or /id/
@@ -58,6 +59,7 @@ request() {
     else
         set_credentials "$jss_instance"
         echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        chosen_id="$jss_api_user"
     fi
     jss_url="$jss_instance"
     # send request
@@ -94,6 +96,14 @@ request() {
         if [[ "$data" ]]; then
             curl_args+=("--data")
             curl_args+=("$data")
+        elif [[ "$datafile" ]]; then
+            if [[ -f "$datafile" ]]; then
+                curl_args+=("--data")
+                curl_args+=("@$datafile")
+            else
+                echo "   [request] ERROR: datafile $datafile not found. Aborting."
+                exit 1
+            fi
         fi
         send_curl_request
     fi
@@ -177,6 +187,10 @@ while [[ "$#" -gt 0 ]]; do
         -d|--data)
             shift
             data="$1"
+        ;;
+        --datafile)
+            shift
+            datafile="$1"
         ;;
         --xml)
             xml_output=1

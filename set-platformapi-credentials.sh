@@ -40,6 +40,43 @@ USAGE
 # MAIN
 # --------------------------------------------------------------------------------
 
+while test $# -gt 0 ; do
+    case "$1" in
+        -il|--instance-list)
+            shift
+            chosen_instance_list_file="$1"
+            ;;
+        -i|--instance)
+            shift
+            chosen_instance="$1"
+            ;;
+        -a|-ai|--all|--all-instances)
+            all_instances=1
+            ;;
+        -x|--nointeraction)
+            no_interaction=1
+            ;;
+        --id|--client-id)
+            shift
+            chosen_id="$1"
+            ;;
+        --secret|--client-secret)
+            shift
+            chosen_secret="$1"
+            ;;
+        -v*)
+            verbose=1
+            ;;
+        *)
+            echo
+            usage
+            exit 0
+            ;;
+    esac
+    shift
+done
+echo
+
 if [[ ${#chosen_instances[@]} -eq 1 ]]; then
     chosen_instance="${chosen_instances[0]}"
     echo "   [main] Running on instance: $chosen_instance"
@@ -52,7 +89,7 @@ choose_destination_instances
 chosen_instance="${instance_choice_array[0]}"
 
 # set the region based on the chosen instance
-get_platform_api_region
+get_platform_api_region "$chosen_instance"
 
 # set the URL based on the chosen region
 if [[ $chosen_region ]]; then
@@ -62,59 +99,108 @@ else
     exit 1
 fi
 
-# Ask for the Client ID
-echo "Enter Client ID for $api_base_url"
-read -r -p "Client ID : " inputted_client_id
-if [[ ! $inputted_client_id ]]; then
-    echo "   [main] No Client ID supplied"
-    exit 1
+# Ask for the username (show any existing value of first instance in list as default)
+if [[ ! $chosen_id ]]; then
+    echo "Enter Client ID for $api_base_url"
+    read -r -p "Client ID : " chosen_id
+    if [[ ! $chosen_id ]]; then
+        echo "   [main] No Client ID supplied"
+        exit 1
+    fi
 fi
 
 # check for existing service entry in login keychain
 region_base="${api_base_url/*:\/\//}"
-kc_check=$(security find-internet-password -s "$api_base_url" -l "$region_base ($inputted_client_id)" -a "$inputted_client_id" -g 2>/dev/null)
 
-if [[ $kc_check ]]; then
-    echo "   [main] Keychain entry for $inputted_client_id found on $region_base"
+# first check if there is an entry for the server
+server_check=$(security find-internet-password -s "$api_base_url" 2>/dev/null)
+if [[ $server_check ]]; then
+    echo "Keychain entry/ies for $region_base found"
+    # next check if there is an entry for the user on that server
+    kc_check=$(security find-internet-password -s "$api_base_url" -l "$region_base ($chosen_id)" -a "$chosen_id" -g 2>/dev/null)
+
+    if [[ $kc_check ]]; then
+        echo "Keychain entry for $chosen_id found on $region_base"
+        # check for existing password entry in login keychain
+        client_secret=$(security find-internet-password -s "$api_base_url" -l "$region_base ($chosen_id)" -a "$chosen_id" -w -g 2>&1)
+        if [[ ${#client_secret} -gt 0 && $client_secret != "security: "* ]]; then
+            echo "Password/Client Secret for $chosen_id found on $region_base"
+        else
+            echo "Password/Client Secret for $chosen_id not found on $region_base"
+            client_secret=""
+        fi
+    else
+        echo "Keychain entry for $chosen_id not found on $region_base"
+    fi
 else
-    echo "   [main] Keychain entry for $inputted_client_id not found on $region_base"
+    echo "Keychain entry for $region_base not found"
+fi
+
+# now delete all existing entries from the selected instance for any username
+# Find and delete all keychain entries for this region, repeatedly until none remain
+deleted_count=0
+while true; do
+    # Find the first entry for this region
+    entry=$(security find-internet-password -s "$api_base_url" 2>/dev/null)
+    if [[ -z "$entry" ]]; then
+        echo "No more entries found, done with $api_base_url"
+        break
+    fi
+    
+    # Extract the label from the entry (stored in 0x00000007 attribute)
+    label=$(echo "$entry" | grep "0x00000007" | awk -F'"' '{print $2}')
+    if [[ $label == "$region_base ("*")" ]]; then
+        # Delete this specific entry
+        echo "Deleting password for $label"
+        if security delete-internet-password -s "$api_base_url" -l "$label"; then
+            ((deleted_count++))
+        else
+            # If deletion failed, break to avoid infinite loop
+            break
+        fi
+    else
+        # No matching label pattern found, break the loop
+        break
+    fi
+done
+
+if [[ $deleted_count -gt 0 ]]; then
+    echo "Deleted $deleted_count existing keychain entries for $region_base"
+else
+    echo "No existing keychain entries found for $region_base"
 fi
 
 echo
-# check for existing password entry in login keychain
-client_secret=$(security find-internet-password -s "$api_base_url" -l "$region_base ($inputted_client_id)" -a "$inputted_client_id" -w -g 2>&1)
 
-if [[ ${#client_secret} -gt 0 && $client_secret != "security: "* ]]; then
-    echo "   [main] Client Secret for $inputted_client_id found on $region_base"
+if [[ "$chosen_secret" ]]; then
+    client_secret="$chosen_secret"
 else
-    echo "   [main] Client Secret for $inputted_client_id not found on $region_base"
-fi
-
-echo "Enter Client Secret for $inputted_client_id on $region_base"
-[[ $client_secret ]] && echo "(or press ENTER to use existing Client Secret from keychain for $inputted_client_id)"
-read -r -s -p "Pass : " inputted_secret
-if [[ "$inputted_secret" ]]; then
-    client_secret="$inputted_secret"
-elif [[ ! $client_secret ]]; then
-    echo "   [main] No Client Secret supplied"
-    exit 1
+    echo "Enter Client Secret for $chosen_id on $region_base"
+    [[ $client_secret ]] && echo "(or press ENTER to use existing Client Secret from keychain for $chosen_id)"
+    read -r -s -p "Pass : " chosen_secret
+    if [[ "$chosen_secret" ]]; then
+        client_secret="$chosen_secret"
+    elif [[ ! $client_secret ]]; then
+        echo "No Client Secret supplied"
+        exit 1
+    fi
 fi
 
 # Apply to selected instance
 echo
 echo
-security add-internet-password -U -s "$api_base_url" -l "$region_base ($inputted_client_id)" -a "$inputted_client_id" -w "$client_secret"
-echo "   [main] Credentials for $api_base_url (user $inputted_client_id) added to keychain"
+security add-internet-password -U -s "$api_base_url" -l "$region_base ($chosen_id)" -a "$chosen_id" -w "$client_secret"
+echo "   [main] Credentials for $api_base_url (user $chosen_id) added to keychain"
 
 # Verify the credentials
 echo
-echo "   [main] Checking credentials for $api_base_url (user $inputted_client_id)"
-platform_api_client_id="$inputted_client_id"
+echo "   [main] Checking credentials for $api_base_url (user $chosen_id)"
+platform_api_client_id="$chosen_id"
 platform_api_client_secret="$client_secret"
 if check_platform_api_token; then
-    echo "   [main] Credentials for $api_base_url (user $inputted_client_id) verified"
+    echo "   [main] Credentials for $api_base_url (user $chosen_id) verified"
 else
-    echo "   [main] ERROR: Credentials for $api_base_url (user $inputted_client_id) could not be verified"
+    echo "   [main] ERROR: Credentials for $api_base_url (user $chosen_id) could not be verified"
 fi
 
 echo
