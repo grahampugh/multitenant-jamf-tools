@@ -195,15 +195,13 @@ done
 
 echo
 
-if [[ "$chosen_secret" ]]; then
-    instance_pass="$chosen_secret"
-else
+if [[ ! "$chosen_secret" ]]; then
     echo "Enter password/Client Secret for $chosen_id on $instance_base"
     [[ $instance_pass ]] && echo "(or press ENTER to use existing password/Client Secret from keychain for $chosen_id)"
     read -r -s -p "Pass : " chosen_secret
-    if [[ "$chosen_secret" ]]; then
-        instance_pass="$chosen_secret"
-    elif [[ ! $instance_pass ]]; then
+    if [[ $instance_pass && ! "$chosen_secret" ]]; then
+        chosen_secret="$instance_pass"
+    elif [[ ! $chosen_secret ]]; then
         echo "No password/Client Secret supplied"
         exit 1
     fi
@@ -214,7 +212,7 @@ echo
 echo
 for instance in "${instance_choice_array[@]}"; do
     instance_base="${instance/*:\/\//}"
-    security add-internet-password -U -s "$instance" -l "$instance_base ($chosen_id)" -a "$chosen_id" -w "$instance_pass"
+    security add-internet-password -U -s "$instance" -l "$instance_base ($chosen_id)" -a "$chosen_id" -w "$chosen_secret"
     echo "   [main] Credentials for $instance_base (user $chosen_id) added to keychain"
 done
 

@@ -45,6 +45,7 @@ Usage:
                                      (prevents interactive choosing of instances)
 --user | --client-id CLIENT_ID     - use the specified client ID or username
 -a                                 - select browser to open the JSS in (interactively)
+-f | --failover                    - use failover address if set
 -v                                 - add verbose curl output
 USAGE
 }

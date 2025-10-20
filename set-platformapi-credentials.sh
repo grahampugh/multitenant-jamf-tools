@@ -95,8 +95,18 @@ get_platform_api_region "$chosen_instance"
 if [[ $chosen_region ]]; then
     get_region_url
 else
-    echo "   [main] ERROR: No region specified. Please provide a region using the --region option."
-    exit 1
+    # ask for the region
+    echo "Enter region (eu, us, apac) for the tenant hosted on $chosen_instance"
+    read -r -p "Region : " chosen_region
+    if [[ ! $chosen_region ]]; then
+        echo "   [main] No region supplied"
+        exit 1
+    fi
+    get_region_url
+    if [[ ! $api_base_url ]]; then
+        echo "   [main] ERROR: Could not determine API URL for region $chosen_region"
+        exit
+    fi
 fi
 
 # Ask for the username (show any existing value of first instance in list as default)
@@ -172,15 +182,13 @@ fi
 
 echo
 
-if [[ "$chosen_secret" ]]; then
-    client_secret="$chosen_secret"
-else
+if [[ ! "$chosen_secret" ]]; then
     echo "Enter Client Secret for $chosen_id on $region_base"
-    [[ $client_secret ]] && echo "(or press ENTER to use existing Client Secret from keychain for $chosen_id)"
+    [[ $instance_pass ]] && echo "(or press ENTER to use existing Client Secret from keychain for $chosen_id)"
     read -r -s -p "Pass : " chosen_secret
-    if [[ "$chosen_secret" ]]; then
-        client_secret="$chosen_secret"
-    elif [[ ! $client_secret ]]; then
+    if [[ $instance_pass && ! "$chosen_secret" ]]; then
+        chosen_secret="$instance_pass"
+    elif [[ ! $chosen_secret ]]; then
         echo "No Client Secret supplied"
         exit 1
     fi
@@ -189,14 +197,14 @@ fi
 # Apply to selected instance
 echo
 echo
-security add-internet-password -U -s "$api_base_url" -l "$region_base ($chosen_id)" -a "$chosen_id" -w "$client_secret"
+security add-internet-password -U -s "$api_base_url" -l "$region_base ($chosen_id)" -a "$chosen_id" -w "$chosen_secret"
 echo "   [main] Credentials for $api_base_url (user $chosen_id) added to keychain"
 
 # Verify the credentials
 echo
 echo "   [main] Checking credentials for $api_base_url (user $chosen_id)"
 platform_api_client_id="$chosen_id"
-platform_api_client_secret="$client_secret"
+platform_api_client_secret="$chosen_secret"
 if check_platform_api_token; then
     echo "   [main] Credentials for $api_base_url (user $chosen_id) verified"
 else
