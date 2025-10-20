@@ -65,23 +65,31 @@ jamfuploader-run.sh command (assuming 7 days):
 ./jamfuploader-run.sh computergroup --template templates/SmartGroup-LastCheckIn.xml --name "Computer Not Checked in for %DAYS_AGO% Days" --key DAYS_AGO=7
 
 # Usage:
-[no arguments]                - interactive mode
-[DAYS] (1-180)                - show count of computers not checked in for DAYS days 
-                                (default 90)
-[no arguments]                - interactive mode
---il FILENAME (without .txt)  - provide an instance list filename
-                                (must exist in the instance-lists folder)
---i JSS_URL                   - perform action on a single instance
-                                (must exist in the relevant instance list)
---all                         - perform action on ALL instances in the instance list
--x | --nointeraction          - run without checking instance is in an instance list 
-                                (prevents interactive mode)
--v                            - add verbose curl output
+[no arguments]                     - interactive mode
+[DAYS] (1-180)                     - show count of computers not checked in for DAYS days 
+                                     (default 90)
+[no arguments]                     - interactive mode
+--il FILENAME (without .txt)       - provide an instance list filename
+                                     (must exist in the instance-lists folder)
+--i JSS_URL                        - perform action on a single instance
+                                     (must exist in the relevant instance list)
+--all                              - perform action on ALL instances in the instance list
+-x | --nointeraction               - run without checking instance is in an instance list 
+                                     (prevents interactive mode)
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+-v                                 - add verbose curl output
 USAGE
 }
 
 do_the_counting() {
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="$jss_instance"
 
     # send request to get each version
@@ -136,6 +144,10 @@ while [[ "$#" -gt 0 ]]; do
         -o|--output)
             shift
             output_file="$1"
+        ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
         ;;
         -x|--nointeraction)
             no_interaction=1

@@ -33,21 +33,22 @@ A script for counting managed and unmanaged devices and computers on one or more
 - The _common-framework.sh script must be available in the same folder as this script.
 
 # Usage:
-[no arguments]                       - interactive mode
--a | --anonymous (or -a)             - output to shell with anonymous contexts
--o | --output /path/to/file.txt      - output to the specified text file (default is 
-                                       /tmp/managed-device-counter.txt)
--c | --csv /path/to/file.csv         - output to the specified CSV file (default is 
-                                       /tmp/managed-device-counter.csv)
--il | --instance-list FILENAME       - provide a server-list filename (without .txt)
-                                       (must exist in the instance-lists folder)
--i | --instance JSS_URL              - perform action on a single instance
-                                       (must exist in the relevant instance list)
---all                                - perform action on ALL instances in the instance list
--x | --nointeraction                 - run without checking instance is in an instance list 
-                                       (prevents interactive mode)
--v | --verbose                       - add verbose curl output
--h | --help                          - Show this help message
+[no arguments]                     - interactive mode
+-a | --anonymous (or -a)           - output to shell with anonymous contexts
+-o | --output /path/to/file.txt    - output to the specified text file (default is 
+                                     /tmp/managed-device-counter.txt)
+-c | --csv /path/to/file.csv       - output to the specified CSV file (default is 
+                                     /tmp/managed-device-counter.csv)
+-il | --instance-list FILENAME     - provide a server-list filename (without .txt)
+                                     (must exist in the instance-lists folder)
+-i | --instance JSS_URL            - perform action on a single instance
+                                     (must exist in the relevant instance list)
+--all                              - perform action on ALL instances in the instance list
+-x | --nointeraction               - run without checking instance is in an instance list 
+                                     (prevents interactive mode)
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+-v | --verbose                     - add verbose curl output
+-h | --help                        - Show this help message
 
 USAGE
 }
@@ -87,6 +88,10 @@ while [[ "$#" -gt 0 ]]; do
         --all)
             all_instances=1
         ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -x|--nointeraction)
             no_interaction=1
             ;;
@@ -104,12 +109,9 @@ while [[ "$#" -gt 0 ]]; do
         -v|--verbose)
             verbose=1
         ;;
-        -h|--help)
+        *)
             usage
             exit
-        ;;
-        *)
-            app_name="$1"
         ;;
     esac
     # Shift after checking all the cases to get the next option
@@ -166,7 +168,14 @@ echo
 instance_count=0
 for jss_instance in "${instance_choice_array[@]}"; do
     ((instance_count++))
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
 
     get_computer_count
     # cat "$curl_output_file"  # TEMP

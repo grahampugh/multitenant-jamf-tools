@@ -45,37 +45,37 @@ usage() {
 -----------------------
 Usage: ./jocads.sh <options>
 
-NOTE: ./set_credentials.sh      Set the Keychain credentials
+NOTE: ./set_credentials.sh         - set the Keychain credentials
 
--h, --help                      Shows this help screen.
+-h, --help                         - shows this help screen.
 
-[no arguments]                  Interactive mode
+[no arguments]                     - interactive mode
 
 
---source '<URL>'                Specify the template instance. Optional.
---dest '<URL>'                  Specify an instance. Required.
-                                If dest flag is set to 'ALL', copies to or deletes from all instances.
---source-list 'prd/tst'         Specify a server. This overrides the default server (prd). Optional.
---dest-list '<SERVERNAME>'"
-                                Specify a server. This overrides the default server (prd). Optional.
---all                           Perform action on ALL instances in the instance list
--d, --delete                    Delete an item.
--c, --copy                      Copy an item.
+--source '<URL>'                   - specify the template instance. Optional.
+--dest '<URL>'                     - specify an instance. Required.
+                                     If dest flag is set to 'ALL', copies to or deletes from all instances.
+--source-list 'prd/tst'            - specify a server. This overrides the default server (prd). Optional.
+--dest-list '<SERVERNAME>'         - specify a server. This overrides the default server (prd). Optional.
+--all                              - perform action on ALL instances in the instance list
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+-d, --delete                       - delete an item.
+-c, --copy                         - copy an item.
 
 Object types. Must be exactly as in the JSS:
---policy '<POLICY-NAME>'        Specify a policy name.
---group '<GROUP-NAME>'          Specify a group name.
---script '<SCRIPT-NAME>'        Specify a script name.
---category '<CATEGORY-NAME>'    Specify a category name.
---ea '<EA-NAME>'                Specify an extension attribute name.
---masapp '<APPSTOREAPP-NAME>'   Specify a Mac App Store app name.
---package '<PACKAGE-NAME>'      Specify a package name.
+--policy '<POLICY-NAME>'           - specify a policy name.
+--group '<GROUP-NAME>'             - specify a group name.
+--script '<SCRIPT-NAME>'           - specify a script name.
+--category '<CATEGORY-NAME>'       - specify a category name.
+--ea '<EA-NAME>'                   - specify an extension attribute name.
+--masapp '<APPSTOREAPP-NAME>'      - specify a Mac App Store app name.
+--package '<PACKAGE-NAME>'         - specify a package name.
 
---dp '<FILTER>'                 Filter the choice of distribution point URL, 
-                                e.g. 'myorg' to only select a URL containing 'myorg'
+--dp '<FILTER>'                    - filter the choice of distribution point URL,
+                                     e.g. 'myorg' to only select a URL containing 'myorg'
 
---clean                         Clean up working files after use.
--v                              Add verbose curl output
+--clean                            - clean up working files after use.
+-v                                 - add verbose curl output
 USAGE
 }
 
@@ -154,7 +154,14 @@ check_eas_in_groups() {
     group_file="${xml_folder}/computer_group-${group_name}-fetched.xml"
 
     # Set the source server
-    set_credentials "${source_instance}"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$source_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $source_instance ($jss_api_user)"
+    else
+        set_credentials "$source_instance"
+        echo "   [request] Using stored credentials for $source_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="${source_instance}"
 
@@ -227,7 +234,14 @@ check_eas_in_mobile_device_groups() {
     group_file="${xml_folder}/mobile_device_group-${group_name}-fetched.xml"
 
     # Set the source server
-    set_credentials "${source_instance}"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$source_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $source_instance ($jss_api_user)"
+    else
+        set_credentials "$source_instance"
+        echo "   [request] Using stored credentials for $source_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="${source_instance}"
 
@@ -617,7 +631,14 @@ copy_api_object() {
     source_name="${source_name_escaped//\&amp;/&}"
 
     # Set the dest server
-    set_credentials "$dest_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$dest_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $dest_instance ($jss_api_user)"
+    else
+        set_credentials "$dest_instance"
+        echo "   [request] Using stored credentials for $dest_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="$dest_instance"
 
@@ -760,7 +781,14 @@ copy_api_object_by_name() {
     source_name="${chosen_api_obj_name}"
 
     # Set the dest server
-    set_credentials "$dest_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$dest_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $dest_instance ($jss_api_user)"
+    else
+        set_credentials "$dest_instance"
+        echo "   [request] Using stored credentials for $dest_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="$dest_instance"
 
@@ -1006,7 +1034,14 @@ copy_computer_group() {
     # source_name_url_encoded=$( encode_name "${source_name}" )
 
     # Set the dest server
-    set_credentials "$dest_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$dest_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $dest_instance ($jss_api_user)"
+    else
+        set_credentials "$dest_instance"
+        echo "   [request] Using stored credentials for $dest_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="$dest_instance"
 
@@ -1076,7 +1111,14 @@ copy_mobile_device_group() {
     # source_name_url_encoded=$( encode_name "${source_name}" )
 
     # Set the dest server
-    set_credentials "$dest_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$dest_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $dest_instance ($jss_api_user)"
+    else
+        set_credentials "$dest_instance"
+        echo "   [request] Using stored credentials for $dest_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="$dest_instance"
 
@@ -1333,7 +1375,14 @@ copy_policy() {
     echo "   [copy_policy] Checking if '${chosen_api_obj_name}' exists..."
 
     # Set the dest server
-    set_credentials "$dest_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$dest_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $dest_instance ($jss_api_user)"
+    else
+        set_credentials "$dest_instance"
+        echo "   [request] Using stored credentials for $dest_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="$dest_instance"
 
@@ -1428,7 +1477,14 @@ create_category() {
     echo "   [create_category] Checking category '${category_name_decoded}'"
 
     # Set the dest server
-    set_credentials "$dest_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$dest_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $dest_instance ($jss_api_user)"
+    else
+        set_credentials "$dest_instance"
+        echo "   [request] Using stored credentials for $dest_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="$dest_instance"
 
@@ -1479,7 +1535,14 @@ delete_api_object() {
     api_xml_object_plural=$(get_plural_from_api_xml_object "$api_xml_object")
 
     # Set the dest server
-    set_credentials "$dest_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$dest_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $dest_instance ($jss_api_user)"
+    else
+        set_credentials "$dest_instance"
+        echo "   [request] Using stored credentials for $dest_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="${dest_instance}"
 
@@ -1607,7 +1670,14 @@ fetch_api_object() {
     echo "   [fetch_api_object] ${api_xml_object} ID: ${chosen_api_obj_id}"
 
     # Set the source server
-    set_credentials "${source_instance}"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$source_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $source_instance ($jss_api_user)"
+    else
+        set_credentials "$source_instance"
+        echo "   [request] Using stored credentials for $source_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="${source_instance}"
 
@@ -1641,7 +1711,14 @@ fetch_api_object_by_name() {
     echo "   [fetch_api_object_by_name] (encoded): ${chosen_api_obj_name_url_encoded}" # TEST
 
     # Set the source server
-    set_credentials "${source_instance}"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$source_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $source_instance ($jss_api_user)"
+    else
+        set_credentials "$source_instance"
+        echo "   [request] Using stored credentials for $source_instance ($jss_api_user)"
+    fi
     # determine jss_url
     jss_url="${source_instance}"
 
@@ -2008,7 +2085,14 @@ main() {
     echo "   [main] Reading $api_xml_object on '$jss_url'..."
 
     # check for an existing token, get a new one if required
-    set_credentials "$jss_url"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$source_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $source_instance ($jss_api_user)"
+    else
+        set_credentials "$source_instance"
+        echo "   [request] Using stored credentials for $source_instance ($jss_api_user)"
+    fi
     api_object_type=$( get_api_object_type "$api_xml_object" )
 
     # policies can be selected by category, other objects cannot
@@ -2589,6 +2673,11 @@ while [[ "$#" -gt 0 ]]; do
             shift
             chosen_instance="${1}"
             echo "   [main] CLI: Destination instance(s): $dest_instance"
+        ;;
+
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
         ;;
 
         --source-list=*)

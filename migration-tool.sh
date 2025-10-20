@@ -173,7 +173,14 @@ grab_existing_jss_xml() {
         # echo "using $jss_url/JSSResource/${readfiles[$loop]} with user $origjssapiuser:$origjssapipwd"
 
         # check for an existing token, get a new one if required
-        set_credentials "$jss_url"
+        # get token
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_url" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
+        else
+            set_credentials "$jss_url"
+            echo "   [request] Using stored credentials for $jss_url ($jss_api_user)"
+        fi
 
         # send request
         curl_url="$jss_url/JSSResource/${readfiles[$loop]}"
@@ -236,7 +243,13 @@ grab_existing_jss_xml() {
                         # determine source jss_url
                         jss_url="$source_instance"
                         # check for an existing token, get a new one if required
-                        set_credentials "$jss_url"
+                        if [[ "$chosen_id" ]]; then
+                            set_credentials "$jss_url" "$chosen_id"
+                            echo "   [request] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
+                        else
+                            set_credentials "$jss_url"
+                            echo "   [request] Using stored credentials for $jss_url ($jss_api_user)"
+                        fi
 
                         # send request
                         curl_url="$jss_url/JSSResource/${readfiles[$loop]}/userid/$userID"
@@ -265,7 +278,13 @@ grab_existing_jss_xml() {
                         # determine source jss_url
                         jss_url="$source_instance"
                         # check for an existing token, get a new one if required
-                        set_credentials "$jss_url"
+                        if [[ "$chosen_id" ]]; then
+                            set_credentials "$jss_url" "$chosen_id"
+                            echo "   [request] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
+                        else
+                            set_credentials "$jss_url"
+                            echo "   [request] Using stored credentials for $jss_url ($jss_api_user)"
+                        fi
 
                         # send request
                         curl_url="$jss_url/JSSResource/${readfiles[$loop]}/groupid/$groupID"
@@ -301,7 +320,13 @@ grab_existing_jss_xml() {
                             # determine source jss_url
                             jss_url="$source_instance"
                             # check for an existing token, get a new one if required
-                            set_credentials "$jss_url"
+                            if [[ "$chosen_id" ]]; then
+                                set_credentials "$jss_url" "$chosen_id"
+                                echo "   [request] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
+                            else
+                                set_credentials "$jss_url"
+                                echo "   [request] Using stored credentials for $jss_url ($jss_api_user)"
+                            fi
 
                             # send request
                             curl_url="$jss_url/JSSResource/${readfiles[$loop]}/id/$apiID"
@@ -317,7 +342,7 @@ grab_existing_jss_xml() {
                         done < "$plainList"
                     else
                         echo
-                        echo "   [grab_existing_jss_xml] No "${readfiles[$loop]}" items found"
+                        echo "   [grab_existing_jss_xml] No ${readfiles[$loop]} items found"
                     fi
                 ;;
             esac
@@ -456,7 +481,13 @@ fetch_icon() {
         # determine source jss_url
         jss_url="$source_instance"
         # check for an existing token, get a new one if required
-        set_credentials "$jss_url"
+        if [[ "$chosen_id" ]]; then
+            set_credentials "$jss_url" "$chosen_id"
+            echo "   [request] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
+        else
+            set_credentials "$jss_url"
+            echo "   [request] Using stored credentials for $jss_url ($jss_api_user)"
+        fi
 
         # send request
         curl_url="$icon_url"
@@ -506,7 +537,13 @@ wipe_jss() {
             echo "   [wipe_jss] Dest: $jss_url"
 
             # check for an existing token, get a new one if required
-            set_credentials "$jss_url"
+            if [[ "$chosen_id" ]]; then
+                set_credentials "$jss_url" "$chosen_id"
+                echo "   [request] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
+            else
+                set_credentials "$jss_url"
+                echo "   [request] Using stored credentials for $jss_url ($jss_api_user)"
+            fi
 
             # send request
             curl_url="$jss_url/JSSResource/${wipefiles[$loop]}"
@@ -568,7 +605,13 @@ put_on_new_jss() {
             # determine source jss_url
             jss_url="$source_instance"
             # check for an existing token, get a new one if required
-            set_credentials "$jss_url"
+            if [[ "$chosen_id" ]]; then
+                set_credentials "$jss_url" "$chosen_id"
+                echo "   [request] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
+            else
+                set_credentials "$jss_url"
+                echo "   [request] Using stored credentials for $jss_url ($jss_api_user)"
+            fi
 
             # get XML object name from object type (URL style)
             api_xml_object=$(get_api_object_from_type "${writefiles[$loop]}")

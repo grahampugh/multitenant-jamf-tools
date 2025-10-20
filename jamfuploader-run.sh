@@ -40,27 +40,29 @@ A script for uploading items to a Jamf Pro instance using the AutoPkg framework 
 - The jamf-upload.sh script must be available (the script will look for it in ~/Library/AutoPkg/RecipeRepos/com.github.grahampugh.jamf-upload/jamf-upload.sh or in ../jamf-upload/jamf-upload.sh)
 
 # Usage
-UPLOADTYPE                       - type of upload (e.g. pkg, policy, script, etc. 
-                                   Exactly one value must be provided)
--il | --instance-list FILENAME   - provide an instance list filename (without .txt)
-                                   (must exist in the instance-lists folder)
--i | --instance JSS_URL          - perform action on a specific instance
-                                   (must exist in the relevant instance list)
-                                   (multiple values can be provided)
--a | -ai | --all-instances       - perform action on ALL instances in the instance list
--x | --nointeraction             - run without checking instance is in an instance list 
-                                   (prevents interactive mode)
---dp                             - filter fileshare distribution points on DP name
---prefs <path>                   - Inherit AutoPkg prefs file provided by the full path to the file
--v[vvv]                          - Set value of verbosity (default is -v)
--q                               - Quiet mode (verbosity 0)
--j <path>                        - Alternative path to jamf-upload.sh script 
-                                   (default is ~/Library/AutoPkg/RecipeRepos/
-                                   com.github.grahampugh.jamf-upload/jamf-upload.sh)
-                                   (if not found, will look in ../jamf-upload/jamf-upload.sh)
--h | --help                      - Show this help message
---[args]                         - Pass through required arguments for jamf-upload.sh. 
-                                   Scroll up for a full list of valid arguments.
+UPLOADTYPE                         - type of upload (e.g. pkg, policy, script, etc. 
+                                     Exactly one value must be provided)
+-il | --instance-list FILENAME     - provide an instance list filename (without .txt)
+                                     (must exist in the instance-lists folder)
+-i | --instance JSS_URL            - perform action on a specific instance
+                                     (must exist in the relevant instance list)
+                                     (multiple values can be provided)
+-a | -ai | --all-instances         - perform action on ALL instances in the instance list
+-x | --nointeraction               - run without checking instance is in an instance list 
+                                     (prevents interactive mode)
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+--dp                               - filter fileshare distribution points on DP name
+--prefs <path>                     - Inherit AutoPkg prefs file provided by the full path to the file
+-v[vvv]                            - Set value of verbosity (default is -v)
+-q                                 - Quiet mode (verbosity 0)
+-j <path>                          - Alternative path to jamf-upload.sh script 
+                                     (default is ~/Library/AutoPkg/RecipeRepos/
+                                     com.github.grahampugh.jamf-upload/jamf-upload.sh)
+                                     (if not found, will look in ../jamf-upload/jamf-upload.sh)
+-h | --help                        - Show this help message
+--[args]                           - Pass through required arguments for jamf-upload.sh. 
+
+Scroll up for a full list of valid arguments.
 
 # Notes
 Credentials set in the AutoPkg preferences file will be used if they exist. If not, the keychain will be used. If there is no keychain entry, the script will prompt for you to run the set_credentials.sh script.
@@ -99,6 +101,10 @@ while test $# -gt 0 ; do
         -a|-ai|--all|--all-instances)
             all_instances=1
             ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -x|--nointeraction)
             no_interaction=1
             ;;
@@ -180,7 +186,14 @@ choose_destination_instances
 # run on specified instances
 for instance in "${instance_choice_array[@]}"; do
     jss_instance="$instance"
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     echo "Running on $jss_instance..."
     echo "jamf-upload.sh ${args[*]}"
     run_jamfupload

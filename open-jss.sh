@@ -34,17 +34,19 @@ fi
 usage() {
     cat <<'USAGE'
 Usage:
-./set_credentials.sh          - set the Keychain credentials
+./set_credentials.sh               - set the Keychain credentials
 
-[no arguments]                - interactive mode
---il FILENAME (without .txt)  - provide an instance list filename
-                                (must exist in the instance-lists folder)
---i JSS_URL                   - perform action on a single instance
-                                (must exist in the relevant instance list)
--x | --nointeraction          - run without checking instance is in an instance list 
-                                (prevents interactive choosing of instances)
--a                            - select browser to open the JSS in (interactively)
--v                            - add verbose curl output
+[no arguments]                     - interactive mode
+--il FILENAME (without .txt)       - provide an instance list filename
+                                     (must exist in the instance-lists folder)
+--i JSS_URL                        - perform action on a single instance
+                                     (must exist in the relevant instance list)
+-x | --nointeraction               - run without checking instance is in an instance list 
+                                     (prevents interactive choosing of instances)
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+-a                                 - select browser to open the JSS in (interactively)
+-f | --failover                    - use failover address if set
+-v                                 - add verbose curl output
 USAGE
 }
 
@@ -99,7 +101,14 @@ get_failover_address() {
     instance="$1"
     echo "   [get_failover_address] Getting failover address for $instance..."
     # determine jss_url
-    set_credentials "$instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $instance ($jss_api_user)"
+    else
+        set_credentials "$instance"
+        echo "   [request] Using stored credentials for $instance ($jss_api_user)"
+    fi
     jss_url="$instance"
     curl_url="$jss_url/api/v1/sso/failover"
     curl_args=("--header")
@@ -140,6 +149,10 @@ while [[ "$#" -gt 0 ]]; do
         -il|--instance-list)
             shift
             chosen_instance_list_file="$1"
+        ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
         ;;
         -x|--nointeraction)
             no_interaction=1

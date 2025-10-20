@@ -57,25 +57,26 @@ A script for running AutoPkg recipes on one or more Jamf Pro instances.
 - Credentials for the Jamf Pro instance(s) must be set in the AutoPkg preferences or in the Keychain (the script will prompt you to run the set_credentials.sh script if not found)
 
 Usage:
-./set_credentials.sh             - set the Keychain credentials
+./set_credentials.sh               - set the Keychain credentials
 
--r | --recipe RECIPE             - recipe to run (e.g. Firefox.jamf, /path/to/recipe)
-                                   (multiple values can be provided)
--l | --recipe-list LIST          - recipe-list to run (must be path to a .txt file)
--il | --instance-list FILENAME   - provide an instance list filename (without .txt)
-                                   (must exist in the instance-lists folder)
--i | --instance JSS_URL          - perform action on a specific instance
-                                   (must exist in the relevant instance list)
-                                   (multiple values can be provided)
--a | --all | --all-instances     - perform action on ALL instances in the instance list
--x | --nointeraction             - run without checking instance is in an instance list 
-                                   (prevents interactive choosing of instances)
---report-plist                   - pass through the report-plist value
---dp                             - filter DPs on DP name
--e | --enabled                   - Force policy to enabled (--key POLICY_ENABLED=True)
--p | --replace                   - Replace existing pkg in Jamf Pro (for pkg uploads)
--v[vv]                           - add verbose output
---[args]                         - Pass through any arguments for AutoPkg
+-r | --recipe RECIPE               - recipe to run (e.g. Firefox.jamf, /path/to/recipe)
+                                     (multiple values can be provided)
+-l | --recipe-list LIST            - recipe-list to run (must be path to a .txt file)
+-il | --instance-list FILENAME     - provide an instance list filename (without .txt)
+                                     (must exist in the instance-lists folder)
+-i | --instance JSS_URL            - perform action on a specific instance
+                                     (must exist in the relevant instance list)
+                                     (multiple values can be provided)
+-a | --all | --all-instances       - perform action on ALL instances in the instance list
+-x | --nointeraction               - run without checking instance is in an instance list 
+                                     (prevents interactive choosing of instances)
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+--report-plist                     - pass through the report-plist value
+--dp                               - filter DPs on DP name
+-e | --enabled                     - Force policy to enabled (--key POLICY_ENABLED=True)
+-p | --replace                     - Replace existing pkg in Jamf Pro (for pkg uploads)
+-v[vv]                             - add verbose output
+--[args]                           - Pass through any arguments for AutoPkg
 USAGE
 }
 
@@ -221,6 +222,10 @@ while [[ "$#" -gt 0 ]]; do
         -a|-ai|--all|--all-instances)
             all_instances=1
             ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -x|--nointeraction)
             no_interaction=1
             ;;
@@ -313,7 +318,14 @@ fi
 # run on specified instances
 for instance in "${instance_choice_array[@]}"; do
     jss_instance="$instance"
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     echo "Running AutoPkg on $jss_instance..."
     if [[ $recipe_list ]]; then
         run_autopkg

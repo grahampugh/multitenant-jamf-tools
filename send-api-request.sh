@@ -32,6 +32,7 @@ Usage:
                                     (must exist in the instance-lists folder)
 --i JSS_URL                        - perform action on a single instance
                                      (must exist in the relevant instance list)
+--user | --client-id CLIENT_ID     - use the specified client ID or username
 --all                              - perform action on ALL instances in the instance list
 -x | --nointeraction               - run without checking instance is in an instance list 
 -e | --endpoint ENDPOINT_URL       - perform action on a specific endpoint, e.g. /api/v1/engage
@@ -42,6 +43,7 @@ Usage:
 --xml                              - use XML output instead of JSON
                                      (only for GET requests to Classic API)
 --data DATA                        - data to send with the request
+--datafile FILENAME                - file containing data to send with the request
 -v                                 - add verbose curl output
 
 Note: for the Classic API, filter directly using the endpoint URL, either with /name/ or /id/
@@ -50,8 +52,15 @@ USAGE
 }
 
 request() {
-    # determine jss_url
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        chosen_id="$jss_api_user"
+    fi
     jss_url="$jss_instance"
     # send request
     curl_url="$jss_url$endpoint"
@@ -87,6 +96,14 @@ request() {
         if [[ "$data" ]]; then
             curl_args+=("--data")
             curl_args+=("$data")
+        elif [[ "$datafile" ]]; then
+            if [[ -f "$datafile" ]]; then
+                curl_args+=("--data")
+                curl_args+=("@$datafile")
+            else
+                echo "   [request] ERROR: datafile $datafile not found. Aborting."
+                exit 1
+            fi
         fi
         send_curl_request
     fi
@@ -140,6 +157,10 @@ while [[ "$#" -gt 0 ]]; do
         -a|-ai|--all|--all-instances)
             all_instances=1
             ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -x|--nointeraction)
             no_interaction=1
             ;;
@@ -166,6 +187,10 @@ while [[ "$#" -gt 0 ]]; do
         -d|--data)
             shift
             data="$1"
+        ;;
+        --datafile)
+            shift
+            datafile="$1"
         ;;
         --xml)
             xml_output=1

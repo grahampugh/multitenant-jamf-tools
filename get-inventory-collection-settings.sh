@@ -31,22 +31,29 @@ usage() {
 
     cat <<'USAGE'
 Usage:
-./set_credentials.sh                - set the Keychain credentials
+./set_credentials.sh               - set the Keychain credentials
 
-[no arguments]                      - interactive mode
---template /path/to/Template.json   - template to use (must be a json file)
---il FILENAME (without .txt)        - provide a server-list filename
-                                        (must exist in the instance-lists folder)
---i JSS_URL                         - perform action on a single instance
-                                        (must exist in the relevant instance list)
---all                               - perform action on ALL instances in the instance list
--v                                  - add verbose curl output
+[no arguments]                     - interactive mode
+--template /path/to/Template.json  - template to use (must be a json file)
+--il FILENAME (without .txt)       - provide a server-list filename
+                                     (must exist in the instance-lists folder)
+--i JSS_URL                        - perform action on a single instance
+                                     (must exist in the relevant instance list)
+--all                              - perform action on ALL instances in the instance list
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+-v                                 - add verbose curl output
 USAGE
 }
 
 get_inventory_collection() {
-    # determine jss_url
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     jss_url="${jss_instance}"
     # send request
     curl_url="$jss_url/api/v1/computer-inventory-collection-settings"
@@ -79,6 +86,10 @@ while [[ "$#" -gt 0 ]]; do
         -a|-ai|--all|--all-instances)
             all_instances=1
             ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -x|--nointeraction)
             no_interaction=1
             ;;

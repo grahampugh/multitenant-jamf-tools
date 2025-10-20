@@ -24,18 +24,19 @@ fi
 usage() {
     cat <<'USAGE'
 Usage:
-./set_credentials.sh            - set the Keychain credentials
+./set_credentials.sh               - set the Keychain credentials
 
-[no arguments]                  - interactive mode
---anonymous (or -a)             - output to shell with anonymous contexts
---csv (or -c)                   - output to shell as comma-separated list
---csv > /path/to/file.csv       - output to CSV file
---il FILENAME (without .txt)    - provide a server-list filename
-                                  (must exist in the instance-lists folder)
---i JSS_URL                     - perform action on a single instance
-                                  (must exist in the relevant instance list)
---all                           - perform action on ALL instances in the instance list
--v                              - add verbose curl output
+[no arguments]                     - interactive mode
+--anonymous (or -a)                - output to shell with anonymous contexts
+--csv (or -c)                      - output to shell as comma-separated list
+--csv > /path/to/file.csv          - output to CSV file
+--il FILENAME (without .txt)       - provide a server-list filename
+                                     (must exist in the instance-lists folder)
+--i JSS_URL                        - perform action on a single instance
+                                     (must exist in the relevant instance list)
+--all                              - perform action on ALL instances in the instance list
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+-v                                 - add verbose curl output
                   
 USAGE
 }

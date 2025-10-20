@@ -26,7 +26,7 @@ tool_directory="../jamf-api-tool"
 tool="jamf_api_tool.py"
 
 # paths to preference files
-tmp_prefs="${HOME}/Library/Preferences/jamf-api-tool.plist"
+# tmp_prefs="${HOME}/Library/Preferences/jamf-api-tool.plist"
 autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
 
 # output directory
@@ -60,19 +60,20 @@ usage() {
 # - jamf-api-tool.py - the main script for interacting with the Jamf API
 
 Usage:
-./set_credentials.sh          - set the Keychain credentials
+./set_credentials.sh               - set the Keychain credentials
 
-[no arguments]                - interactive mode
--il FILENAME (without .txt)   - provide an instance list filename
-                                (must exist in the instance-lists folder)
--i JSS_URL                    - perform action on a single instance
-                                (must exist in the relevant instance list)
--ai | --all-instances         - perform action on ALL instances in the instance list
---dp                          - filter DPs on DP name
---prefs <path>                - Inherit AutoPkg prefs file provided by the full path to the file
--v[vvv]                       - Set value of verbosity
---confirm                     - Automatically confirm the command (no prompt)
---[args]                      - Pass through any arguments for jamf_api_tool.py
+[no arguments]                     - interactive mode
+-il FILENAME (without .txt)        - provide an instance list filename
+                                     (must exist in the instance-lists folder)
+-i JSS_URL                         - perform action on a single instance
+                                     (must exist in the relevant instance list)
+-ai | --all-instances              - perform action on ALL instances in the instance list
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+--dp                               - filter DPs on DP name
+--prefs <path>                     - Inherit AutoPkg prefs file provided by the full path to the file
+-v[vvv]                            - Set value of verbosity
+--confirm                          - Automatically confirm the command (no prompt)
+--[args]                           - Pass through any arguments for jamf_api_tool.py
 
 "
 }
@@ -177,19 +178,21 @@ while test $# -gt 0 ; do
         -ai|--all-instances)
             all_instances=1
             ;;
+        --id|--client-id|--user|--username)
+            shift
+            chosen_id="$1"
+        ;;
         -x|--nointeraction)
             no_interaction=1
             ;;
         -s|--share)
             shift
             smb_share="$1"
+            export smb_share
         ;;
         -d|--dp)
             shift
             dp_url_filter="$1"
-        ;;
-        -ai|--all-instances)
-            all_instances=1
         ;;
         --confirm)
             confirmed="yes"
@@ -605,7 +608,14 @@ for instance in "${instance_choice_array[@]}"; do
     if [[ "${args[*]}" == *"--delete"* ]]; then
         confirm
     fi
-    set_credentials "$jss_instance"
+    # get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
     echo "Running jamf-api-tool.py ${args[*]} on $jss_instance..."
     run_api_tool
 done
