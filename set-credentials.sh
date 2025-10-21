@@ -13,6 +13,9 @@
 # reduce the curl tries
 max_tries_override=2
 
+# set instance list type
+instance_list_type="ios"
+
 # --------------------------------------------------------------------------------
 # ENVIRONMENT CHECKS
 # --------------------------------------------------------------------------------
