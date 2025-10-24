@@ -44,8 +44,6 @@ packages
 advancedcomputersearches
 advancedmobiledevicesearches
 mobiledevicegroups
-mobiledevicegroups
-mobiledevicegroups
 mobiledeviceapplications
 mobiledeviceconfigurationprofiles
 mobiledeviceenrollmentprofiles
@@ -56,9 +54,6 @@ userextensionattributes
 # usergroups
 # users
 advancedusersearches
-computergroups
-computergroups
-computergroups
 computergroups
 computerextensionattributes
 scripts

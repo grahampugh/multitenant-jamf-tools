@@ -7,9 +7,6 @@ categories
 packages
 computerextensionattributes
 computergroups
-computergroups
-computergroups
-computergroups
 # buildings
 # departments
 # directorybindings
@@ -47,8 +44,6 @@ advancedcomputersearches
 # patchinternalsources
 # patchpolicies
 mobiledeviceextensionattributes
-mobiledevicegroups
-mobiledevicegroups
 mobiledevicegroups
 # mobiledeviceapplications
 mobiledeviceconfigurationprofiles

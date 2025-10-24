@@ -915,7 +915,7 @@ send_curl_request() {
         echo "Supplied URL: $curl_url"
     fi
 
-    try=1
+    try=0
 
     while [[ $try -le $max_tries ]]; do
         # skip token check for Platform API requests

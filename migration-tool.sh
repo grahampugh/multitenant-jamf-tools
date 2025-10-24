@@ -528,9 +528,6 @@ wipe_jss() {
             echo
             echo "   [wipe_jss] Skipping ${wipefiles[$loop]} API endpoint as no delete option is available via API."
         else
-            # Set our result incremental variable to 1
-            resultInt=1
-
             # Grab all existing ID's for the current API endpoint we're processing
             echo
             echo "   [wipe_jss] Processing ID list for ${wipefiles[$loop]}"
@@ -539,53 +536,137 @@ wipe_jss() {
             # check for an existing token, get a new one if required
             if [[ "$chosen_id" ]]; then
                 set_credentials "$jss_url" "$chosen_id"
-                echo "   [request] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
+                echo "   [wipe_jss] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
             else
                 set_credentials "$jss_url"
-                echo "   [request] Using stored credentials for $jss_url ($jss_api_user)"
+                echo "   [wipe_jss] Using stored credentials for $jss_url ($jss_api_user)"
             fi
 
-            # send request
-            curl_url="$jss_url/JSSResource/${wipefiles[$loop]}"
-            curl_args=("--header")
-            curl_args+=("Accept: application/xml")
-            send_curl_request
-
-            # format the output into a file
-            xmllint --format "$curl_output_file" 2>/dev/null > "${xmlloc}/unprocessedid.txt"
-
-            # Check if any ids have been captured. Skip if none present.
-            check=$(grep -c "<size>0</size>" "${xmlloc}/unprocessedid.txt")
-
-            if [[ "$check" == "0" ]]; then
-                # What are we deleting?
-                echo
-                echo "   [wipe_jss] Deleting ${wipefiles[$loop]}"
-
-                # Process all the item id numbers
-                awk -F '<id>|</id>' '/<id>/ {print $2}' "${xmlloc}/unprocessedid.txt" > "${xmlloc}/processedid.txt"
-
-                # Delete all the item id numbers
-                totalFetchedIDs=$( wc -l < "${xmlloc}/processedid.txt" | sed -e 's/^[ \t]*//' )
-
-                while read -r line; do
+            case "${wipefiles[$loop]}" in
+                computergroups|mobiledevicegroups)
                     echo
-                    echo "   [wipe_jss] Deleting ID number $line ($resultInt/$totalFetchedIDs)"
+                    echo "   [wipe_jss] Deleting ${wipefiles[$loop]}."
 
+                    # look for conflicts
+                    pass_count=0
+                    conflicts_found=1
+                    while [[ $conflicts_found -gt 0 ]]; do
+                        # Set our result incremental variable to 1
+                        resultInt=1
+                        conflicts_found=0
+
+                        # send request
+                        curl_url="$jss_url/JSSResource/${wipefiles[$loop]}"
+                        curl_args=("--header")
+                        curl_args+=("Accept: application/xml")
+                        send_curl_request
+
+                        # format the output into a file
+                        xmllint --format "$curl_output_file" 2>/dev/null > "${xmlloc}/unprocessedid.txt"
+
+                        # Check if any ids have been captured. Skip if none present.
+                        check=$(grep -c "<size>0</size>" "${xmlloc}/unprocessedid.txt")
+
+                        if [[ "$check" == "0" ]]; then
+                            # What are we deleting?
+                            echo
+                            echo "   [wipe_jss] Deleting ${wipefiles[$loop]}"
+
+                            # Process all the item id numbers
+                            awk -F '<id>|</id>' '/<id>/ {print $2}' "${xmlloc}/unprocessedid.txt" > "${xmlloc}/processedid.txt"
+
+                            # Delete all the item id numbers
+                            totalFetchedIDs=$( wc -l < "${xmlloc}/processedid.txt" | sed -e 's/^[ \t]*//' )
+
+                            while read -r line; do
+                                echo
+                                echo "   [wipe_jss] Deleting ID number $line ($resultInt/$totalFetchedIDs)"
+
+                                # send request
+                                curl_url="$jss_url/JSSResource/${wipefiles[$loop]}/id/$line"
+                                curl_args=("--request")
+                                curl_args+=("DELETE")
+                                curl_args+=("--header")
+                                curl_args+=("Accept: application/xml")
+                                send_curl_request
+
+                                # temp echo http response
+                                echo "   [wipe_jss] HTTP response: $http_response"
+
+                                # check for a 400 response code (conflict)
+                                if [[ $http_response == "400" ]]; then
+                                    echo
+                                    echo "   [wipe_jss] Conflict detected when deleting ${wipefiles[$loop]} ID number $line."
+                                    ((conflicts_found++))
+                                fi
+
+                                resultInt=$((resultInt + 1))
+                            done < "${xmlloc}/processedid.txt"
+                        else
+                            echo
+                            echo "   [wipe_jss] API endpoint ${wipefiles[$loop]} is empty. Skipping."
+                            break
+                        fi
+                        ((pass_count++))
+                        if [[ $pass_count -gt 5 ]]; then
+                            echo
+                            echo "   [wipe_jss] Maximum conflict resolution passes reached. Some ${writefiles[$loop]} may not have been posted correctly."
+                            break
+                        fi
+                        if [[ $conflicts_found -gt 0 ]]; then
+                            echo
+                            echo "   [wipe_jss] Conflicts detected when posting ${writefiles[$loop]}. Starting pass #$pass_count to resolve..."
+                        fi
+                    done
+                    ;;
+                *)
+                    echo
+                    echo "   [wipe_jss] Deleting ${wipefiles[$loop]}."
+                    # Set our result incremental variable to 1
+                    resultInt=1
                     # send request
-                    curl_url="$jss_url/JSSResource/${wipefiles[$loop]}/id/$line"
-                    curl_args=("--request")
-                    curl_args+=("DELETE")
-                    curl_args+=("--header")
+                    curl_url="$jss_url/JSSResource/${wipefiles[$loop]}"
+                    curl_args=("--header")
                     curl_args+=("Accept: application/xml")
                     send_curl_request
 
-                    resultInt=$((resultInt + 1))
-                done < "${xmlloc}/processedid.txt"
-            else
-                echo
-                echo "   [wipe_jss] API endpoint ${wipefiles[$loop]} is empty. Skipping."
-            fi
+                    # format the output into a file
+                    xmllint --format "$curl_output_file" 2>/dev/null > "${xmlloc}/unprocessedid.txt"
+
+                    # Check if any ids have been captured. Skip if none present.
+                    check=$(grep -c "<size>0</size>" "${xmlloc}/unprocessedid.txt")
+
+                    if [[ "$check" == "0" ]]; then
+                        # What are we deleting?
+                        echo
+                        echo "   [wipe_jss] Deleting ${wipefiles[$loop]}"
+
+                        # Process all the item id numbers
+                        awk -F '<id>|</id>' '/<id>/ {print $2}' "${xmlloc}/unprocessedid.txt" > "${xmlloc}/processedid.txt"
+
+                        # Delete all the item id numbers
+                        totalFetchedIDs=$( wc -l < "${xmlloc}/processedid.txt" | sed -e 's/^[ \t]*//' )
+
+                        while read -r line; do
+                            echo
+                            echo "   [wipe_jss] Deleting ID number $line ($resultInt/$totalFetchedIDs)"
+
+                            # send request
+                            curl_url="$jss_url/JSSResource/${wipefiles[$loop]}/id/$line"
+                            curl_args=("--request")
+                            curl_args+=("DELETE")
+                            curl_args+=("--header")
+                            curl_args+=("Accept: application/xml")
+                            send_curl_request
+
+                            resultInt=$((resultInt + 1))
+                        done < "${xmlloc}/processedid.txt"
+                    else
+                        echo
+                        echo "   [wipe_jss] API endpoint ${wipefiles[$loop]} is empty. Skipping."
+                    fi
+                ;;
+            esac
         fi
     done
 }
@@ -607,10 +688,10 @@ put_on_new_jss() {
             # check for an existing token, get a new one if required
             if [[ "$chosen_id" ]]; then
                 set_credentials "$jss_url" "$chosen_id"
-                echo "   [request] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
+                echo "   [put_on_new_jss] Using provided Client ID and stored secret for $jss_url ($jss_api_user)"
             else
                 set_credentials "$jss_url"
-                echo "   [request] Using stored credentials for $jss_url ($jss_api_user)"
+                echo "   [put_on_new_jss] Using stored credentials for $jss_url ($jss_api_user)"
             fi
 
             # get XML object name from object type (URL style)
@@ -666,103 +747,132 @@ put_on_new_jss() {
                     echo
                     echo "   [put_on_new_jss] Posting static groups."
 
-                    # grab a list of existing groups
-                    curl_url="$jss_url/JSSResource/${writefiles[$loop]}"
-                    curl_args=("--header")
-                    curl_args+=("Accept: application/xml")
-                    send_curl_request
+                    # look for conflicts
+                    pass_count=0
+                    conflicts_found=1
+                    while [[ $conflicts_found -gt 0 ]]; do
 
-                    # save the output file
-                    instance_check_file="$xmlloc/${writefiles[$loop]}/$(basename "$jss_url").output.txt"
-                    xmllint --format "$curl_output_file" 2>/dev/null > "$instance_check_file"
+                        # grab a list of existing groups
+                        curl_url="$jss_url/JSSResource/${writefiles[$loop]}"
+                        curl_args=("--header")
+                        curl_args+=("Accept: application/xml")
+                        send_curl_request
 
-                    totalParsedResourceXML_staticGroups=$( ls "$xmlloc/${writefiles[$loop]}/parsed_xml/"static_group_parsed* | wc -l | sed -e 's/^[ \t]*//' )
-                    postInt_static=0
+                        # save the output file
+                        instance_check_file="$xmlloc/${writefiles[$loop]}/$(basename "$jss_url").output.txt"
+                        xmllint --format "$curl_output_file" 2>/dev/null > "$instance_check_file"
 
-                    for parsedXML_static in "$xmlloc/${writefiles[$loop]}/parsed_xml"/static_group_parsed*; do
-                        (( postInt_static++ ))
-                        # look for existing group and update it rather than create a new one if it exists
-                        source_name="$( grep "<name>" < "$parsedXML_static" | head -n 1 | awk -F '<name>|</name>' '{ print $2; exit; }' | sed -e 's|&amp;|\&|g' )"
-                        # source_name_urlencode="$( echo "$source_name" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
-
-                        echo
-                        echo "   [put_on_new_jss] Posting Static Group $postInt_static/$totalParsedResourceXML_staticGroups '$source_name' from $(basename "$parsedXML_static")"
-
-                        # get id from output
-                        existing_id=$(xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = \"$source_name\"]/id/text()" "$instance_check_file" 2>/dev/null)
-
-                        if [[ $existing_id ]]; then
+                        if [[ $pass_count -eq 0 ]]; then
                             echo
-                            echo "   [put_on_new_jss] Static group '$source_name' already exists - not overwriting..."
-                        else
-                            # send request
-                            curl_url="$jss_url/JSSResource/${writefiles[$loop]}/id/0"
-                            curl_args=("--request")
-                            curl_args+=("POST")
-                            curl_args+=("--header")
-                            curl_args+=("Content-Type: application/xml")
-                            curl_args+=("--data-binary")
-                            curl_args+=(@"$parsedXML_static")
-                            send_curl_request
+                            echo "   [put_on_new_jss] Posting ${writefiles[$loop]}"
 
-                            # slow down to allow Jamf Pro 10.39+ to to its thing
-                            sleep 2
-                        fi
-                    done
+                            totalParsedResourceXML_staticGroups=$( ls "$xmlloc/${writefiles[$loop]}/parsed_xml/"static_group_parsed* | wc -l | sed -e 's/^[ \t]*//' )
+                            postInt_static=0
 
-                    echo
-                    echo "   [put_on_new_jss] Posting smart groups"
+                            for parsedXML_static in "$xmlloc/${writefiles[$loop]}/parsed_xml"/static_group_parsed*; do
+                                (( postInt_static++ ))
+                                # look for existing group and update it rather than create a new one if it exists
+                                source_name="$( grep "<name>" < "$parsedXML_static" | head -n 1 | awk -F '<name>|</name>' '{ print $2; exit; }' | sed -e 's|&amp;|\&|g' )"
+                                # source_name_urlencode="$( echo "$source_name" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
 
-                    totalParsedResourceXML_smartGroups=$(ls $xmlloc/${writefiles[$loop]}/parsed_xml/smart_group_parsed* | wc -l | sed -e 's/^[ \t]*//')
-                    postInt_smart=0
+                                echo
+                                echo "   [put_on_new_jss] Posting Static Group $postInt_static/$totalParsedResourceXML_staticGroups '$source_name' from $(basename "$parsedXML_static")"
 
-                    for parsedXML_smart in "$xmlloc/${writefiles[$loop]}/parsed_xml"/smart_group_parsed*; do
-                        (( postInt_smart++ ))
-                        # look for existing entry and update it rather than create a new one if it exists
-                        source_name="$( grep "<name>" < "$parsedXML_smart" | head -n 1 | awk -F '<name>|</name>' '{ print $2; exit; }' | sed -e 's|&amp;|\&|g' )"
+                                # get id from output
+                                existing_id=$(xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = \"$source_name\"]/id/text()" "$instance_check_file" 2>/dev/null)
 
-                        echo
-                        echo "   [put_on_new_jss] Posting Smart Group $postInt_smart/$totalParsedResourceXML_smartGroups '$source_name' from $(basename "$parsedXML_smart")"
-
-                        # get id from output
-                        existing_id=$(xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = \"$source_name\"]/id/text()" "$instance_check_file" 2>/dev/null)
-
-                        if [[ $existing_id ]]; then
-                            if [[ $overwrite_items == "yes" ]]; then
-                                # We only want to replace certain smart groups, namely those with "test version installed" or "current version installed" in their name.
-                                # if [[ "$source_name" == *"version installed"*  ]]; then # TEMP DISABLE
+                                if [[ $existing_id ]]; then
                                     echo
-                                    echo "   [put_on_new_jss] Smart Group '$source_name' can be replaced"
-                                    echo
-
+                                    echo "   [put_on_new_jss] Static group '$source_name' already exists - not overwriting..."
+                                else
                                     # send request
-                                    curl_url="$jss_url/JSSResource/${writefiles[$loop]}/id/$existing_id"
+                                    curl_url="$jss_url/JSSResource/${writefiles[$loop]}/id/0"
                                     curl_args=("--request")
-                                    curl_args+=("PUT")
+                                    curl_args+=("POST")
                                     curl_args+=("--header")
                                     curl_args+=("Content-Type: application/xml")
                                     curl_args+=("--data-binary")
-                                    curl_args+=(@"$parsedXML_smart")
+                                    curl_args+=(@"$parsedXML_static")
                                     send_curl_request
 
                                     # slow down to allow Jamf Pro 10.39+ to to its thing
                                     sleep 2
-                            else
-                                echo "   [put_on_new_jss] Smart Group '$source_name' already exists... skipping"
-                            fi
-                        else
-                            # send request
-                            curl_url="$jss_url/JSSResource/${writefiles[$loop]}/id/0"
-                            curl_args=("--request")
-                            curl_args+=("POST")
-                            curl_args+=("--header")
-                            curl_args+=("Content-Type: application/xml")
-                            curl_args+=("--data-binary")
-                            curl_args+=(@"$parsedXML_smart")
-                            send_curl_request
+                                fi
+                            done
+                        fi
 
-                            # slow down to allow Jamf Pro 10.39+ to to its thing
-                            sleep 2
+                        echo
+                        echo "   [put_on_new_jss] Posting ${writefiles[$loop]}"
+
+                        totalParsedResourceXML_smartGroups=$(ls $xmlloc/${writefiles[$loop]}/parsed_xml/smart_group_parsed* | wc -l | sed -e 's/^[ \t]*//')
+
+                        postInt_smart=0
+                        conflicts_found=0
+                        for parsedXML_smart in "$xmlloc/${writefiles[$loop]}/parsed_xml"/smart_group_parsed*; do
+                            (( postInt_smart++ ))
+                            # look for existing entry and update it rather than create a new one if it exists
+                            source_name="$( grep "<name>" < "$parsedXML_smart" | head -n 1 | awk -F '<name>|</name>' '{ print $2; exit; }' | sed -e 's|&amp;|\&|g' )"
+
+                            echo
+                            echo "   [put_on_new_jss] Posting ${writefiles[$loop]} $postInt_smart/$totalParsedResourceXML_smartGroups '$source_name' from $(basename "$parsedXML_smart")"
+
+                            # get id from output
+                            existing_id=$(xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = \"$source_name\"]/id/text()" "$instance_check_file" 2>/dev/null)
+
+                            if [[ $existing_id ]]; then
+                                if [[ $overwrite_items == "yes" ]]; then
+                                    # We only want to replace certain smart groups, namely those with "test version installed" or "current version installed" in their name.
+                                    # if [[ "$source_name" == *"version installed"*  ]]; then # TEMP DISABLE
+                                        echo
+                                        echo "   [put_on_new_jss] ${writefiles[$loop]} '$source_name' can be replaced"
+                                        echo
+
+                                        # send request
+                                        curl_url="$jss_url/JSSResource/${writefiles[$loop]}/id/$existing_id"
+                                        curl_args=("--request")
+                                        curl_args+=("PUT")
+                                        curl_args+=("--header")
+                                        curl_args+=("Content-Type: application/xml")
+                                        curl_args+=("--data-binary")
+                                        curl_args+=(@"$parsedXML_smart")
+                                        send_curl_request
+
+                                        # slow down to allow Jamf Pro 10.39+ to to its thing
+                                        sleep 2
+                                else
+                                    echo "   [put_on_new_jss] ${writefiles[$loop]} '$source_name' already exists... skipping"
+                                fi
+                            else
+                                # send request
+                                curl_url="$jss_url/JSSResource/${writefiles[$loop]}/id/0"
+                                curl_args=("--request")
+                                curl_args+=("POST")
+                                curl_args+=("--header")
+                                curl_args+=("Content-Type: application/xml")
+                                curl_args+=("--data-binary")
+                                curl_args+=(@"$parsedXML_smart")
+                                send_curl_request
+
+                                # check for a 409 response code (conflict)
+                                if [[ $http_response == "409" ]]; then
+                                    echo
+                                    echo "   [put_on_new_jss] Conflict detected when posting ${writefiles[$loop]} '$source_name'."
+                                    ((conflicts_found++))
+                                fi
+
+                                # slow down to allow Jamf Pro 10.39+ to to its thing
+                                sleep 2
+                            fi
+                        done
+                        ((pass_count++))
+                        if [[ $pass_count -gt 5 ]]; then
+                            echo
+                            echo "   [put_on_new_jss] Maximum conflict resolution passes reached. Some ${writefiles[$loop]} may not have been posted correctly."
+                            break
+                        fi
+                        if [[ $conflicts_found -gt 0 ]]; then
+                            echo
+                            echo "   [put_on_new_jss] Conflicts detected when posting ${writefiles[$loop]}. Starting pass #$pass_count to resolve..."
                         fi
                     done
                 ;;
@@ -1211,6 +1321,7 @@ main_menu() {
                 fi
 
                 jss_url="${instance_choice_array[0]}"
+                echo "   [wipe_jss] Wiping JSS at ${url}"
                 wipe_jss
             ;;
 
@@ -1265,6 +1376,18 @@ echo
 # Do the checks to see if this script can run
 # check_icons_folder_mounted
 check_xml_folder
+
+# Command line override for the above settings
+while [[ "$#" -gt 0 ]]; do
+    key="$1"
+    case $key in
+        -v|--verbose)
+            verbose=1
+        ;;
+    esac
+    # Shift after checking all the cases to get the next option
+    shift
+done
 
 # Show main menu in interactive mode.
 main_menu
