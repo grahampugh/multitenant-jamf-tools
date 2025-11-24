@@ -69,7 +69,7 @@ write_count_to_file() {
     local output_file="$1"
     local csv_file="$2"
     # count the number of items in the members array of the output_file JSON
-    count=$(jq '.members | length' "$output_file")
+    count=$(jq '.totalCount' "$output_file")
     if [[ -z "$count" ]]; then
         count=0
     fi
