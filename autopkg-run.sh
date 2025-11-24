@@ -118,7 +118,7 @@ run_autopkg() {
             pass_rw=$(defaults read "$autopkg_prefs" SMB_PASSWORD)
             if [[ ! "$pass_rw" ]]; then
                 echo "ERROR: DP not determined. Cannot continue"
-                exit 1
+                return 1
             fi
         fi
         autopkg_run_options+=("--key")
@@ -128,7 +128,7 @@ run_autopkg() {
             autopkg_run_options+=("SMB_PASSWORD=$pass_rw")
         else
             echo "ERROR: Password not found for $dp_server"
-            exit 1
+            return 1
         fi
 
     else
@@ -189,7 +189,7 @@ run_autopkg() {
     elif  [[ $recipe ]]; then
         if ! "$autopkg_binary" run "$autopkg_verbosity" "$recipe" "${autopkg_run_options[@]}"; then
             echo "ERROR: AutoPkg run failed"
-            exit 1
+            return 1
         else
             echo "AutoPkg run completed"
         fi
