@@ -1,4 +1,4 @@
-Identifier: multitenant-jamf-tools.jamf.GetSmartGroupMembership
+Identifier: multitenant-jamf-tools.jamf.GetSmartComputerGroupMembership
 Description: |
   Designed to work in a wrapper script, using an edited JSON file based on a list_only output from JamfObjectReader.
   Requires:

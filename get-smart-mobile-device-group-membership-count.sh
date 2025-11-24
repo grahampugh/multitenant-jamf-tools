@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # --------------------------------------------------------------------------------
-# Script for getting the membership count of a smart computer group across multiple Jamf instances
+# Script for getting the membership count of a smart mobile device group across multiple Jamf instances
 # USAGE:
-# ./get-smart-computer-group-membership-count.sh "SMART_COMPUTER_GROUP_NAME"
-#   SMART_COMPUTER_GROUP_NAME: Name of the smart computer group to check
+# ./get-smart-mobile-device-group-membership-count.sh "SMART_MOBILE_DEVICE_GROUP_NAME"
+#   SMART_MOBILE_DEVICE_GROUP_NAME: Name of the smart mobile device group to check
 # --------------------------------------------------------------------------------
 
 # --------------------------------------------------------------------------------
@@ -27,8 +27,8 @@ fi
 usage() {
     cat <<'USAGE'
 Usage:
-./get-smart-computer-group-membership-count.sh -g "SMART_COMPUTER_GROUP_NAME"
-  -g | --group "SMART_COMPUTER_GROUP_NAME"   - Name of the smart computer group to check
+./get-smart-mobile-device-group-membership-count.sh -g "SMART_MOBILE_DEVICE_GROUP_NAME"
+  -g | --group "SMART_MOBILE_DEVICE_GROUP_NAME"   - Name of the smart mobile device group to check
 USAGE
 }   
 
@@ -37,17 +37,17 @@ run_autopkg() {
     subdomain=$(echo "$jss_instance" | awk -F[/:] '{print $4}' | cut -d'.' -f1)
     output_dir="/Users/Shared/Jamf/JamfUploader"
     mkdir -p "$output_dir"
-    output_file="$output_dir/$subdomain-smart_computer_group_membership-$SMART_COMPUTER_GROUP_NAME.json"
+    output_file="$output_dir/$subdomain-smart_mobile_device_group_membership-$SMART_MOBILE_DEVICE_GROUP_NAME.json"
 
     # delete any existing output file
     if [[ -f "$output_file" ]]; then
         rm "$output_file"
     fi
 
-    if ! "$this_script_dir/autopkg-run.sh" -r "$this_script_dir/recipes/GetSmartComputerGroupMembership.jamf.recipe.yaml" \
+    if ! "$this_script_dir/autopkg-run.sh" -r "$this_script_dir/recipes/GetSmartMobileDeviceGroupMembership.jamf.recipe.yaml" \
         --instance "$jss_instance" \
         --nointeraction \
-        --key SMART_COMPUTER_GROUP_NAME="$SMART_COMPUTER_GROUP_NAME"; then
+        --key SMART_MOBILE_DEVICE_GROUP_NAME="$SMART_MOBILE_DEVICE_GROUP_NAME"; then
         echo "ERROR: AutoPkg run failed for $jss_instance"
         exit 1
     fi
@@ -73,8 +73,8 @@ write_count_to_file() {
     if [[ -z "$count" ]]; then
         count=0
     fi
-    echo "Membership count for '$SMART_COMPUTER_GROUP_NAME' in '$jss_instance': $count"
-    # we need to escape any commas in SMART_COMPUTER_GROUP_NAME
+    echo "Membership count for '$SMART_MOBILE_DEVICE_GROUP_NAME' in '$jss_instance': $count"
+    # we need to escape any commas in SMART_MOBILE_DEVICE_GROUP_NAME
     echo "$jss_instance,$count" >> "$csv_file"
 }
 
@@ -109,7 +109,7 @@ while [[ "$#" -gt 0 ]]; do
         ;;
         -g|--group)
             shift
-            SMART_COMPUTER_GROUP_NAME="$1"
+            SMART_MOBILE_DEVICE_GROUP_NAME="$1"
             ;;
         *)
             usage
@@ -122,9 +122,9 @@ done
 echo
 
 # ensure that parameter 1 is provided
-if [[ -z "$SMART_COMPUTER_GROUP_NAME" ]]; then
-    echo "Usage: $0 -g <smart_computer_group_name>"
-    echo "Example: $0 -g 'My Smart Computer Group'"
+if [[ -z "$SMART_MOBILE_DEVICE_GROUP_NAME" ]]; then
+    echo "Usage: $0 -g <smart_mobile_device_group_name>"
+    echo "Example: $0 -g 'My Smart Mobile Device Group'"
     exit 1
 fi
 
@@ -139,7 +139,7 @@ fi
 choose_destination_instances
 
 # create the CSV file
-output_csv_file="/Users/Shared/Jamf/JamfUploader/smart_computer_group_membership_counts-$SMART_COMPUTER_GROUP_NAME-$(date +%Y-%m-%d).csv"
+output_csv_file="/Users/Shared/Jamf/JamfUploader/smart_mobile_device_group_membership_counts-$SMART_MOBILE_DEVICE_GROUP_NAME-$(date +%Y-%m-%d).csv"
 create_csv_file "$output_csv_file"
 
 # run on all chosen instances
