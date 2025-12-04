@@ -74,7 +74,7 @@ find_duplicates() {
         while IFS= read -r duplicate_name; do
             # echo "Duplicates for name: $duplicate_name"
             jq -r --arg name "$duplicate_name" '.[] | select(.name == $name) | "\(.id): \(.name)"' "$output_file" 
-            jq -r --arg name "$duplicate_name" '.[] | select(.name == $name) | "\(.id),\(.name)"' "$output_file" >> "$duplicates_output_file"
+            jq -r --arg name "$duplicate_name" '.[] | select(.name == $name) | "\(.id),\"\(.name)\""' "$output_file" >> "$duplicates_output_file"
         echo "----------------------------------------------------------------------"
         done < "$duplicates_file"
         echo
