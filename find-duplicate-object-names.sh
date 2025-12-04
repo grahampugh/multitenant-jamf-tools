@@ -42,7 +42,7 @@ run_autopkg() {
         --key "JSS_URL=$jss_instance" \
         --key OUTPUT_DIR="/Users/Shared/Jamf/JamfUploader"
 
-    object_api_type=$(get_api_object_type "$OBJECT_TYPE")
+    object_api_type=$(get_plural_from_api_xml_object "$OBJECT_TYPE")
     if [[ -z "$object_api_type" ]]; then
         echo "   [request] ERROR: Could not determine API object type for $OBJECT_TYPE. Aborting."
         exit 1
