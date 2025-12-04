@@ -1,0 +1,10 @@
+Identifier: multitenant-jamf-tools.jamf.DownloadObjectList
+MinimumVersion: "2.3"
+Input: {}
+
+Process:
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectReader
+    Arguments:
+      list_only: True
+      object_type: "%OBJECT_TYPE%"
+      output_dir: /Users/Shared/Jamf/JamfUploader
