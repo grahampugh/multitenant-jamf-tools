@@ -1574,9 +1574,7 @@ find_all_internet_passwords() {
     local count=0
     local in_inet_entry=false
     local matching_entries=()
-    
     local instance_base="${server/*:\/\//}"
-
 
     echo "   [find_all_internet_passwords] Searching for all internet passwords with server: $server"
     
