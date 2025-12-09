@@ -1575,6 +1575,9 @@ find_all_internet_passwords() {
     local in_inet_entry=false
     local matching_entries=()
     
+    local instance_base="${server/*:\/\//}"
+
+
     echo "   [find_all_internet_passwords] Searching for all internet passwords with server: $server"
     
     # Get raw keychain data and process it
@@ -1587,11 +1590,11 @@ find_all_internet_passwords() {
             current_entry=""
         elif [[ "$in_inet_entry" == true ]]; then
             current_entry+="$line"$'\n'
-            
-            if [[ "$line" =~ srvr.*"$server" ]]; then
+            # echo "$instance_base ($jss_api_user)" # DEBUG
+            if [[ "$line" =~ "0x00000007 <blob>".*"$instance_base (".*")" ]]; then
                 ((count++))
                 # echo "Entry #$count found in $current_keychain"
-                matching_entries+=("$(echo "$current_entry" | grep -E 'acct.*<blob>=' | sed 's/.*<blob>="\([^"]*\)".*/\1/')")
+                matching_entries+=("$(echo "$current_entry" | grep -E '0x00000007 <blob>' | sed 's/.*<blob>="\([^"]*\)".*/\1/' | sed 's/.*(\([^)]*\)).*/\1/')")
             fi
             
             if [[ -z "$line" ]]; then
@@ -1611,7 +1614,9 @@ find_all_internet_passwords() {
         chosen_account="${matching_entries[0]}"
         echo "   [find_all_internet_passwords] Single entry found, using account: $chosen_account"
     elif [ $count -gt 1 ]; then
-        echo "   [find_all_internet_passwords] Multiple entries found for server $server."
+        echo "   [find_all_internet_passwords] Multiple entries found for server $server:"
+        echo "   [find_all_internet_passwords] ${matching_entries[*]}"
+        echo  "   [find_all_internet_passwords] Checking for matching display name"
         echo
         if [[ $no_interaction -eq 1 ]]; then
             echo "   [find_all_internet_passwords] No interaction mode enabled, cannot choose between multiple entries."
