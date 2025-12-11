@@ -98,7 +98,7 @@ while test $# -gt 0 ; do
             shift
             chosen_instances+=("$1")
             ;;
-        -a|-ai|--all|--all-instances)
+        -a|-ai|--all-instances)
             all_instances=1
             ;;
         --id|--client-id|--user|--username)
