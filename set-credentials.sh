@@ -164,36 +164,67 @@ for instance in "${instance_choice_array[@]}"; do
     instance_base="${instance/*:\/\//}"
     # Find and delete all keychain entries for this instance_base, repeatedly until none remain
     deleted_count=0
-    while true; do
-        # Find the first entry for this instance
-        entry=$(security find-internet-password -s "$instance" 2>/dev/null)
-        if [[ -z "$entry" ]]; then
-            echo "No more entries found, done with $instance"
-            break
+
+    # first dump the login keychain entries so that we can parse them
+    keychain_dump=$(security dump-keychain login.keychain-db 2>/dev/null)
+
+    # Parse the keychain dump to find entries matching this instance
+    # Split on 'keychain:' to separate entries, then process each entry
+    matching_labels=()
+    
+    # Use awk to process the keychain dump and find matching entries
+    while IFS= read -r label; do
+        if [[ -n "$label" ]]; then
+            matching_labels+=("$label")
         fi
-        
-        # Extract the label from the entry (stored in 0x00000007 attribute)
-        label=$(echo "$entry" | grep "0x00000007" | awk -F'"' '{print $2}')
+    done < <(echo "$keychain_dump" | awk -v target_server="$instance" '
+        BEGIN { 
+            RS = "keychain:"
+        }
+        {
+            # Check if this entry contains our target server
+            if ($0 ~ "\"srvr\"[^=]*=\"" target_server "\"") {
+                # Split the record into lines and look for 0x00000007
+                split($0, lines, "\n")
+                for (i in lines) {
+                    if (lines[i] ~ /0x00000007.*=".*"/) {
+                        # Extract the value between quotes
+                        gsub(/.*="/, "", lines[i])
+                        gsub(/".*/, "", lines[i])
+                        if (lines[i] != "") {
+                            print lines[i]
+                        }
+                        break
+                    }
+                }
+            }
+        }
+    ')
+    
+    echo "Found ${#matching_labels[@]} keychain entries for $instance_base:"
+    for label in "${matching_labels[@]}"; do
+        echo "  - $label"
+    done
+
+    # Delete each matching entry
+    for label in "${matching_labels[@]}"; do
+        # only delete if the label matches the pattern $instance_base (some text)
         if [[ $label == "$instance_base ("*")" ]]; then
-            # Delete this specific entry
-            echo "Deleting password for $label"
-            if security delete-internet-password -s "$instance" -l "$label"; then
+            echo "Deleting keychain entry with label: $label"
+            if security delete-internet-password -s "$instance" -l "$label" 2>/dev/null; then
+                echo "Deleted keychain entry for $label"
                 ((deleted_count++))
             else
-                # If deletion failed, break to avoid infinite loop
-                break
+                echo "Failed to delete keychain entry for $label (may not exist or access denied)"
             fi
-        else
-            # No matching label pattern found, break the loop
-            break
         fi
     done
     
-    if [[ $deleted_count -gt 0 ]]; then
-        echo "Deleted $deleted_count existing keychain entries for $instance_base"
-    else
-        echo "No existing keychain entries found for $instance_base"
-    fi
+    # if [[ $deleted_count -gt 0 ]]; then
+    #     echo "Deleted $deleted_count existing keychain entries for $instance_base"
+    # else
+    #     echo "No existing keychain entries found for $instance_base"
+    # fi
 done
 
 echo
