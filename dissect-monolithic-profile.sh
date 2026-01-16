@@ -7,7 +7,8 @@
 # are omitted. The defaults are based off Apple's documentation for each payload.
 # 
 # By Graham Pugh (@grahampugh), based off an idea for reporting non-default keys 
-# in a monolithic profile by Neil Martin (@neilmartin83).
+# in a monolithic profile by Neil Martin (@neilmartin83). 
+# Claude Sonnet 4 and ChatGPT-5.1-Codex were used to assist in development.
 # --------------------------------------------------------------------------------
 
 # --------------------------------------------------------------------------------
