@@ -2,7 +2,9 @@
 
 # --------------------------------------------------------------------------------
 # Script for dissecting a monolithic configuration profile into discrete payloads
-# and uploading each payload back to Jamf Pro as its own profile using AutoPkg.
+# and uploading each payload back to Jamf Pro as its own profile using AutoPkg. 
+# Only identified payloads are extracted and keys set to the default values 
+# are omitted. The defaults are based off Apple's documentation for each payload.
 # 
 # By Graham Pugh (@grahampugh), based off an idea for reporting non-default keys 
 # in a monolithic profile by Neil Martin (@neilmartin83).
