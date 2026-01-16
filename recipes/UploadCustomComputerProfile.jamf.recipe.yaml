@@ -1,0 +1,32 @@
+Description: Creates a custom computer profile using a template and supplied payload
+Comment: |
+  Requires:
+  - PROFILE_NAME
+  - PROFILE_CATEGORY
+  - PROFILE_TEMPLATE
+  - PROFILE_PAYLOAD
+  - IDENTIFIER
+  - ORGANIZATION
+  - PROFILE_DESCRIPTION
+  - TARGET_GROUP_NAME
+
+Identifier: multitenant-jamf-tools.jamf.UploadCustomComputerProfile
+MinimumVersion: "2.3"
+
+Input:
+  PROFILE_CATEGORY: Global Policy
+  REPLACE_PROFILE: "True"
+  ORGANIZATION: None
+
+Process:
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfComputerProfileUploader
+    Arguments:
+      profile_name: "%PROFILE_NAME%"
+      profile_category: "%PROFILE_CATEGORY%"
+      profile_template: "%PROFILE_TEMPLATE%"
+      payload: "%PROFILE_PAYLOAD%"
+      identifier: "%IDENTIFIER%"
+      organization: "%ORGANIZATION%"
+      profile_description: "%PROFILE_DESCRIPTION%"
+      profile_computergroup: "%TARGET_GROUP_NAME%"
+      replace_profile: "%REPLACE_PROFILE%"

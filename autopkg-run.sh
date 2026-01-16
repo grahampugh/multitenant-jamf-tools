@@ -115,7 +115,7 @@ run_autopkg() {
             fi
         else
             echo "DP not determined. Trying AutoPkg prefs"
-            pass_rw=$(defaults read "$autopkg_prefs" SMB_PASSWORD)
+            pass_rw=$(defaults read "$autopkg_prefs" SMB_PASSWORD 2>/dev/null)
             if [[ ! "$pass_rw" ]]; then
                 echo "ERROR: DP not determined. Cannot continue"
                 return 1
@@ -132,9 +132,9 @@ run_autopkg() {
         fi
 
     else
-        defaults delete "$autopkg_prefs" SMB_URL
-        # defaults delete "$autopkg_prefs" SMB_USERNAME
-        # defaults delete "$autopkg_prefs" SMB_PASSWORD
+        defaults delete "$autopkg_prefs" SMB_URL 2>/dev/null
+        # defaults delete "$autopkg_prefs" SMB_USERNAME 2>/dev/null
+        # defaults delete "$autopkg_prefs" SMB_PASSWORD 2>/dev/null
         # autopkg_run_options+=("--key")
         # autopkg_run_options+=("jcds2_mode=True")
     fi
