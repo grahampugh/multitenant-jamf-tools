@@ -75,7 +75,7 @@ Usage:
 --dp                               - filter DPs on DP name
 -e | --enabled                     - Force policy to enabled (--key POLICY_ENABLED=True)
 -p | --replace                     - Replace existing pkg in Jamf Pro (for pkg uploads)
--v[vv]                             - add verbose output
+-v[vvv]                            - add verbose output
 --[args]                           - Pass through any arguments for AutoPkg
 USAGE
 }
@@ -99,6 +99,9 @@ run_autopkg() {
     autopkg_run_options+=("CLIENT_ID=")
     autopkg_run_options+=("--key")
     autopkg_run_options+=("CLIENT_SECRET=")
+
+    # echo verbosity
+    echo "AutoPkg verbosity mode: $verbosity_mode"
 
     # determine the share
     get_instance_distribution_point
@@ -161,13 +164,6 @@ run_autopkg() {
         autopkg_run_options+=("${args[@]}")
     fi
     
-    # verbosity
-    case $verbose in
-        2) autopkg_verbosity="-vv";;
-        3) autopkg_verbosity="-vvv";;
-        *) autopkg_verbosity="-v";;
-    esac
-
     # report to Slack
     if [[ "$instance_list_file" ]]; then
         if get_slack_webhook "$instance_list_file"; then
@@ -185,9 +181,9 @@ run_autopkg() {
     fi
 
     if [[ $recipe_list ]]; then
-        "$autopkg_binary" run "$autopkg_verbosity" --recipe-list "$recipe_list" "${autopkg_run_options[@]}"
+        "$autopkg_binary" run "$verbosity_mode" --recipe-list "$recipe_list" "${autopkg_run_options[@]}"
     elif  [[ $recipe ]]; then
-        if ! "$autopkg_binary" run "$autopkg_verbosity" "$recipe" "${autopkg_run_options[@]}"; then
+        if ! "$autopkg_binary" run "$verbosity_mode" "$recipe" "${autopkg_run_options[@]}"; then
             echo "ERROR: AutoPkg run failed"
             return 1
         else
@@ -279,9 +275,11 @@ done
 
 if [[ ! $verbosity_mode && ! $quiet_mode ]]; then
     # default verbosity
-    args+=("-v")
-elif [[ ! $quiet_mode ]]; then
-    args+=("$verbosity_mode")
+    verbosity_mode="-v"
+elif [[ $verbosity_mode == "-vvvvv"* ]]; then
+    verbosity_mode="-vvvv"
+elif [[ $quiet_mode ]]; then
+    verbosity_mode=""
 fi
 
 # Ask for the instance list, show list, ask to apply to one, multiple or all
