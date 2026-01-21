@@ -81,7 +81,10 @@ prepare_output_file() {
 print_scoped_objects() {
     # print the scoped objects
     for obj in "${scoped_objects[@]}"; do
-        printf "%-22s %s\n" "$object_printname" "$obj" >> "$output_file"
+        printf "%-22s %s\n" "$object_printname - Target - " "$obj" >> "$output_file"
+    done
+    for obj in "${excluded_objects[@]}"; do
+        printf "%-22s %s\n" "$object_printname - Exclusion - " "$obj" >> "$output_file"
     done
     echo
 }
@@ -126,8 +129,9 @@ find_scoped_objects() {
     )
 
     scoped_objects=()
+    excluded_objects=() 
 
-    echo "Checking for every $object_printname scoped to '$group_name'..."
+    echo "Checking for every $object_printname scoped to or excluded from '$group_name'..."
     echo "Matches will be listed below:"
     while read -r i; do
         # echo "Retrieving $object_printname ID $i's data..."
@@ -160,6 +164,7 @@ find_scoped_objects() {
 
         # cat "$curl_output_file" # TEMP
         # echo "Checking for groups in '$object_name' ($i)"
+        # Target groups
         group_names=$(
             xmllint --xpath "//$api_xml_object/scope/computer_groups/computer_group/name" \
             "$curl_output_file" 2>/dev/null \
@@ -170,16 +175,32 @@ find_scoped_objects() {
             # echo "    Checking if '$object_name' ($i) is scoped to $group_name..." # TEMP
             # echo "    Comparing $targeted_group to $group_name..." # TEMP
             if [[ "$targeted_group" == "$group_name" ]]; then
-                echo "$object_printname - '$object_name' ($i)"
+                echo "$object_printname - Target - '$object_name' ($i)"
                 scoped_objects+=("$object_name")
             fi
         done <<< "${group_names}"
+
+        # Exclusion groups
+        exclusion_group_names=$(
+            xmllint --xpath "//$api_xml_object/scope/exclusions/computer_groups/computer_group/name" \
+            "$curl_output_file" 2>/dev/null \
+            | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+        )   
+
+        while read -r excluded_group ; do
+            # echo "    Checking if '$object_name' ($i) is excluded from $group_name..." # TEMP
+            # echo "    Comparing $excluded_group to $group_name..." # TEMP
+            if [[ "$excluded_group" == "$group_name" ]]; then
+                echo "$object_printname - Exclusion - '$object_name' ($i)"
+                excluded_objects+=("$object_name")
+            fi
+        done <<< "${exclusion_group_names}"    
     done <<< "${object_ids[@]}"
 
     print_scoped_objects
 
-    if [[ ${#scoped_objects[@]} -eq 0 ]]; then
-        echo "No $object_printname objects found scoped to '$group_name'." >> "$output_file"
+    if [[ ${#scoped_objects[@]} -eq 0 && ${#excluded_objects[@]} -eq 0 ]]; then
+        echo "No $object_printname objects found scoped to or excluded from '$group_name'." >> "$output_file"
         echo
     fi
 }
