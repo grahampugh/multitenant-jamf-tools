@@ -63,28 +63,22 @@ USAGE
 }
 
 prepare_output_file() {
-    # prepare the output file
+    # prepare the CSV output file
     jss_shortname=$( echo "$jss_instance" | sed 's|https://||' | sed 's|http://||' | sed 's|/$||' )
-    output_file="$workdir/$jss_shortname-$group_name.txt"
-    # ensure the directories can be written to, and empty the files
-    echo "" > "$output_file"
-    (
-        echo "Timestamp: $( date )"
-        echo "-------------------------------------------------------------------------------"
-        echo "Group Name: $group_name"                        
-        echo "-------------------------------------------------------------------------------"
-        echo "Object Type            Name"                        
-        echo "-------------------------------------------------------------------------------"
-    ) > "$output_file"
+    output_file="$workdir/ScopedComputerGroups-$jss_url-$group_name.csv"
+    # ensure the directories can be written to, and create the file with headers
+    echo "Object Type,Scope Type,Name,ID" > "$output_file"
 }
 
 print_scoped_objects() {
-    # print the scoped objects
-    for obj in "${scoped_objects[@]}"; do
-        printf "%-22s %s\n" "$object_printname - Target - " "$obj" >> "$output_file"
+    # write the scoped objects to CSV
+    for i in "${!scoped_objects[@]}"; do
+        # CSV format: Object Type,Scope Type,Name,ID
+        echo "$object_printname,Target,${scoped_objects[$i]},${scoped_object_ids[$i]}" >> "$output_file"
     done
-    for obj in "${excluded_objects[@]}"; do
-        printf "%-22s %s\n" "$object_printname - Exclusion - " "$obj" >> "$output_file"
+    for i in "${!excluded_objects[@]}"; do
+        # CSV format: Object Type,Scope Type,Name,ID
+        echo "$object_printname,Exclusion,${excluded_objects[$i]},${excluded_object_ids[$i]}" >> "$output_file"
     done
     echo
 }
@@ -129,7 +123,9 @@ find_scoped_objects() {
     )
 
     scoped_objects=()
-    excluded_objects=() 
+    excluded_objects=()
+    scoped_object_ids=()
+    excluded_object_ids=()
 
     echo "Checking for every $object_printname scoped to or excluded from '$group_name'..."
     echo "Matches will be listed below:"
@@ -177,6 +173,7 @@ find_scoped_objects() {
             if [[ "$targeted_group" == "$group_name" ]]; then
                 echo "$object_printname - Target - '$object_name' ($i)"
                 scoped_objects+=("$object_name")
+                scoped_object_ids+=("$i")
             fi
         done <<< "${group_names}"
 
@@ -193,6 +190,7 @@ find_scoped_objects() {
             if [[ "$excluded_group" == "$group_name" ]]; then
                 echo "$object_printname - Exclusion - '$object_name' ($i)"
                 excluded_objects+=("$object_name")
+                excluded_object_ids+=("$i")
             fi
         done <<< "${exclusion_group_names}"    
     done <<< "${object_ids[@]}"
@@ -200,7 +198,7 @@ find_scoped_objects() {
     print_scoped_objects
 
     if [[ ${#scoped_objects[@]} -eq 0 && ${#excluded_objects[@]} -eq 0 ]]; then
-        echo "No $object_printname objects found scoped to or excluded from '$group_name'." >> "$output_file"
+        echo "No $object_printname objects found scoped to or excluded from '$group_name'."
         echo
     fi
 }
@@ -275,9 +273,8 @@ for instance in "${instance_choice_array[@]}"; do
     find_scoped_objects "Configuration Profile" "os_x_configuration_profile" "$group_name"
     find_scoped_objects "Restricted Software" "restricted_software" "$group_name"
     find_scoped_objects "Mac App Store App" "mac_application" "$group_name"
+    echo "Output written to: $output_file"
 done
-
-echo "-------------------------------------------------------------------------------" > "$output_file"
 
 echo
 echo "Finished"
