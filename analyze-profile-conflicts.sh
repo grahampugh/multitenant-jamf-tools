@@ -142,11 +142,12 @@ parse_mobileconfig_files() {
     for mobileconfig in "${mobileconfig_files[@]}"; do
         ((file_counter++))
         local profile_name
-        profile_name=$(basename "$mobileconfig" .mobileconfig)
+        local full_name
+        full_name=$(basename "$mobileconfig" .mobileconfig)
         
-        # Extract profile ID from filename (assumes format: ID-ProfileName.mobileconfig)
-        local profile_id
-        profile_id=$(echo "$profile_name" | grep -o '^[0-9]\+' || echo "unknown")
+        # Extract profile name by removing instance-os_x_configuration_profiles- prefix
+        # Format: instance-os_x_configuration_profiles-PROFILE_NAME.mobileconfig
+        profile_name=$(echo "$full_name" | sed -E 's/^[^-]+-os_x_configuration_profiles-//')
         
         echo "  [$file_counter/${#mobileconfig_files[@]}] Processing: $profile_name" >&2
         
@@ -163,15 +164,14 @@ parse_mobileconfig_files() {
         fi
         
         if /usr/bin/plutil -convert json -o - "$mobileconfig" 2>/dev/null | \
-            jq -c --arg pid "$profile_id" --arg pname "$profile_name" --arg instance "$jss_instance" "$jq_filter | {
-                    profile_id: \$pid,
+            jq -c --arg pname "$profile_name" --arg instance "$jss_instance" "$jq_filter | {
                     profile_name: \$pname,
                     domain: .PayloadType,
                     instance: \$instance,
                     payload: .
                 }" >> "$temp_json.tmp" 2>/dev/null; then
             # Count payloads extracted from this profile
-            payload_count=$(grep -c "profile_id" "$temp_json.tmp" 2>/dev/null || echo 0)
+            payload_count=$(grep -c "profile_name" "$temp_json.tmp" 2>/dev/null || echo 0)
             if [[ $payload_count -gt 0 ]]; then
                 echo "       Extracted $payload_count payload(s)" >&2
                 ((total_payloads += payload_count))
@@ -234,7 +234,6 @@ parse_analysis_results() {
                    .key != "PayloadDescription" and
                    .key != "PayloadOrganization") |
             {
-                profile_id: $entry.profile_id,
                 profile_name: $entry.profile_name,
                 domain: $entry.domain,
                 key: .key,
@@ -334,15 +333,18 @@ generate_csv_report() {
         echo "Fetching default values from Apple MDM schema..." >&2
     fi
     
+    # Ensure temp directory exists
+    mkdir -p "$temp_output_dir"
+    
     {
         # Write CSV header
-        echo "Instance,Profile ID,Profile Name,Domain,Key,Assigned Value,Default Value"
+        echo "Instance,Profile Name,Domain,Key,Assigned Value,Default Value"
         
         # Process each result file and convert to CSV rows
         for result_file in "${all_results[@]}"; do
             # Read the JSON and look up defaults for each row
-            jq -r '.[] | [.instance, .profile_id, .profile_name, .domain, .key, .value] | @tsv' "$result_file" | \
-            while IFS=$'\t' read -r instance profile_id profile_name domain key value; do
+            jq -r '.[] | [.instance, .profile_name, .domain, .key, .value] | @tsv' "$result_file" > "$temp_output_dir/tsv_rows.txt"
+            while IFS=$'\t' read -r instance profile_name domain key value; do
                 # Look up default value if --get-defaults flag is set
                 if [[ $GET_DEFAULTS ]]; then
                     if default_value=$(python3 "$this_script_dir/get_mdm_default.py" "$domain" "$key" 2>/dev/null); then
@@ -353,17 +355,16 @@ generate_csv_report() {
                 else
                     default_value=""
                 fi
-                
+
                 # Output as CSV (properly escape fields with commas/quotes)
-                printf '%s,%s,%s,%s,%s,%s,%s\n' \
+                printf '%s,%s,%s,%s,%s,%s\n' \
                     "$(echo "$instance" | sed 's/"/""/g' | awk '{print "\"" $0 "\""}')" \
-                    "$(echo "$profile_id" | sed 's/"/""/g' | awk '{print "\"" $0 "\""}')" \
                     "$(echo "$profile_name" | sed 's/"/""/g' | awk '{print "\"" $0 "\""}')" \
                     "$(echo "$domain" | sed 's/"/""/g' | awk '{print "\"" $0 "\""}')" \
                     "$(echo "$key" | sed 's/"/""/g' | awk '{print "\"" $0 "\""}')" \
                     "$(echo "$value" | sed 's/"/""/g' | awk '{print "\"" $0 "\""}')" \
                     "$(echo "$default_value" | sed 's/"/""/g' | awk '{print "\"" $0 "\""}')"
-            done
+            done < "$temp_output_dir/tsv_rows.txt"
         done
     } > "$CSV_OUTPUT"
 
