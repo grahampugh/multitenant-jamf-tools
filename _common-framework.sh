@@ -1346,10 +1346,19 @@ generate_computer_list() {
 
     if [ ${#computer_choice[@]} -eq 0 ]; then
         echo
-        read -r -p "Enter the ID(s) of the computer(s) above : " computer_input
+        echo "Enter the ID(s) of the computer(s) above."
+        read -r -p "Ranges can be provided, e.g. 0-4 : " computer_input
         # computers chosen
         for computer in $computer_input; do
-            computer_choice+=("$computer")
+            if [[ $computer == *"-"* ]]; then
+                list_first=$(echo "$computer" | cut -d'-' -f1)
+                list_last=$(echo "$computer" | cut -d'-' -f2)
+                for (( i=list_first; i<=list_last; i++ )); do
+                    computer_choice+=("$i")
+                done
+            else
+                computer_choice+=("$computer")
+            fi
         done
     fi
 
@@ -1488,10 +1497,19 @@ generate_mobile_device_list() {
 
     if [ ${#mobile_device_choice[@]} -eq 0 ]; then
         echo
-        read -r -p "Enter the ID(s) of the mobile_device(s) above : " mobile_device_input
+        echo "Enter the ID(s) of the mobile_device(s) above."
+        read -r -p "Ranges can be provided, e.g. 0-4 : " mobile_device_input
         # mobile_devices chosen
         for mobile_device in $mobile_device_input; do
-            mobile_device_choice+=("$mobile_device")
+            if [[ $mobile_device == *"-"* ]]; then
+                list_first=$(echo "$mobile_device" | cut -d'-' -f1)
+                list_last=$(echo "$mobile_device" | cut -d'-' -f2)
+                for (( i=list_first; i<=list_last; i++ )); do
+                    mobile_device_choice+=("$i")
+                done
+            else
+                mobile_device_choice+=("$mobile_device")
+            fi
         done
     fi
 

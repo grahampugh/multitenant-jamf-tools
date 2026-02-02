@@ -50,6 +50,7 @@ MDM command type:
                                      Recovery lock password will be random unless set
                                      with --recovery-lock-password
 --removemdm                        - Remove the MDM Enrollment Profile (Unmanage)
+--renewmdm                         - Renew the MDM Enrollment Profile
 --deleteusers                      - Delete all users from a device (Shared iPad)
 --restart                          - Restart device (mobile devices only)
 --logout                           - Log out user from a device (mobile devices only)
@@ -1118,6 +1119,41 @@ remove_mdm() {
     send_slack_notification "$slack_text"
 }
 
+renew_mdm() {
+    # This function will renew the MDM enrollment profile on the selected devices
+
+    # now loop through the list and perform the action
+    for computer in "${computer_choice[@]}"; do
+        management_id="${management_ids[$computer]}"
+        computer_id="${computer_ids[$computer]}"
+        computer_name="${computer_names[$computer]}"
+        echo
+        echo "   [eacas] Processing Computer: id: $computer_id  name: $computer_name  management id: $management_id"
+        echo
+
+        # send MDM command
+        endpoint="api/v1/mdm/renew-profile"
+        curl_url="$jss_url/$endpoint"
+        curl_args=("--request")
+        curl_args+=("POST")
+        curl_args+=("--header")
+        curl_args+=("Content-Type: application/json")
+        curl_args+=("--data-raw")
+        curl_args+=(
+            '{
+                "udids": [
+                    "'"$management_id"'"
+                ],
+            }'
+        )
+        send_curl_request
+    done
+
+    # Send Slack notification
+    slack_text="{'username': '$jss_url', 'text': '*mdm-commands.sh*\nUser: $jss_api_user\nInstance: $jss_url\nAction: Renew MDM Profile'}"
+    send_slack_notification "$slack_text"
+}
+
 flush_mdm() {
     # This function will flush the MDM commands from the selected devices
 
@@ -1298,6 +1334,9 @@ while test $# -gt 0 ; do
         --removemdm|--remove-mdm-profile)
             mdm_command="removemdm"
             ;;
+        --renewmdm|--renew-mdm-profile)
+            mdm_command="renewmdm"
+            ;;
         --flushmdm|--flush-mdm)
             mdm_command="flushmdm"
             ;;
@@ -1395,6 +1434,7 @@ else
     echo "   [M] Redeploy Management Framework"
     echo "   [R] Set Recovery Lock"
     echo "   [P] Remove MDM Enrollment Profile"
+    echo "   [N] Renew MDM Enrollment Profile"
     echo "   [D] Delete all users (Shared iPads)"
     echo "   [S] Restart device (mobile devices)"
     echo "   [L] Logout user (mobile devices)"
@@ -1419,6 +1459,9 @@ else
             ;;
         P|p)
             mdm_command="removemdm"
+            ;;
+        N|n)
+            mdm_command="renewmdm"
             ;;
         MSUP|msup)
             mdm_command="msuplanstatus"
@@ -1454,6 +1497,47 @@ else
             echo
             echo "No valid action chosen!"
             exit 1
+            ;;
+    esac
+fi
+
+# if group name, id or serial not provided, show a prompt to ask which to search for
+if [[ ! $group_name && ! $id && ! $serial ]]; then
+    echo
+    echo "Select from the following options on which to perform the action:"
+    echo "  [1] Provide the Jamf ID of a computer"
+    echo "  [2] Provide a serial number or comma-separated list of serials"
+    echo "  [3] Provide a group name"
+    echo "  [4] Select from a list of computer or mobile device objects"
+    printf 'Choose one : '
+    read -r device_selection_question
+
+    case "$device_selection_question" in
+        1)
+            echo
+            echo "You chose to provide an ID."
+            printf 'Please enter the ID : '
+            read -r id
+            ;;
+        2)
+            echo
+            echo "You chose to provide a comma-separated list of serials."
+            printf 'Please enter the serials : '
+            read -r serial
+            ;;
+        3)
+            echo
+            if [[ $mdm_command == "deleteusers" || $mdm_command == "restart" || $mdm_command == "logout" ]]; then
+                echo "You chose to provide a mobile device group name."
+            else
+                echo "You chose to provide a computer group name."
+            fi
+            printf 'Please enter the group name : '
+            read -r group_name
+            ;;
+        *)
+            echo
+            echo "You chose to select from a list of objects."
             ;;
     esac
 fi
@@ -1529,6 +1613,10 @@ case "$mdm_command" in
         ;;
     removemdm)
         echo "   [main] Removing MDM Enrollment Profile"
+        remove_mdm
+        ;;
+    renewmdm)
+        echo "   [main] Renewing MDM Enrollment Profile"
         remove_mdm
         ;;
     restart)
