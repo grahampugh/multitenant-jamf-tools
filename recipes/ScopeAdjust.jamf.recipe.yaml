@@ -1,0 +1,37 @@
+Description: Add or remove a scopeable object as a target, limitation or exclusion to or from an API object.
+Comment: |
+  Requires the following keys to be set or overridden:
+  * SCOPED_OBJECT_TYPE
+      configuration_profile, os_x_configuration_profile, 
+      mobile_device_application, mac_application, policy, 
+      restricted_software
+  * SCOPED_OBJECT_NAME
+  * SCOPING_OPERATION
+      add, remove
+  * SCOPING_TYPE
+      target, limitation, exclusion
+  * SCOPEABLE_OBJECT_TYPE
+      user_group, computer_group, mobile_device_group, 
+      network_segment, building, department
+  * SCOPEABLE_OBJECT_NAME
+Identifier: multitenant-jamf-tools.jamf.ScopeAdjust
+MinimumVersion: "2.3"
+
+Input: {}
+
+Process:
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectReader
+    Arguments:
+      object_name: "%SCOPED_OBJECT_NAME%"
+      object_type: "%SCOPED_OBJECT_TYPE%"
+
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfScopeAdjuster
+    Arguments:
+      scoping_operation: "%SCOPING_OPERATION%"
+      scoping_type: "%SCOPING_TYPE%"
+      scopeable_type: "%SCOPEABLE_OBJECT_TYPE%"
+      scopeable_name: "%SCOPEABLE_OBJECT_NAME%"
+
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectUploader
+    Arguments:
+      replace_object: "True"
