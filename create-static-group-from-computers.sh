@@ -60,6 +60,8 @@ Options:
                                      configuration_profile, restricted_software,
                                      mac_application, mobile_device_application
 -n | --name OBJECT_NAME            - process a single named object (optional)
+-p | --prefix PREFIX               - prefix for target groups (default: "Testing - ")
+-e | --exclusion-prefix PREFIX       - prefix for exclusion groups (default: "Testing - Exclude - ")
 -il | --instance-list FILENAME     - provide an instance list filename (without .txt)
 -i | --instance JSS_URL            - perform action on a specific instance
 -a | --all | --all-instances       - perform action on ALL instances in the instance list
@@ -415,7 +417,7 @@ process_objects() {
         # Process targeted devices
         target_group_name=""
         if [[ -n "$targeted_device_ids" ]]; then
-            target_group_name="Testing - $object_name"
+            target_group_name="${TARGET_GROUP_PREFIX}${object_name}"
             echo "    Creating target group: $target_group_name"
             
             # Create the static group XML template
@@ -440,7 +442,7 @@ process_objects() {
         # Process excluded devices
         exclusion_group_name=""
         if [[ -n "$excluded_device_ids" ]]; then
-            exclusion_group_name="Testing - Exclude - $object_name"
+            exclusion_group_name="${EXCLUSION_GROUP_PREFIX}${object_name}"
             echo "    Creating exclusion group: $exclusion_group_name"
             
             # Create the static group XML template
@@ -504,6 +506,8 @@ process_objects() {
 chosen_instances=()
 OBJECT_TYPE=""
 OBJECT_NAME=""
+TARGET_GROUP_PREFIX="Testing - "
+EXCLUSION_GROUP_PREFIX="Testing - Exclude - "
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
@@ -514,6 +518,14 @@ while [[ "$#" -gt 0 ]]; do
         -n|--name)
             shift
             OBJECT_NAME="$1"
+            ;;
+        -p|--prefix)
+            shift
+            TARGET_GROUP_PREFIX="$1"
+            ;;
+        -e|--exclusion-prefix)
+            shift
+            EXCLUSION_GROUP_PREFIX="$1"
             ;;
         -il|--instance-list)
             shift
