@@ -9,9 +9,17 @@
 # 2. Identify objects with individually targeted or excluded computers
 # 3. Create static computer groups for those computers
 # 4. Update the objects to use the groups instead of individual computers
+# 
+# The new groups are named as follows by default:
+# Exp-YYYY-MM-DD - Auto-Temp - <Target|Exclusion> - <object_type> - <Object Name>
+# 
+# The date refers to 30 days in the future. If this default naming convention is
+# retained, an additional --cleanup-expired option may be used, which will remove
+# any groups matching the naming pattern which contain a date in the past from the 
+# scope of the object the name refers to, and then the group will be deleted.
 #
-# USAGE:
-# ./create-static-group-from-computers.sh [-i instance] [-il instance-list] [-a]
+# USAGE: See
+# ./create-static-group-from-computers.sh --help
 # --------------------------------------------------------------------------------
 
 # --------------------------------------------------------------------------------
