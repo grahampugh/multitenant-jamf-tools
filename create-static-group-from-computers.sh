@@ -2,13 +2,13 @@
 
 # --------------------------------------------------------------------------------
 # Script for creating static computer groups from individually scoped computers
-# in policies, and updating those policies to use the groups instead.
+# in scopeable opjects, and updating those objects to use the groups instead.
 #
 # This script will:
-# 1. Download all policies from a Jamf Pro instance
-# 2. Identify policies with individually targeted or excluded computers
+# 1. Download all objects of a specified type from a Jamf Pro instance
+# 2. Identify objects with individually targeted or excluded computers
 # 3. Create static computer groups for those computers
-# 4. Update the policies to use the groups instead of individual computers
+# 4. Update the objects to use the groups instead of individual computers
 #
 # USAGE:
 # ./create-static-group-from-computers.sh [-i instance] [-il instance-list] [-a]
@@ -44,16 +44,22 @@ declare -a errors
 
 usage() {
     cat <<'USAGE'
-# Create Static Groups from Computers in Policies
+# Create Static Groups from Computers in Scoped Objects
 
-This script identifies policies with individually targeted or excluded computers,
-creates static computer groups for those computers, and updates the policies to
+This script identifies objects with individually targeted or excluded computers,
+creates static computer groups for those computers, and updates the objects to
 use the groups instead.
 
 Usage:
-./create-static-group-from-computers.sh [options]
+./create-static-group-from-computers.sh -t <object_type> [options]
 
 Options:
+-t | --type OBJECT_TYPE            - REQUIRED: object type to process
+                                     Valid types: policy, advanced_computer_search,
+                                     advanced_mobile_device_search, os_x_configuration_profile,
+                                     configuration_profile, restricted_software,
+                                     mac_application, mobile_device_application
+-n | --name OBJECT_NAME            - process a single named object (optional)
 -il | --instance-list FILENAME     - provide an instance list filename (without .txt)
 -i | --instance JSS_URL            - perform action on a specific instance
 -a | --all | --all-instances       - perform action on ALL instances in the instance list
@@ -65,9 +71,23 @@ Options:
 USAGE
 }
 
+validate_object_type() {
+    local object_type="$1"
+    local valid_types=("policy" "advanced_computer_search" "advanced_mobile_device_search" 
+                       "os_x_configuration_profile" "configuration_profile" 
+                       "restricted_software" "mac_application" "mobile_device_application")
+    
+    for valid_type in "${valid_types[@]}"; do
+        if [[ "$object_type" == "$valid_type" ]]; then
+            return 0
+        fi
+    done
+    return 1
+}
+
 create_static_group_xml() {
     local group_name="$1"
-    local computer_ids="$2"
+    local computer_ids_string="$2"
     local output_file="$3"
 
     cat > "$output_file" <<EOF
@@ -79,7 +99,7 @@ create_static_group_xml() {
 EOF
 
     # Add each computer ID to the XML
-    IFS=',' read -ra ADDR <<< "$computer_ids"
+    IFS=',' read -ra ADDR <<< "$computer_ids_string"
     for computer_id in "${ADDR[@]}"; do
         cat >> "$output_file" <<EOF
         <computer>
@@ -94,31 +114,61 @@ EOF
 EOF
 }
 
-create_policy_scope_xml() {
-    local original_policy_file="$1"
+create_object_scope_xml() {
+    local original_file="$1"
     local output_file="$2"
     local target_group_name="$3"
     local exclusion_group_name="$4"
+    local object_type="$5"
 
-    # Start the policy XML with just the scope element
+    # Determine the root element based on object type
+    local root_element
+    case "$object_type" in
+        policy)
+            root_element="policy"
+            ;;
+        advanced_computer_search)
+            root_element="advanced_computer_search"
+            ;;
+        advanced_mobile_device_search)
+            root_element="advanced_mobile_device_search"
+            ;;
+        os_x_configuration_profile)
+            root_element="os_x_configuration_profile"
+            ;;
+        configuration_profile)
+            root_element="configuration_profile"
+            ;;
+        restricted_software)
+            root_element="restricted_software"
+            ;;
+        mac_application)
+            root_element="mac_application"
+            ;;
+        mobile_device_application)
+            root_element="mobile_device_application"
+            ;;
+    esac
+
+    # Start the XML with just the scope element
     echo '<?xml version="1.0" encoding="UTF-8"?>' > "$output_file"
-    echo '<policy>' >> "$output_file"
+    echo "<$root_element>" >> "$output_file"
 
     # Extract the existing scope element and modify it
-    xmllint --xpath '//scope' "$original_policy_file" 2>/dev/null > "$temp_dir/scope_temp.xml"
+    xmllint --xpath '//scope' "$original_file" 2>/dev/null > "$temp_dir/scope_temp.xml"
 
     # Create a modified scope with computers removed and groups added
     echo '    <scope>' >> "$output_file"
 
     # Copy all_computers element if it exists
-    if xmllint --xpath '//scope/all_computers' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/all_computers' "$original_policy_file" 2>/dev/null | sed 's/^/        /' >> "$output_file"
+    if xmllint --xpath '//scope/all_computers' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/all_computers' "$original_file" 2>/dev/null | sed 's/^/        /' >> "$output_file"
     fi
 
     # Handle computer_groups - preserve existing and add new target group
     echo '        <computer_groups>' >> "$output_file"
-    if xmllint --xpath '//scope/computer_groups/computer_group' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/computer_groups/computer_group' "$original_policy_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
+    if xmllint --xpath '//scope/computer_groups/computer_group' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/computer_groups/computer_group' "$original_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
     fi
     # Add new target group if specified
     if [[ -n "$target_group_name" ]]; then
@@ -132,18 +182,18 @@ create_policy_scope_xml() {
     echo '        <computers/>' >> "$output_file"
 
     # Copy buildings if they exist
-    if xmllint --xpath '//scope/buildings' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/buildings' "$original_policy_file" 2>/dev/null | sed 's/^/        /' >> "$output_file"
+    if xmllint --xpath '//scope/buildings' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/buildings' "$original_file" 2>/dev/null | sed 's/^/        /' >> "$output_file"
     fi
 
     # Copy departments if they exist
-    if xmllint --xpath '//scope/departments' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/departments' "$original_policy_file" 2>/dev/null | sed 's/^/        /' >> "$output_file"
+    if xmllint --xpath '//scope/departments' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/departments' "$original_file" 2>/dev/null | sed 's/^/        /' >> "$output_file"
     fi
 
     # Copy limitations if they exist
-    if xmllint --xpath '//scope/limitations' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/limitations' "$original_policy_file" 2>/dev/null | sed 's/^/        /' >> "$output_file"
+    if xmllint --xpath '//scope/limitations' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/limitations' "$original_file" 2>/dev/null | sed 's/^/        /' >> "$output_file"
     fi
 
     # Handle exclusions
@@ -151,8 +201,8 @@ create_policy_scope_xml() {
 
     # Copy existing exclusion computer_groups and add new one if specified
     echo '            <computer_groups>' >> "$output_file"
-    if xmllint --xpath '//scope/exclusions/computer_groups/computer_group' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/exclusions/computer_groups/computer_group' "$original_policy_file" 2>/dev/null | sed 's/^/                /' >> "$output_file"
+    if xmllint --xpath '//scope/exclusions/computer_groups/computer_group' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/exclusions/computer_groups/computer_group' "$original_file" 2>/dev/null | sed 's/^/                /' >> "$output_file"
     fi
     # Add new exclusion group if specified
     if [[ -n "$exclusion_group_name" ]]; then
@@ -166,93 +216,111 @@ create_policy_scope_xml() {
     echo '            <computers/>' >> "$output_file"
 
     # Copy other exclusion elements if they exist
-    if xmllint --xpath '//scope/exclusions/buildings' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/exclusions/buildings' "$original_policy_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
+    if xmllint --xpath '//scope/exclusions/buildings' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/exclusions/buildings' "$original_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
     fi
-    if xmllint --xpath '//scope/exclusions/departments' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/exclusions/departments' "$original_policy_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
+    if xmllint --xpath '//scope/exclusions/departments' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/exclusions/departments' "$original_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
     fi
-    if xmllint --xpath '//scope/exclusions/users' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/exclusions/users' "$original_policy_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
+    if xmllint --xpath '//scope/exclusions/users' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/exclusions/users' "$original_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
     fi
-    if xmllint --xpath '//scope/exclusions/user_groups' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/exclusions/user_groups' "$original_policy_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
+    if xmllint --xpath '//scope/exclusions/user_groups' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/exclusions/user_groups' "$original_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
     fi
-    if xmllint --xpath '//scope/exclusions/network_segments' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/exclusions/network_segments' "$original_policy_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
+    if xmllint --xpath '//scope/exclusions/network_segments' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/exclusions/network_segments' "$original_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
     fi
-    if xmllint --xpath '//scope/exclusions/ibeacons' "$original_policy_file" &>/dev/null; then
-        xmllint --xpath '//scope/exclusions/ibeacons' "$original_policy_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
+    if xmllint --xpath '//scope/exclusions/ibeacons' "$original_file" &>/dev/null; then
+        xmllint --xpath '//scope/exclusions/ibeacons' "$original_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
     fi
 
     echo '        </exclusions>' >> "$output_file"
 
     echo '    </scope>' >> "$output_file"
-    echo '</policy>' >> "$output_file"
+    echo "</$root_element>" >> "$output_file"
 }
 
-process_policies() {
+process_objects() {
     # Extract subdomain from jss_instance
     subdomain=$(echo "$jss_instance" | awk -F[/:] '{print $4}' | cut -d'.' -f1)
+    
+    # Get plural form of object type for filename matching
+    object_type_plural=$(get_plural_from_api_xml_object "$OBJECT_TYPE")
     
     echo
     echo "================================================"
     echo "Processing instance: $jss_instance"
+    echo "Object type: $OBJECT_TYPE"
+    if [[ -n "$OBJECT_NAME" ]]; then
+        echo "Object name: $OBJECT_NAME"
+    fi
     echo "================================================"
     echo
 
-    # Step 1: Download all policies
-    echo "Step 1: Downloading all policies from $jss_instance..."
-    "$this_script_dir/autopkg-run.sh" \
-        -r "$this_script_dir/recipes/DownloadAllObjects.jamf.recipe.yaml" \
-        --nointeraction \
-        --instance "$jss_instance" \
-        --key "OUTPUT_DIR=$output_dir" \
-        --key OBJECT_TYPE=policy
+    # Step 1: Download objects
+    if [[ -n "$OBJECT_NAME" ]]; then
+        echo "Step 1: Downloading '$OBJECT_NAME' from $jss_instance..."
+        "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
+            -r "$this_script_dir/recipes/DownloadObject.jamf.recipe.yaml" \
+            --nointeraction \
+            --instance "$jss_instance" \
+            --key "OUTPUT_DIR=$output_dir" \
+            --key "OBJECT_NAME=$OBJECT_NAME" \
+            --key OBJECT_TYPE="$OBJECT_TYPE"
+    else
+        echo "Step 1: Downloading all ${object_type_plural} from $jss_instance..."
+        "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
+            -r "$this_script_dir/recipes/DownloadAllObjects.jamf.recipe.yaml" \
+            --nointeraction \
+            --instance "$jss_instance" \
+            --key "OUTPUT_DIR=$output_dir" \
+            --key OBJECT_TYPE="$OBJECT_TYPE"
+    fi
 
     if [[ $? -ne 0 ]]; then
-        errors+=("Failed to download policies from $jss_instance")
+        errors+=("Failed to download ${object_type_plural} from $jss_instance")
         return 1
     fi
 
-    # Step 2: Find and process policies with individual computers
+    # Step 2: Find and process objects with individual computers
     echo
-    echo "Step 2: Analyzing policies for individually scoped computers..."
+    echo "Step 2: Analyzing ${object_type_plural} for individually scoped computers..."
     
-    # Find all policy files for this instance
-    policy_files=("$output_dir/$subdomain-policies-"*.xml)
+    # Find all object files for this instance
+    object_files=("$output_dir/$subdomain-${object_type_plural}-"*.xml)
     
-    if [[ ! -e "${policy_files[0]}" ]]; then
+    if [[ ! -e "${object_files[0]}" ]]; then
         echo "No policy files found for $subdomain"
         return 0
     fi
 
-    policies_processed=0
-    policies_with_individual_computers=0
+    objects_processed=0
+    objects_with_individual_computers=0
 
-    for policy_file in "${policy_files[@]}"; do
-        if [[ ! -f "$policy_file" ]]; then
+    for object_file in "${object_files[@]}"; do
+        if [[ ! -f "$object_file" ]]; then
             continue
         fi
 
-        # Extract policy name from filename
-        policy_name=$(basename "$policy_file" | sed "s/^$subdomain-policies-//" | sed 's/\.xml$//')
+        # Extract object name from filename
+        object_name=$(basename "$object_file" | sed "s/^$subdomain-$object_type_plural-//" | sed 's/\.xml$//')
         
         echo
-        echo "  Checking policy: $policy_name"
+        echo "  Checking policy: $object_name"
         
-        ((policies_processed++))
+        ((objects_processed++))
 
         # Check for targeted computers
         targeted_computer_ids=""
-        if xmllint --xpath '//scope/computers/computer/id' "$policy_file" &>/dev/null; then
-            targeted_computer_ids=$(xmllint --xpath '//scope/computers/computer/id/text()' "$policy_file" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+        if xmllint --xpath '//scope/computers/computer/id' "$object_file" &>/dev/null; then
+            targeted_computer_ids=$(xmllint --xpath '//scope/computers/computer/id/text()' "$object_file" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
         fi
 
         # Check for excluded computers
         excluded_computer_ids=""
-        if xmllint --xpath '//scope/exclusions/computers/computer/id' "$policy_file" &>/dev/null; then
-            excluded_computer_ids=$(xmllint --xpath '//scope/exclusions/computers/computer/id/text()' "$policy_file" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+        if xmllint --xpath '//scope/exclusions/computers/computer/id' "$object_file" &>/dev/null; then
+            excluded_computer_ids=$(xmllint --xpath '//scope/exclusions/computers/computer/id/text()' "$object_file" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
         fi
 
         # Skip if no individual computers found
@@ -261,22 +329,22 @@ process_policies() {
             continue
         fi
 
-        ((policies_with_individual_computers++))
+        ((objects_with_individual_computers++))
         echo "    Found individually scoped computers!"
 
         # Process targeted computers
         target_group_name=""
         if [[ -n "$targeted_computer_ids" ]]; then
-            target_group_name="Testing - $policy_name"
+            target_group_name="Testing - $object_name"
             echo "    Creating target group: $target_group_name"
             
             # Create the static group XML template
-            target_group_template="$temp_dir/$subdomain-target-group-$policies_with_individual_computers.xml"
+            target_group_template="$temp_dir/$subdomain-target-group-$objects_with_individual_computers.xml"
             create_static_group_xml "$target_group_name" "$targeted_computer_ids" "$target_group_template"
             
             # Upload the group
             echo "    Uploading target group..."
-            "$this_script_dir/autopkg-run.sh" \
+            "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
                 -r "$this_script_dir/recipes/UploadObject.jamf.recipe.yaml" \
                 --nointeraction \
                 --instance "$jss_instance" \
@@ -285,23 +353,23 @@ process_policies() {
                 --key "OBJECT_TEMPLATE=$target_group_template"
             
             if [[ $? -ne 0 ]]; then
-                errors+=("Failed to create target group '$target_group_name' for policy '$policy_name' on $jss_instance")
+                errors+=("Failed to create target group '$target_group_name' for $OBJECT_TYPE '$object_name' on $jss_instance")
             fi
         fi
 
         # Process excluded computers
         exclusion_group_name=""
         if [[ -n "$excluded_computer_ids" ]]; then
-            exclusion_group_name="Testing - Exclude - $policy_name"
+            exclusion_group_name="Testing - Exclude - $object_name"
             echo "    Creating exclusion group: $exclusion_group_name"
             
             # Create the static group XML template
-            exclusion_group_template="$temp_dir/$subdomain-exclusion-group-$policies_with_individual_computers.xml"
+            exclusion_group_template="$temp_dir/$subdomain-exclusion-group-$objects_with_individual_computers.xml"
             create_static_group_xml "$exclusion_group_name" "$excluded_computer_ids" "$exclusion_group_template"
             
             # Upload the group
             echo "    Uploading exclusion group..."
-            "$this_script_dir/autopkg-run.sh" \
+            "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
                 -r "$this_script_dir/recipes/UploadObject.jamf.recipe.yaml" \
                 --nointeraction \
                 --instance "$jss_instance" \
@@ -310,38 +378,38 @@ process_policies() {
                 --key "OBJECT_TEMPLATE=$exclusion_group_template"
             
             if [[ $? -ne 0 ]]; then
-                errors+=("Failed to create exclusion group '$exclusion_group_name' for policy '$policy_name' on $jss_instance")
+                errors+=("Failed to create exclusion group '$exclusion_group_name' for $OBJECT_TYPE '$object_name' on $jss_instance")
             fi
         fi
 
-        # Update the policy
-        echo "    Updating policy scope..."
+        # Update the object
+        echo "    Updating $OBJECT_TYPE scope..."
         
-        # Create the modified policy scope template
-        policy_scope_template="$temp_dir/$subdomain-policy-scope-$policies_with_individual_computers.xml"
-        create_policy_scope_xml "$policy_file" "$policy_scope_template" "$target_group_name" "$exclusion_group_name"
+        # Create the modified object scope template
+        object_scope_template="$temp_dir/$subdomain-object-scope-$objects_with_individual_computers.xml"
+        create_object_scope_xml "$object_file" "$object_scope_template" "$target_group_name" "$exclusion_group_name" "$OBJECT_TYPE"
         
-        # Upload the updated policy
-        "$this_script_dir/autopkg-run.sh" \
+        # Upload the updated object
+        "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
             -r "$this_script_dir/recipes/UploadObject.jamf.recipe.yaml" \
             --nointeraction \
             --instance "$jss_instance" \
-            --key "OBJECT_NAME=$policy_name" \
-            --key OBJECT_TYPE=policy \
-            --key "OBJECT_TEMPLATE=$policy_scope_template" \
+            --key "OBJECT_NAME=$object_name" \
+            --key OBJECT_TYPE="$OBJECT_TYPE" \
+            --key "OBJECT_TEMPLATE=$object_scope_template" \
             --replace
         
         if [[ $? -ne 0 ]]; then
-            errors+=("Failed to update policy '$policy_name' on $jss_instance")
+            errors+=("Failed to update $OBJECT_TYPE '$object_name' on $jss_instance")
         else
-            echo "    ✓ Successfully updated policy: $policy_name"
+            echo "    Successfully updated $OBJECT_TYPE: $object_name"
         fi
     done
 
     echo
     echo "Summary for $jss_instance:"
-    echo "  Total policies analyzed: $policies_processed"
-    echo "  Policies with individual computers: $policies_with_individual_computers"
+    echo "  Total ${object_type_plural} analyzed: $objects_processed"
+    echo "  ${OBJECT_TYPE}s with individual computers: $objects_with_individual_computers"
 }
 
 # --------------------------------------------------------------------------------
@@ -350,9 +418,19 @@ process_policies() {
 
 # Command line override for the above settings
 chosen_instances=()
+OBJECT_TYPE=""
+OBJECT_NAME=""
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
+        -t|--type)
+            shift
+            OBJECT_TYPE="$1"
+            ;;
+        -n|--name)
+            shift
+            OBJECT_NAME="$1"
+            ;;
         -il|--instance-list)
             shift
             chosen_instance_list_file="$1"
@@ -373,7 +451,6 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         -v*)
             verbosity_mode="$1"
-            verbose=1
             ;;
         -h|--help)
             usage
@@ -384,9 +461,30 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
+# Validate that object type is provided
+if [[ -z "$OBJECT_TYPE" ]]; then
+    echo "ERROR: Object type is required."
+    echo
+    usage
+    exit 1
+fi
+
+# Validate object type
+if ! validate_object_type "$OBJECT_TYPE"; then
+    echo "ERROR: Invalid object type: $OBJECT_TYPE"
+    echo
+    usage
+    exit 1
+fi
+
 echo
-echo "This script will create static computer groups from individually scoped"
-echo "computers in policies and update those policies to use the groups."
+if [[ -n "$OBJECT_NAME" ]]; then
+    echo "This script will create static computer groups from individually scoped"
+    echo "computers in the specified $OBJECT_TYPE and update it to use the groups."
+else
+    echo "This script will create static computer groups from individually scoped"
+    echo "computers in ${OBJECT_TYPE}s and update those objects to use the groups."
+fi
 echo
 
 # select the instances that will be changed
@@ -411,7 +509,7 @@ for instance in "${instance_choice_array[@]}"; do
         echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
     fi
     
-    process_policies
+    process_objects
 done
 
 # Clean up temp directory

@@ -1539,7 +1539,7 @@ get_api_object_type() {
         configuration_profile)           api_object_type="mobiledeviceconfigurationprofiles";;
         group|user)                      api_object_type="accounts";;
         policy)                          api_object_type="policies";;
-        restricted_software_title)       api_object_type="restrictedsoftware";;
+        restricted_software)       api_object_type="restrictedsoftware";;
         *)                               api_object_type=$( echo "${api_xml_object}s" | sed 's|_||g' );;
 
     esac
@@ -1554,7 +1554,7 @@ get_plural_from_api_xml_object() {
         advanced_mobile_device_search)   api_xml_object_plural="advanced_mobile_device_searches";;
         category)                        api_xml_object_plural="categories";;
         policy)                          api_xml_object_plural="policies";;
-        restricted_software_title)       api_xml_object_plural="restricted_software";;
+        restricted_software)       api_xml_object_plural="restricted_software";;
         *)                               api_xml_object_plural="${api_xml_object}s"
     esac
     echo "$api_xml_object_plural"
@@ -1580,7 +1580,7 @@ get_api_object_from_type() {
         mobiledevicegroups)                 api_xml_object="mobile_device_group";;
         osxconfigurationprofiles)           api_xml_object="os_x_configuration_profile";;
         policies)                           api_xml_object="policy";;
-        restrictedsoftware)                 api_xml_object="restricted_software_title";;
+        restrictedsoftware)                 api_xml_object="restricted_software";;
         smtpserver)                         api_xml_object="smtp_server";;
         *)                                  api_xml_object=$(sed 's|s$||' <<< "$api_object_type") ;; 
     esac

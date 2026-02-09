@@ -26,4 +26,14 @@ d. Any errors should be reported in a summary that is shown at the end of the ru
 
 Do not include any emoji in the output.
 
+SECOND PROMPT:
 
+The script is working well with policies. I wish to extend the functionality in two ways:
+
+1. Add a script parameter which allows different object types to be operated upon. The valid endpoints should be as follows: policy, advanced_computer_search, advanced_mobile_device_search, os_x_configuration_profile, configuration_profile, restricted_software_title, mac_application, mobile_device_application. There should be no default, so the script should fail if no object type is provided, or if an invalid object type is provided.
+
+2. Add the option to specify a single named object rather than processing all objects. If this option is selected, then DownloadObject.jamf.recipe.yaml should be used instead of DownloadAllObjects.jamf.recipe.yaml.
+
+MANUAL WORK DONE:
+
+Some variables were not renamed from policy to object during the recalculation.
