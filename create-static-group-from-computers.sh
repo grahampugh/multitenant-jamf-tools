@@ -17,6 +17,9 @@
 # retained, an additional --cleanup-expired option may be used, which will remove
 # any groups matching the naming pattern which contain a date in the past from the 
 # scope of the object the name refers to, and then the group will be deleted.
+# 
+# By Graham Pugh (@grahampugh)
+# Claude Sonnet 4.5 was used to assist in development.
 #
 # USAGE: See
 # ./create-static-group-from-computers.sh --help
