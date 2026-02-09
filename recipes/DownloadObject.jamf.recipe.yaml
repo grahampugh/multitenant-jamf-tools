@@ -1,0 +1,16 @@
+Description: Downloads an object to the specified directory.
+Comment: |
+  Requires:
+  - OBJECT_NAME
+  - OBJECT_TYPE
+Identifier: multitenant-jamf-tools.jamf.DownloadObject
+MinimumVersion: "2.3"
+Input:
+  OUTPUT_DIR: /Users/Shared/Jamf/JamfUploaderTests
+
+Process:
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectReader
+    Arguments:
+      object_type: "%OBJECT_TYPE%"
+      object_name: "%OBJECT_NAME%"
+      output_dir: "%OUTPUT_DIR%"
