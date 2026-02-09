@@ -1,0 +1,29 @@
+Create a new bash script within the multitenant-jamf-tools repo called "create-static-group-from-computers.sh" that performs the following tasks on a specified Jamf Pro instance. All scripts within this repo use a common framework to allow the user to select the instances required and obtain the credentials automatically from the user's Login Keychain. This script should use the same common framework, adapted for the following tasks:
+
+1. Download all policies from a specified Jamf Pro instance using the AutoPkg recipeDownloadAllObjects.jamf.recipe.yaml, outputting to the folder /Users/Shared/Jamf/JamfUploaderTests. This can be done as follows:
+
+./autopkg-run.sh -r /Users/gpugh/sourcecode/multitenant-jamf-tools/recipes/DownloadAllObjects.jamf.recipe.yaml --nointeraction --instance <JAMF_PRO_URL> --key "OUTPUT_DIR=/Users/Shared/Jamf/JamfUploaderTests" --key OBJECT_TYPE=policy
+
+The downloaded files are in the form "SHORTNAME-policies-POLICY NAME.xml", where SHORTNAME refers to the subdomain of the instance, e.g. for https://example.jamfcloud.com it would be "example".
+
+2. Read the downloaded XML files, specifically the <scope> object, to look for individual targeted or excluded computers. Targeted computers will be shown in the <computers> object within the <scope> object. Excluded computers will be shown in the <computers> object, within the <exclusions> object, which is also within the <scope> object.
+
+3. Where any single policy contains any individually targeted or excluded computers, the following actions should be carried out:
+
+a. Where there are any targeted computers, create a static computer group XML template with a name that matches the policy name preceded with "Testing - ", for example if the policy name is "Install - Firefox", the static computer group should be named "Testing - Install - Firefox". The constructed XML static computer group template must provide the name and each targeted computer object. This will need to be saved in a temporary location, the path to be provided in the recipe UploadObject.jamf, which can be done as follows in order to create the new group in the same Jamf Pro instance:
+
+./autopkg-run.sh -r /Users/gpugh/sourcecode/multitenant-jamf-tools/recipes/UploadObject.jamf.recipe.yaml --nointeraction --instance <JAMF_PRO_URL> --key "OBJECT_NAME=<STATIC_COMPUTER_GROUP_NAME>" --key OBJECT_TYPE=computer_group --key OBJECT_TEMPLATE=</path/to/CONSTRUCTED_STATIC_COMPUTER_GROUP_TEMPLATE.xml>"
+
+b. Where there are any excluded computers, create a static computer group using the JamfComputerGroupUploader processor, with a name that matches the policy name preceded with "Testing - Exclude - ", for example "Testing - Exclude - Install - Firefox". The new group can be uploaded as with the previous point.
+
+b. The scope in the downloaded XML policy template needs to be amended, removing the individual computers and adding the new static computer group as a target or exclusion, as appropriate. It is not necessary to provide the <id> of the new group - the name is sufficient. Any existing values for target or exclusion computer groups, buildings, departments, limitations, users, user groups, network segments and ibeacons must be retained. This will require XML manipulation. The amended template can remove all top-level keys other than the <scope> key, because Jamf Pro will accept XML containing only the top-level key that needs to be changed. The amended policy needs to be saved in a temporary location, the path to be provided in the recipe UploadObject.jamf, which can be done as follows:
+
+c. The policy should be uploaded back to the instance using JamfObjectUploader, ensuring that the `replace_object` value is set to True. This can be done as follows:
+
+./autopkg-run.sh -r /Users/gpugh/sourcecode/multitenant-jamf-tools/recipes/UploadObject.jamf.recipe.yaml --nointeraction --instance <JAMF_PRO_URL> --key "OBJECT_NAME=<POLICY_NAME>" --key OBJECT_TYPE=policy --key OBJECT_TEMPLATE=</path/to/AMENDED_POLICY_TEMPLATE.xml>"
+
+d. Any errors should be reported in a summary that is shown at the end of the run.
+
+Do not include any emoji in the output.
+
+
