@@ -85,12 +85,49 @@ validate_object_type() {
     return 1
 }
 
+is_mobile_device_type() {
+    local object_type="$1"
+    case "$object_type" in
+        advanced_mobile_device_search|configuration_profile|mobile_device_application)
+            return 0
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
 create_static_group_xml() {
     local group_name="$1"
-    local computer_ids_string="$2"
+    local device_ids_string="$2"
     local output_file="$3"
+    local is_mobile_device="$4"
 
-    cat > "$output_file" <<EOF
+    if [[ "$is_mobile_device" == "true" ]]; then
+        cat > "$output_file" <<EOF
+<?xml version="1.0" encoding="UTF-8"?>
+<mobile_device_group>
+    <name>$group_name</name>
+    <is_smart>false</is_smart>
+    <mobile_devices>
+EOF
+
+        # Add each mobile device ID to the XML
+        IFS=',' read -ra ADDR <<< "$device_ids_string"
+        for device_id in "${ADDR[@]}"; do
+            cat >> "$output_file" <<EOF
+        <mobile_device>
+            <id>$device_id</id>
+        </mobile_device>
+EOF
+        done
+
+        cat >> "$output_file" <<EOF
+    </mobile_devices>
+</mobile_device_group>
+EOF
+    else
+        cat > "$output_file" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <computer_group>
     <name>$group_name</name>
@@ -98,20 +135,21 @@ create_static_group_xml() {
     <computers>
 EOF
 
-    # Add each computer ID to the XML
-    IFS=',' read -ra ADDR <<< "$computer_ids_string"
-    for computer_id in "${ADDR[@]}"; do
-        cat >> "$output_file" <<EOF
+        # Add each computer ID to the XML
+        IFS=',' read -ra ADDR <<< "$device_ids_string"
+        for device_id in "${ADDR[@]}"; do
+            cat >> "$output_file" <<EOF
         <computer>
-            <id>$computer_id</id>
+            <id>$device_id</id>
         </computer>
 EOF
-    done
+        done
 
-    cat >> "$output_file" <<EOF
+        cat >> "$output_file" <<EOF
     </computers>
 </computer_group>
 EOF
+    fi
 }
 
 create_object_scope_xml() {
@@ -157,29 +195,49 @@ create_object_scope_xml() {
     # Extract the existing scope element and modify it
     xmllint --xpath '//scope' "$original_file" 2>/dev/null > "$temp_dir/scope_temp.xml"
 
-    # Create a modified scope with computers removed and groups added
-    echo '    <scope>' >> "$output_file"
-
-    # Copy all_computers element if it exists
-    if xmllint --xpath '//scope/all_computers' "$original_file" &>/dev/null; then
-        xmllint --xpath '//scope/all_computers' "$original_file" 2>/dev/null | sed 's/^/        /' >> "$output_file"
+    # Determine if this is a mobile device type
+    local device_element device_group_element device_groups_element all_devices_element
+    if is_mobile_device_type "$object_type"; then
+        device_element="mobile_device"
+        device_group_element="mobile_device_group"
+        device_groups_element="mobile_device_groups"
+        all_devices_element="all_mobile_devices"
+    else
+        device_element="computer"
+        device_group_element="computer_group"
+        device_groups_element="computer_groups"
+        all_devices_element="all_computers"
     fi
 
-    # Handle computer_groups - preserve existing and add new target group
-    echo '        <computer_groups>' >> "$output_file"
-    if xmllint --xpath '//scope/computer_groups/computer_group' "$original_file" &>/dev/null; then
-        xmllint --xpath '//scope/computer_groups/computer_group' "$original_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
+    # Create a modified scope with devices removed and groups added
+    echo '    <scope>' >> "$output_file"
+
+    # Copy all_computers or all_mobile_devices element if it exists
+    if xmllint --xpath "//scope/$all_devices_element" "$original_file" &>/dev/null; then
+        xmllint --xpath "//scope/$all_devices_element" "$original_file" 2>/dev/null | sed 's/^/        /' >> "$output_file"
+    fi
+
+    # Handle device groups - preserve existing and add new target group
+    echo "        <$device_groups_element>" >> "$output_file"
+    if xmllint --xpath "//scope/$device_groups_element/$device_group_element" "$original_file" &>/dev/null; then
+        xmllint --xpath "//scope/$device_groups_element/$device_group_element" "$original_file" 2>/dev/null | sed 's/^/            /' >> "$output_file"
     fi
     # Add new target group if specified
     if [[ -n "$target_group_name" ]]; then
-        echo "            <computer_group>" >> "$output_file"
+        echo "            <$device_group_element>" >> "$output_file"
         echo "                <name>$target_group_name</name>" >> "$output_file"
-        echo "            </computer_group>" >> "$output_file"
+        echo "            </$device_group_element>" >> "$output_file"
     fi
-    echo '        </computer_groups>' >> "$output_file"
+    echo "        </$device_groups_element>" >> "$output_file"
 
-    # Remove individual computers by creating empty computers element
-    echo '        <computers/>' >> "$output_file"
+    # Remove individual devices by creating empty devices element
+    local devices_element
+    if is_mobile_device_type "$object_type"; then
+        devices_element="mobile_devices"
+    else
+        devices_element="computers"
+    fi
+    echo "        <$devices_element/>" >> "$output_file"
 
     # Copy buildings if they exist
     if xmllint --xpath '//scope/buildings' "$original_file" &>/dev/null; then
@@ -199,21 +257,21 @@ create_object_scope_xml() {
     # Handle exclusions
     echo '        <exclusions>' >> "$output_file"
 
-    # Copy existing exclusion computer_groups and add new one if specified
-    echo '            <computer_groups>' >> "$output_file"
-    if xmllint --xpath '//scope/exclusions/computer_groups/computer_group' "$original_file" &>/dev/null; then
-        xmllint --xpath '//scope/exclusions/computer_groups/computer_group' "$original_file" 2>/dev/null | sed 's/^/                /' >> "$output_file"
+    # Copy existing exclusion device groups and add new one if specified
+    echo "            <$device_groups_element>" >> "$output_file"
+    if xmllint --xpath "//scope/exclusions/$device_groups_element/$device_group_element" "$original_file" &>/dev/null; then
+        xmllint --xpath "//scope/exclusions/$device_groups_element/$device_group_element" "$original_file" 2>/dev/null | sed 's/^/                /' >> "$output_file"
     fi
     # Add new exclusion group if specified
     if [[ -n "$exclusion_group_name" ]]; then
-        echo "                <computer_group>" >> "$output_file"
+        echo "                <$device_group_element>" >> "$output_file"
         echo "                    <name>$exclusion_group_name</name>" >> "$output_file"
-        echo "                </computer_group>" >> "$output_file"
+        echo "                </$device_group_element>" >> "$output_file"
     fi
-    echo '            </computer_groups>' >> "$output_file"
+    echo "            </$device_groups_element>" >> "$output_file"
 
-    # Remove individual excluded computers
-    echo '            <computers/>' >> "$output_file"
+    # Remove individual excluded devices
+    echo "            <$devices_element/>" >> "$output_file"
 
     # Copy other exclusion elements if they exist
     if xmllint --xpath '//scope/exclusions/buildings' "$original_file" &>/dev/null; then
@@ -298,6 +356,20 @@ process_objects() {
     objects_processed=0
     objects_with_individual_computers=0
 
+    # Determine if this object type uses mobile devices
+    local is_mobile_device="false"
+    local device_element devices_element device_group_type
+    if is_mobile_device_type "$OBJECT_TYPE"; then
+        is_mobile_device="true"
+        device_element="mobile_device"
+        devices_element="mobile_devices"
+        device_group_type="mobile_device_group"
+    else
+        device_element="computer"
+        devices_element="computers"
+        device_group_type="computer_group"
+    fi
+
     for object_file in "${object_files[@]}"; do
         if [[ ! -f "$object_file" ]]; then
             continue
@@ -307,40 +379,48 @@ process_objects() {
         object_name=$(basename "$object_file" | sed "s/^$subdomain-$object_type_plural-//" | sed 's/\.xml$//')
         
         echo
-        echo "  Checking policy: $object_name"
+        echo "  Checking $OBJECT_TYPE: $object_name"
         
         ((objects_processed++))
 
-        # Check for targeted computers
-        targeted_computer_ids=""
-        if xmllint --xpath '//scope/computers/computer/id' "$object_file" &>/dev/null; then
-            targeted_computer_ids=$(xmllint --xpath '//scope/computers/computer/id/text()' "$object_file" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+        # Check for targeted devices
+        targeted_device_ids=""
+        if xmllint --xpath "//scope/$devices_element/$device_element/id" "$object_file" &>/dev/null; then
+            targeted_device_ids=$(xmllint --xpath "//scope/$devices_element/$device_element/id/text()" "$object_file" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
         fi
 
-        # Check for excluded computers
-        excluded_computer_ids=""
-        if xmllint --xpath '//scope/exclusions/computers/computer/id' "$object_file" &>/dev/null; then
-            excluded_computer_ids=$(xmllint --xpath '//scope/exclusions/computers/computer/id/text()' "$object_file" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
+        # Check for excluded devices
+        excluded_device_ids=""
+        if xmllint --xpath "//scope/exclusions/$devices_element/$device_element/id" "$object_file" &>/dev/null; then
+            excluded_device_ids=$(xmllint --xpath "//scope/exclusions/$devices_element/$device_element/id/text()" "$object_file" 2>/dev/null | tr '\n' ',' | sed 's/,$//')
         fi
 
-        # Skip if no individual computers found
-        if [[ -z "$targeted_computer_ids" && -z "$excluded_computer_ids" ]]; then
-            echo "    No individually scoped computers found."
+        # Skip if no individual devices found
+        if [[ -z "$targeted_device_ids" && -z "$excluded_device_ids" ]]; then
+            if [[ "$is_mobile_device" == "true" ]]; then
+                echo "    No individually scoped mobile devices found."
+            else
+                echo "    No individually scoped computers found."
+            fi
             continue
         fi
 
         ((objects_with_individual_computers++))
-        echo "    Found individually scoped computers!"
+        if [[ "$is_mobile_device" == "true" ]]; then
+            echo "    Found individually scoped mobile devices!"
+        else
+            echo "    Found individually scoped computers!"
+        fi
 
-        # Process targeted computers
+        # Process targeted devices
         target_group_name=""
-        if [[ -n "$targeted_computer_ids" ]]; then
+        if [[ -n "$targeted_device_ids" ]]; then
             target_group_name="Testing - $object_name"
             echo "    Creating target group: $target_group_name"
             
             # Create the static group XML template
             target_group_template="$temp_dir/$subdomain-target-group-$objects_with_individual_computers.xml"
-            create_static_group_xml "$target_group_name" "$targeted_computer_ids" "$target_group_template"
+            create_static_group_xml "$target_group_name" "$targeted_device_ids" "$target_group_template" "$is_mobile_device"
             
             # Upload the group
             echo "    Uploading target group..."
@@ -349,7 +429,7 @@ process_objects() {
                 --nointeraction \
                 --instance "$jss_instance" \
                 --key "OBJECT_NAME=$target_group_name" \
-                --key OBJECT_TYPE=computer_group \
+                --key OBJECT_TYPE="$device_group_type" \
                 --key "OBJECT_TEMPLATE=$target_group_template"
             
             if [[ $? -ne 0 ]]; then
@@ -357,15 +437,15 @@ process_objects() {
             fi
         fi
 
-        # Process excluded computers
+        # Process excluded devices
         exclusion_group_name=""
-        if [[ -n "$excluded_computer_ids" ]]; then
+        if [[ -n "$excluded_device_ids" ]]; then
             exclusion_group_name="Testing - Exclude - $object_name"
             echo "    Creating exclusion group: $exclusion_group_name"
             
             # Create the static group XML template
             exclusion_group_template="$temp_dir/$subdomain-exclusion-group-$objects_with_individual_computers.xml"
-            create_static_group_xml "$exclusion_group_name" "$excluded_computer_ids" "$exclusion_group_template"
+            create_static_group_xml "$exclusion_group_name" "$excluded_device_ids" "$exclusion_group_template" "$is_mobile_device"
             
             # Upload the group
             echo "    Uploading exclusion group..."
@@ -374,7 +454,7 @@ process_objects() {
                 --nointeraction \
                 --instance "$jss_instance" \
                 --key "OBJECT_NAME=$exclusion_group_name" \
-                --key OBJECT_TYPE=computer_group \
+                --key OBJECT_TYPE="$device_group_type" \
                 --key "OBJECT_TEMPLATE=$exclusion_group_template"
             
             if [[ $? -ne 0 ]]; then
@@ -409,7 +489,11 @@ process_objects() {
     echo
     echo "Summary for $jss_instance:"
     echo "  Total ${object_type_plural} analyzed: $objects_processed"
-    echo "  ${OBJECT_TYPE}s with individual computers: $objects_with_individual_computers"
+    if [[ "$is_mobile_device" == "true" ]]; then
+        echo "  ${OBJECT_TYPE}s with individual mobile devices: $objects_with_individual_computers"
+    else
+        echo "  ${OBJECT_TYPE}s with individual computers: $objects_with_individual_computers"
+    fi
 }
 
 # --------------------------------------------------------------------------------
