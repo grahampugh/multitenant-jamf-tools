@@ -59,8 +59,9 @@ Options:
                                      configuration_profile, restricted_software,
                                      mac_application, mobile_device_application
 -n | --name OBJECT_NAME            - process a single named object (optional)
--p | --prefix PREFIX               - prefix for target groups (default: "Testing - ")
--e | --exclusion-prefix PREFIX       - prefix for exclusion groups (default: "Testing - Exclude - ")
+-p | --prefix PREFIX               - prefix for target groups (default: "Exp-YYYY-MM-DD Auto-Temp - Target - <OBJECT_TYPE> - ")
+-e | --exclusion-prefix PREFIX       - prefix for exclusion groups (default: "Exp-YYYY-MM-DD Auto-Temp - Exclusion - <OBJECT_TYPE> - ")
+--cleanup-expired                  - cleanup expired temporary groups (deletes groups with past dates)
 -il | --instance-list FILENAME     - provide an instance list filename (without .txt)
 -i | --instance JSS_URL            - perform action on a specific instance
 -a | --all | --all-instances       - perform action on ALL instances in the instance list
@@ -293,6 +294,211 @@ create_object_scope_xml() {
     echo "</$root_element>" >> "$output_file"
 }
 
+cleanup_expired_groups() {
+    # Extract subdomain from jss_instance
+    subdomain=$(echo "$jss_instance" | awk -F[/:] '{print $4}' | cut -d'.' -f1)
+    
+    echo
+    echo "================================================"
+    echo "Cleaning up expired groups on: $jss_instance"
+    echo "================================================"
+    echo
+
+    local deleted_count=0
+    local deleted_groups=()
+
+    # Process computer groups
+    echo "Step 1: Downloading all computer groups from $jss_instance..."
+    "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
+        -r "$this_script_dir/recipes/DownloadAllObjects.jamf.recipe.yaml" \
+        --nointeraction \
+        --instance "$jss_instance" \
+        --key "OUTPUT_DIR=$output_dir" \
+        --key OBJECT_TYPE=computer_group
+
+    if [[ $? -eq 0 ]]; then
+        # Find all computer group files for this instance
+        computer_group_files=("$output_dir/$subdomain-computer_groups-"*.xml)
+        
+        if [[ -e "${computer_group_files[0]}" ]]; then
+            echo "Analyzing computer groups for expired dates..."
+            for group_file in "${computer_group_files[@]}"; do
+                if [[ ! -f "$group_file" ]]; then
+                    continue
+                fi
+
+                # Extract group name from filename
+                group_name=$(basename "$group_file" | sed "s/^$subdomain-computer_groups-//" | sed 's/\.xml$//')
+                
+                # Check if group name matches the prefix pattern and extract date
+                if [[ "$group_name" =~ Exp-([0-9]{4}-[0-9]{2}-[0-9]{2}) ]]; then
+                    group_date="${BASH_REMATCH[1]}"
+                    
+                    # Convert dates to seconds since epoch for comparison
+                    group_date_epoch=$(date -j -f "%Y-%m-%d" "$group_date" "+%s" 2>/dev/null)
+                    current_date_epoch=$(date -j -f "%Y-%m-%d" "$current_date" "+%s" 2>/dev/null)
+                    
+                    if [[ $group_date_epoch -lt $current_date_epoch ]]; then
+                        echo "  Processing expired computer group: $group_name (expired: $group_date)"
+                        
+                        # Parse the group name to extract scoping details
+                        # Expected format: "Exp-YYYY-MM-DD Auto-Temp - Target|Exclusion - OBJECT_TYPE - OBJECT_NAME"
+                        if [[ "$group_name" =~ Exp-[0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]]Auto-Temp[[:space:]]-[[:space:]](Target|Exclusion)[[:space:]]-[[:space:]]([^[:space:]]+)[[:space:]]-[[:space:]](.+) ]]; then
+                            scoping_type_raw="${BASH_REMATCH[1]}"
+                            scoped_object_type="${BASH_REMATCH[2]}"
+                            scoped_object_name="${BASH_REMATCH[3]}"
+                            
+                            # Convert Target/Exclusion to lowercase for SCOPING_TYPE
+                            if [[ "$scoping_type_raw" == "Target" ]]; then
+                                scoping_type="target"
+                            else
+                                scoping_type="exclusion"
+                            fi
+                            
+                            echo "    Removing group from $scoped_object_type '$scoped_object_name' ($scoping_type scope)"
+                            
+                            "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
+                                -r "$this_script_dir/recipes/ScopeAdjust.jamf.recipe.yaml" \
+                                --nointeraction \
+                                --instance "$jss_instance" \
+                                --key "SCOPED_OBJECT_NAME=$scoped_object_name" \
+                                --key "SCOPED_OBJECT_TYPE=$scoped_object_type" \
+                                --key "SCOPING_OPERATION=remove" \
+                                --key "SCOPING_TYPE=$scoping_type" \
+                                --key "SCOPEABLE_OBJECT_TYPE=computer_group" \
+                                --key "SCOPEABLE_OBJECT_NAME=$group_name"
+                            
+                            if [[ $? -ne 0 ]]; then
+                                echo "    Warning: Failed to remove group from scope, but will continue with deletion"
+                            fi
+                        else
+                            echo "    Warning: Could not parse group name format, skipping scope removal"
+                        fi
+                        
+                        echo "    Deleting group..."
+                        "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
+                            -r "$this_script_dir/recipes/DeleteObject.jamf.recipe.yaml" \
+                            --nointeraction \
+                            --instance "$jss_instance" \
+                            --key "OBJECT_NAME=$group_name" \
+                            --key OBJECT_TYPE=computer_group
+                        
+                        if [[ $? -eq 0 ]]; then
+                            ((deleted_count++))
+                            deleted_groups+=("Computer Group: $group_name (expired: $group_date)")
+                        else
+                            errors+=("Failed to delete computer group '$group_name' on $jss_instance")
+                        fi
+                    fi
+                fi
+            done
+        fi
+    else
+        errors+=("Failed to download computer groups from $jss_instance")
+    fi
+
+    # Process mobile device groups
+    echo
+    echo "Step 2: Downloading all mobile device groups from $jss_instance..."
+    "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
+        -r "$this_script_dir/recipes/DownloadAllObjects.jamf.recipe.yaml" \
+        --nointeraction \
+        --instance "$jss_instance" \
+        --key "OUTPUT_DIR=$output_dir" \
+        --key OBJECT_TYPE=mobile_device_group
+
+    if [[ $? -eq 0 ]]; then
+        # Find all mobile device group files for this instance
+        mobile_device_group_files=("$output_dir/$subdomain-mobile_device_groups-"*.xml)
+        
+        if [[ -e "${mobile_device_group_files[0]}" ]]; then
+            echo "Analyzing mobile device groups for expired dates..."
+            for group_file in "${mobile_device_group_files[@]}"; do
+                if [[ ! -f "$group_file" ]]; then
+                    continue
+                fi
+
+                # Extract group name from filename
+                group_name=$(basename "$group_file" | sed "s/^$subdomain-mobile_device_groups-//" | sed 's/\.xml$//')
+                
+                # Check if group name matches the prefix pattern and extract date
+                if [[ "$group_name" =~ Exp-([0-9]{4}-[0-9]{2}-[0-9]{2}) ]]; then
+                    group_date="${BASH_REMATCH[1]}"
+                    
+                    # Convert dates to seconds since epoch for comparison
+                    group_date_epoch=$(date -j -f "%Y-%m-%d" "$group_date" "+%s" 2>/dev/null)
+                    current_date_epoch=$(date -j -f "%Y-%m-%d" "$current_date" "+%s" 2>/dev/null)
+                    
+                    if [[ $group_date_epoch -lt $current_date_epoch ]]; then
+                        echo "  Processing expired mobile device group: $group_name (expired: $group_date)"
+                        
+                        # Parse the group name to extract scoping details
+                        # Expected format: "Exp-YYYY-MM-DD Auto-Temp - Target|Exclusion - OBJECT_TYPE - OBJECT_NAME"
+                        if [[ "$group_name" =~ Exp-[0-9]{4}-[0-9]{2}-[0-9]{2}[[:space:]]Auto-Temp[[:space:]]-[[:space:]](Target|Exclusion)[[:space:]]-[[:space:]]([^[:space:]]+)[[:space:]]-[[:space:]](.+) ]]; then
+                            scoping_type_raw="${BASH_REMATCH[1]}"
+                            scoped_object_type="${BASH_REMATCH[2]}"
+                            scoped_object_name="${BASH_REMATCH[3]}"
+                            
+                            # Convert Target/Exclusion to lowercase for SCOPING_TYPE
+                            if [[ "$scoping_type_raw" == "Target" ]]; then
+                                scoping_type="target"
+                            else
+                                scoping_type="exclusion"
+                            fi
+                            
+                            echo "    Removing group from $scoped_object_type '$scoped_object_name' ($scoping_type scope)"
+                            
+                            "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
+                                -r "$this_script_dir/recipes/ScopeAdjust.jamf.recipe.yaml" \
+                                --nointeraction \
+                                --instance "$jss_instance" \
+                                --key "SCOPED_OBJECT_NAME=$scoped_object_name" \
+                                --key "SCOPED_OBJECT_TYPE=$scoped_object_type" \
+                                --key "SCOPING_OPERATION=remove" \
+                                --key "SCOPING_TYPE=$scoping_type" \
+                                --key "SCOPEABLE_OBJECT_TYPE=mobile_device_group" \
+                                --key "SCOPEABLE_OBJECT_NAME=$group_name"
+                            
+                            if [[ $? -ne 0 ]]; then
+                                echo "    Warning: Failed to remove group from scope, but will continue with deletion"
+                            fi
+                        else
+                            echo "    Warning: Could not parse group name format, skipping scope removal"
+                        fi
+                        
+                        echo "    Deleting group..."
+                        "$this_script_dir/autopkg-run.sh" "$verbosity_mode" \
+                            -r "$this_script_dir/recipes/DeleteObject.jamf.recipe.yaml" \
+                            --nointeraction \
+                            --instance "$jss_instance" \
+                            --key "OBJECT_NAME=$group_name" \
+                            --key OBJECT_TYPE=mobile_device_group
+                        
+                        if [[ $? -eq 0 ]]; then
+                            ((deleted_count++))
+                            deleted_groups+=("Mobile Device Group: $group_name (expired: $group_date)")
+                        else
+                            errors+=("Failed to delete mobile device group '$group_name' on $jss_instance")
+                        fi
+                    fi
+                fi
+            done
+        fi
+    else
+        errors+=("Failed to download mobile device groups from $jss_instance")
+    fi
+
+    echo
+    echo "Summary for $jss_instance:"
+    echo "  Total expired groups deleted: $deleted_count"
+    if [[ ${#deleted_groups[@]} -gt 0 ]]; then
+        echo "  Deleted groups:"
+        for deleted_group in "${deleted_groups[@]}"; do
+            echo "    - $deleted_group"
+        done
+    fi
+}
+
 process_objects() {
     # Extract subdomain from jss_instance
     subdomain=$(echo "$jss_instance" | awk -F[/:] '{print $4}' | cut -d'.' -f1)
@@ -494,12 +700,18 @@ process_objects() {
 # MAIN
 # --------------------------------------------------------------------------------
 
+# determine current date in YYYY-MM-DD format
+current_date=$(date +"%Y-%m-%d")
+
 # Command line override for the above settings
 chosen_instances=()
 OBJECT_TYPE=""
 OBJECT_NAME=""
-TARGET_GROUP_PREFIX="Testing - "
-EXCLUSION_GROUP_PREFIX="Testing - Exclude - "
+TARGET_GROUP_PREFIX=""
+EXCLUSION_GROUP_PREFIX=""
+cleanup_mode=0
+verbosity_mode="-v"
+
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
@@ -518,6 +730,9 @@ while [[ "$#" -gt 0 ]]; do
         -e|--exclusion-prefix)
             shift
             EXCLUSION_GROUP_PREFIX="$1"
+            ;;
+        --cleanup-expired)
+            cleanup_mode=1
             ;;
         -il|--instance-list)
             shift
@@ -549,31 +764,48 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# Validate that object type is provided
-if [[ -z "$OBJECT_TYPE" ]]; then
-    echo "ERROR: Object type is required."
+# If cleanup mode is enabled, we don't need object type validation
+if [[ $cleanup_mode -eq 1 ]]; then
     echo
-    usage
-    exit 1
-fi
-
-# Validate object type
-if ! validate_object_type "$OBJECT_TYPE"; then
-    echo "ERROR: Invalid object type: $OBJECT_TYPE"
+    echo "Running in cleanup mode - will delete expired temporary groups."
     echo
-    usage
-    exit 1
-fi
-
-echo
-if [[ -n "$OBJECT_NAME" ]]; then
-    echo "This script will create static computer groups from individually scoped"
-    echo "computers in the specified $OBJECT_TYPE and update it to use the groups."
 else
-    echo "This script will create static computer groups from individually scoped"
-    echo "computers in ${OBJECT_TYPE}s and update those objects to use the groups."
+    # Validate that object type is provided
+    if [[ -z "$OBJECT_TYPE" ]]; then
+        echo "ERROR: Object type is required."
+        echo
+        usage
+        exit 1
+    fi
+
+    # Validate object type
+    if ! validate_object_type "$OBJECT_TYPE"; then
+        echo "ERROR: Invalid object type: $OBJECT_TYPE"
+        echo
+        usage
+        exit 1
+    fi
+
+    # Set default prefixes if not provided by user
+    # date to be set 30 days in the future
+    expiry_date=$(date -j -v+30d -f "%Y-%m-%d" "$current_date" "+%Y-%m-%d")
+    if [[ -z "$TARGET_GROUP_PREFIX" ]]; then
+        TARGET_GROUP_PREFIX="Exp-${expiry_date} Auto-Temp - Target - ${OBJECT_TYPE} - "
+    fi
+    if [[ -z "$EXCLUSION_GROUP_PREFIX" ]]; then
+        EXCLUSION_GROUP_PREFIX="Exp-${expiry_date} Auto-Temp - Exclusion - ${OBJECT_TYPE} - "
+    fi
+
+    echo
+    if [[ -n "$OBJECT_NAME" ]]; then
+        echo "This script will create static computer groups from individually scoped"
+        echo "computers in the specified $OBJECT_TYPE and update it to use the groups."
+    else
+        echo "This script will create static computer groups from individually scoped"
+        echo "computers in ${OBJECT_TYPE}s and update those objects to use the groups."
+    fi
+    echo
 fi
-echo
 
 # select the instances that will be changed
 choose_destination_instances
@@ -597,7 +829,11 @@ for instance in "${instance_choice_array[@]}"; do
         echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
     fi
     
-    process_objects
+    if [[ $cleanup_mode -eq 1 ]]; then
+        cleanup_expired_groups
+    else
+        process_objects
+    fi
 done
 
 # Clean up temp directory
