@@ -55,8 +55,7 @@ Usage:
 
 Options:
 -t | --type OBJECT_TYPE            - REQUIRED: object type to process
-                                     Valid types: policy, advanced_computer_search,
-                                     advanced_mobile_device_search, os_x_configuration_profile,
+                                     Valid types: policy, os_x_configuration_profile,
                                      configuration_profile, restricted_software,
                                      mac_application, mobile_device_application
 -n | --name OBJECT_NAME            - process a single named object (optional)
@@ -75,8 +74,7 @@ USAGE
 
 validate_object_type() {
     local object_type="$1"
-    local valid_types=("policy" "advanced_computer_search" "advanced_mobile_device_search" 
-                       "os_x_configuration_profile" "configuration_profile" 
+    local valid_types=("policy" "os_x_configuration_profile" "configuration_profile" 
                        "restricted_software" "mac_application" "mobile_device_application")
     
     for valid_type in "${valid_types[@]}"; do
@@ -90,7 +88,7 @@ validate_object_type() {
 is_mobile_device_type() {
     local object_type="$1"
     case "$object_type" in
-        advanced_mobile_device_search|configuration_profile|mobile_device_application)
+        configuration_profile|mobile_device_application)
             return 0
             ;;
         *)
@@ -166,12 +164,6 @@ create_object_scope_xml() {
     case "$object_type" in
         policy)
             root_element="policy"
-            ;;
-        advanced_computer_search)
-            root_element="advanced_computer_search"
-            ;;
-        advanced_mobile_device_search)
-            root_element="advanced_mobile_device_search"
             ;;
         os_x_configuration_profile)
             root_element="os_x_configuration_profile"
