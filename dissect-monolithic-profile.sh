@@ -231,6 +231,9 @@ while [[ "$#" -gt 0 ]]; do
             shift
             PROFILE_DESCRIPTION="$1"
             ;;
+        --dry-run)
+            dry_run=1
+            ;;
         *)
             echo "Unknown option: $1"
             usage
@@ -276,6 +279,10 @@ for instance in "${instance_choice_array[@]}"; do
     fi
 
     if run_conversion; then
+        if [[ $dry_run ]]; then
+            echo "Dry run mode enabled. Skipping upload of payloads for $jss_instance."
+            continue
+        fi
         upload_payloads
     else
         echo "Skipping upload for $jss_instance due to previous errors."
@@ -283,8 +290,11 @@ for instance in "${instance_choice_array[@]}"; do
     echo
     echo "Completed processing for $jss_instance"
     echo
-
 done
+
+if [[ $dry_run ]]; then
+    echo "Dry run mode enabled. No payloads were uploaded. Payloads created during conversion can be found in $output_dir for review."
+fi
 
 echo
 echo "Finished"
