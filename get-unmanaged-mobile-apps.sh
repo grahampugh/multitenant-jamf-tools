@@ -47,6 +47,7 @@ Usage:
                                      (must exist in the relevant instance list)
 --all                              - perform action on ALL instances in the instance list
 --user | --client-id CLIENT_ID     - use the specified client ID or username
+--list-apps                        - list all apps for each device with management status
 -v                                 - add verbose curl output
 USAGE
 }
@@ -95,25 +96,55 @@ get_device_applications() {
         # Parse the applications and identify unmanaged ones
         app_count=$(jq -r '.mobile_device.applications | length' "$curl_output_file" 2>/dev/null)
 
+        if [[ "$app_count" == "null" || -z "$app_count" ]]; then
+            echo "   [get_device_applications] Device '$device_name' (ID: $device_id) - no applications data found"
+            if [[ $list_apps -eq 1 ]]; then
+                echo "      DEBUG: Response structure:"
+                jq -r '.mobile_device | keys' "$curl_output_file" 2>/dev/null || echo "      ERROR: Failed to parse JSON"
+            fi
+            return
+        fi
+
+        echo "   [get_device_applications] Device '$device_name' (ID: $device_id) has $app_count total apps"
+
         if [[ $app_count -gt 0 ]]; then
+            # Debug: show keys of first app to identify correct field names
+            if [[ $list_apps -eq 1 ]]; then
+                echo "      DEBUG: Available keys in first app object:"
+                jq -r ".mobile_device.applications[0] | keys" "$curl_output_file" 2>/dev/null
+                echo "      DEBUG: First app full object:"
+                jq -r ".mobile_device.applications[0]" "$curl_output_file" 2>/dev/null
+                echo ""
+            fi
+
             local unmanaged_apps=()
+            local managed_count=0
+            local unmanaged_count=0
             i=0
             while [[ $i -lt $app_count ]]; do
                 app_name=$(jq -r ".mobile_device.applications[$i].application_name" "$curl_output_file" 2>/dev/null)
                 app_version=$(jq -r ".mobile_device.applications[$i].application_version" "$curl_output_file" 2>/dev/null)
-                management_status=$(jq -r ".mobile_device.applications[$i].management_status" "$curl_output_file" 2>/dev/null)
+                management_status=$(jq -r ".mobile_device.applications[$i].application_status" "$curl_output_file" 2>/dev/null)
+
+                # List apps if requested
+                if [[ $list_apps -eq 1 ]]; then
+                    printf "      %-50s %-15s [%s]\n" "$app_name" "$app_version" "$management_status"
+                fi
 
                 # Check if app is Unmanaged
                 if [[ "$management_status" == "Unmanaged" ]]; then
                     unmanaged_apps+=("${app_name}|${app_version}")
+                    ((unmanaged_count++))
+                elif [[ "$management_status" == "Managed" ]]; then
+                    ((managed_count++))
                 fi
                 ((i++))
             done
 
+            echo "   [get_device_applications] Device '$device_name': Managed=$managed_count, Unmanaged=$unmanaged_count"
+
             # If device has unmanaged apps, add to report data
             if [[ ${#unmanaged_apps[@]} -gt 0 ]]; then
-                echo "   [get_device_applications] Device '$device_name' (ID: $device_id) has ${#unmanaged_apps[@]} unmanaged apps"
-
                 # Add to devices-with-apps report
                 for app_data in "${unmanaged_apps[@]}"; do
                     app_name="${app_data%|*}"
@@ -132,9 +163,14 @@ get_device_applications() {
                     echo "\"$jss_instance\",\"$escaped_app_name\",\"$app_version\",\"$escaped_device_name\",\"$device_id\"" >>"$apps_report_file"
                 done
             fi
+        else
+            echo "   [get_device_applications] Device '$device_name' (ID: $device_id) has no applications"
         fi
     else
         echo "   [get_device_applications] WARNING: Failed to fetch applications for device ID $device_id (HTTP $http_response)"
+        if [[ -f "$curl_output_file" ]]; then
+            echo "      Response: $(cat "$curl_output_file")"
+        fi
     fi
 }
 
@@ -220,6 +256,7 @@ finalize_reports() {
 
 # Initialize arrays for tracking
 tracked_apps=()
+list_apps=0
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -242,6 +279,9 @@ while [[ "$#" -gt 0 ]]; do
         ;;
     -x | --nointeraction)
         no_interaction=1
+        ;;
+    --list-apps)
+        list_apps=1
         ;;
     -v | --verbose)
         verbose=1
