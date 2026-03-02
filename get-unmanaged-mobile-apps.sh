@@ -87,12 +87,14 @@ get_device_applications() {
     local device_name="$2"
 
     # Fetch the Applications subset for this device
-    curl_url="$jss_url/JSSResource/mobiledevices/id/${device_id}/subset/Applications"
+    curl_url="$jss_url/JSSResource/mobiledevices/id/${device_id}/subset/Applications+General"
     curl_args=("--header")
     curl_args+=("Accept: application/json")
     send_curl_request
 
     if [[ $http_response -eq 200 ]]; then
+        # get the device's serial number for reporting
+        serial_number=$(jq -r ".mobile_device.general.serial_number" "$curl_output_file" 2>/dev/null)
         # Parse the applications and identify unmanaged ones
         app_count=$(jq -r '.mobile_device.applications | length' "$curl_output_file" 2>/dev/null)
 
@@ -124,6 +126,7 @@ get_device_applications() {
             while [[ $i -lt $app_count ]]; do
                 app_name=$(jq -r ".mobile_device.applications[$i].application_name" "$curl_output_file" 2>/dev/null)
                 app_version=$(jq -r ".mobile_device.applications[$i].application_version" "$curl_output_file" 2>/dev/null)
+                app_identifier=$(jq -r ".mobile_device.applications[$i].identifier" "$curl_output_file" 2>/dev/null)
                 management_status=$(jq -r ".mobile_device.applications[$i].application_status" "$curl_output_file" 2>/dev/null)
 
                 # List apps if requested
@@ -133,7 +136,7 @@ get_device_applications() {
 
                 # Check if app is Unmanaged
                 if [[ "$management_status" == "Unmanaged" ]]; then
-                    unmanaged_apps+=("${app_name}|${app_version}")
+                    unmanaged_apps+=("${app_name}|${app_version}|${app_identifier}")
                     ((unmanaged_count++))
                 elif [[ "$management_status" == "Managed" ]]; then
                     ((managed_count++))
@@ -147,12 +150,15 @@ get_device_applications() {
             if [[ ${#unmanaged_apps[@]} -gt 0 ]]; then
                 # Add to devices-with-apps report
                 for app_data in "${unmanaged_apps[@]}"; do
-                    app_name="${app_data%|*}"
-                    app_version="${app_data#*|}"
+                    # Parse the app data (name|version|identifier)
+                    app_name="$(echo "$app_data" | cut -d'|' -f1)"
+                    app_version="$(echo "$app_data" | cut -d'|' -f2)"
+                    app_identifier="$(echo "$app_data" | cut -d'|' -f3)"
                     # Escape commas and quotes in names for CSV
                     escaped_device_name=$(echo "$device_name" | sed 's/"/""/g')
                     escaped_app_name=$(echo "$app_name" | sed 's/"/""/g')
-                    echo "\"$jss_instance\",\"$escaped_device_name\",\"$device_id\",\"$escaped_app_name\",\"$app_version\"" >>"$devices_report_file"
+                    escaped_app_identifier=$(echo "$app_identifier" | sed 's/"/""/g')
+                    echo "\"$escaped_device_name\",\"$device_id\",\"$serial_number\",\"$escaped_app_name\",\"$app_version\",\"$escaped_app_identifier\"" >>"$devices_report_file"
 
                     # Track for apps-with-devices report
                     app_key="${app_name}::${app_version}"
@@ -160,7 +166,7 @@ get_device_applications() {
                         tracked_apps+=("$app_key")
                     fi
                     # Store device info for this app (will aggregate later)
-                    echo "\"$jss_instance\",\"$escaped_app_name\",\"$app_version\",\"$escaped_device_name\",\"$device_id\"" >>"$apps_report_file"
+                    echo "\"$escaped_app_name\",\"$app_version\",\"$escaped_app_identifier\",\"$escaped_device_name\",\"$device_id\",\"$serial_number\"" >>"$apps_report_file"
                 done
             fi
         else
@@ -214,13 +220,16 @@ process_instance() {
 
 create_csv_files() {
     # Create CSV for devices with unmanaged apps
-    devices_report_file="$workdir/devices-with-unmanaged-apps-$(date +%Y-%m-%d_%H%M%S).csv"
-    echo "Instance,Device Name,Device ID,App Name,App Version" >"$devices_report_file"
+    # instance short name for file naming (remove protocol and dots and keep only the subdomain/host part)
+    instance_short=$(echo "$jss_instance" | sed -E 's#https?://##; s/[./]/-/g')
+
+    devices_report_file="$workdir/$instance_short-unmanaged-apps-$(date +%Y-%m-%d_%H%M%S).csv"
+    echo "Device Name,Device ID,Serial Number,App Name,App Version,App Identifier" >"$devices_report_file"
     echo "   [create_csv_files] Created devices report: $devices_report_file"
 
     # Create CSV for apps with devices
-    apps_report_file="$workdir/unmanaged-apps-with-devices-$(date +%Y-%m-%d_%H%M%S).csv"
-    echo "Instance,App Name,App Version,Device Name,Device ID" >"$apps_report_file"
+    apps_report_file="$workdir/$instance_short-unmanaged-apps-with-devices-$(date +%Y-%m-%d_%H%M%S).csv"
+    echo "App Name,App Version,App Identifier,Device Name,Device ID,Serial Number" >"$apps_report_file"
     echo "   [create_csv_files] Created apps report: $apps_report_file"
 }
 
@@ -310,13 +319,13 @@ fi
 # Select the instances that will be processed
 choose_destination_instances
 
-# Create CSV files
-create_csv_files
-
 # Process all chosen instances
 for instance in "${instance_choice_array[@]}"; do
     # set the instance variable
     jss_instance="$instance"
+
+    # Create CSV files
+    create_csv_files
 
     # Process this instance
     process_instance
