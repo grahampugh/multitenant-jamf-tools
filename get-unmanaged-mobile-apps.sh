@@ -48,8 +48,71 @@ Usage:
 --all                              - perform action on ALL instances in the instance list
 --user | --client-id CLIENT_ID     - use the specified client ID or username
 --list-apps                        - list all apps for each device with management status
+--limit 5                          - limit the number of devices processed (for testing)
 -v                                 - add verbose curl output
 USAGE
+}
+
+track_app_management_status() {
+    local app_name="$1"
+    local app_version="$2"
+    local app_identifier="$3"
+    local management_status="$4"
+
+    # Check if tracking file exists, if not create empty JSON array
+    if [[ ! -f "$app_tracking_file" ]]; then
+        echo '[]' >"$app_tracking_file"
+    fi
+
+    # Check if this app already exists in the tracking file
+    local existing_entry=$(jq --arg name "$app_name" --arg version "$app_version" --arg identifier "$app_identifier" \
+        '.[] | select(.name == $name and .version == $version and .identifier == $identifier)' "$app_tracking_file" 2>/dev/null)
+
+    if [[ -n "$existing_entry" ]]; then
+        # Update existing entry based on management status
+        if [[ "$management_status" == "Managed" ]]; then
+            jq --arg name "$app_name" --arg version "$app_version" --arg identifier "$app_identifier" \
+                'map(if .name == $name and .version == $version and .identifier == $identifier then .has_managed = true else . end)' \
+                "$app_tracking_file" >"${app_tracking_file}.tmp" && mv "${app_tracking_file}.tmp" "$app_tracking_file"
+        elif [[ "$management_status" == "Unmanaged" ]]; then
+            jq --arg name "$app_name" --arg version "$app_version" --arg identifier "$app_identifier" \
+                'map(if .name == $name and .version == $version and .identifier == $identifier then .has_unmanaged = true else . end)' \
+                "$app_tracking_file" >"${app_tracking_file}.tmp" && mv "${app_tracking_file}.tmp" "$app_tracking_file"
+        fi
+    else
+        # Add new entry
+        local has_managed="false"
+        local has_unmanaged="false"
+        if [[ "$management_status" == "Managed" ]]; then
+            has_managed="true"
+        elif [[ "$management_status" == "Unmanaged" ]]; then
+            has_unmanaged="true"
+        fi
+        jq --arg name "$app_name" --arg version "$app_version" --arg identifier "$app_identifier" --argjson managed "$has_managed" --argjson unmanaged "$has_unmanaged" \
+            '. += [{"name": $name, "version": $version, "identifier": $identifier, "has_managed": $managed, "has_unmanaged": $unmanaged}]' \
+            "$app_tracking_file" >"${app_tracking_file}.tmp" && mv "${app_tracking_file}.tmp" "$app_tracking_file"
+    fi
+}
+
+get_app_managed_status() {
+    local app_name="$1"
+    local app_version="$2"
+    local app_identifier="$3"
+
+    if [[ ! -f "$app_tracking_file" ]]; then
+        echo "No"
+        return
+    fi
+
+    local has_managed=$(jq -r --arg name "$app_name" --arg version "$app_version" --arg identifier "$app_identifier" \
+        '.[] | select(.name == $name and .version == $version and .identifier == $identifier) | .has_managed' \
+        "$app_tracking_file" 2>/dev/null)
+
+    if [[ "$has_managed" == "true" ]]; then
+        echo "Yes"
+    else
+        echo "No"
+    fi
 }
 
 get_all_mobile_devices() {
@@ -129,6 +192,9 @@ get_device_applications() {
                 app_identifier=$(jq -r ".mobile_device.applications[$i].identifier" "$curl_output_file" 2>/dev/null)
                 management_status=$(jq -r ".mobile_device.applications[$i].application_status" "$curl_output_file" 2>/dev/null)
 
+                # Track whether this app is managed on ANY device using JSON file
+                track_app_management_status "$app_name" "$app_version" "$app_identifier" "$management_status"
+
                 # List apps if requested
                 if [[ $list_apps -eq 1 ]]; then
                     printf "      %-50s %-15s [%s]\n" "$app_name" "$app_version" "$management_status"
@@ -161,12 +227,14 @@ get_device_applications() {
                     echo "\"$escaped_device_name\",\"$device_id\",\"$serial_number\",\"$escaped_app_name\",\"$app_version\",\"$escaped_app_identifier\"" >>"$devices_report_file"
 
                     # Track for apps-with-devices report
-                    app_key="${app_name}::${app_version}"
+                    app_key="${app_name}::${app_version}::${app_identifier}"
                     if [[ ! " ${tracked_apps[*]} " =~ " ${app_key} " ]]; then
                         tracked_apps+=("$app_key")
                     fi
+                    # Get managed status for this app from tracking file
+                    managed_anywhere=$(get_app_managed_status "$app_name" "$app_version" "$app_identifier")
                     # Store device info for this app (will aggregate later)
-                    echo "\"$escaped_app_name\",\"$app_version\",\"$escaped_app_identifier\",\"$escaped_device_name\",\"$device_id\",\"$serial_number\"" >>"$apps_report_file"
+                    echo "\"$escaped_app_name\",\"$app_version\",\"$escaped_app_identifier\",\"$managed_anywhere\",\"$escaped_device_name\",\"$device_id\",\"$serial_number\"" >>"$apps_report_file"
                 done
             fi
         else
@@ -213,6 +281,11 @@ process_instance() {
         get_device_applications "$device_id" "$device_name"
 
         ((device_index++))
+        # Check if we have a limit for testing
+        if [[ $device_index -ge $device_limit && $device_limit -gt 0 ]]; then
+            echo "   [process_instance] Device processing limit of $device_limit reached, stopping for testing purposes"
+            break
+        fi
     done
 
     echo "   [process_instance] Completed processing $jss_instance"
@@ -222,15 +295,21 @@ create_csv_files() {
     # Create CSV for devices with unmanaged apps
     # instance short name for file naming (remove protocol and dots and keep only the subdomain/host part)
     instance_short=$(echo "$jss_instance" | sed -E 's#https?://##; s/[./]/-/g')
+    timestamp=$(date +%Y-%m-%d_%H%M%S)
 
-    devices_report_file="$workdir/$instance_short-unmanaged-apps-$(date +%Y-%m-%d_%H%M%S).csv"
+    devices_report_file="$workdir/$instance_short-unmanaged-apps-$timestamp.csv"
     echo "Device Name,Device ID,Serial Number,App Name,App Version,App Identifier" >"$devices_report_file"
     echo "   [create_csv_files] Created devices report: $devices_report_file"
 
     # Create CSV for apps with devices
-    apps_report_file="$workdir/$instance_short-unmanaged-apps-with-devices-$(date +%Y-%m-%d_%H%M%S).csv"
-    echo "App Name,App Version,App Identifier,Device Name,Device ID,Serial Number" >"$apps_report_file"
+    apps_report_file="$workdir/$instance_short-unmanaged-apps-with-devices-$timestamp.csv"
+    echo "App Name,App Version,App Identifier,Managed on Any Device,Device Name,Device ID,Serial Number" >"$apps_report_file"
     echo "   [create_csv_files] Created apps report: $apps_report_file"
+
+    # Create app tracking JSON file
+    app_tracking_file="$workdir/$instance_short-app-tracking-$timestamp.json"
+    echo '[]' >"$app_tracking_file"
+    echo "   [create_csv_files] Created app tracking file: $app_tracking_file"
 }
 
 finalize_reports() {
@@ -254,9 +333,13 @@ finalize_reports() {
     echo "   - Total unique unmanaged apps: $app_count"
 
     echo
+    echo "3. App tracking data (JSON): $app_tracking_file"
+    echo "   - Shows which apps are managed/unmanaged across devices"
+    echo
     echo "You can open these files with:"
     echo "  open \"$devices_report_file\""
     echo "  open \"$apps_report_file\""
+    echo "  open \"$app_tracking_file\""
 }
 
 # --------------------------------------------------------------------------------
@@ -291,6 +374,10 @@ while [[ "$#" -gt 0 ]]; do
         ;;
     --list-apps)
         list_apps=1
+        ;;
+    --limit)
+        shift
+        device_limit="$1"
         ;;
     -v | --verbose)
         verbose=1
