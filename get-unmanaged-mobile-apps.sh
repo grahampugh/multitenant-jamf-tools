@@ -48,7 +48,8 @@ Usage:
 --all                              - perform action on ALL instances in the instance list
 --user | --client-id CLIENT_ID     - use the specified client ID or username
 --list-apps                        - list all apps for each device with management status
---limit 5                          - limit the number of devices processed (for testing)
+--limit VALUE                      - limit the number of devices processed (for testing), e.g. 5
+--profile                          - generate a mobileconfig plist with unmanaged-only apps
 -v                                 - add verbose curl output
 USAGE
 }
@@ -113,6 +114,116 @@ get_app_managed_status() {
     else
         echo "No"
     fi
+}
+
+generate_mobileconfig_profile() {
+    echo
+    echo "   [generate_mobileconfig_profile] Generating mobileconfig profile..."
+
+    if [[ ! -f "$app_tracking_file" ]]; then
+        echo "   [generate_mobileconfig_profile] ERROR: App tracking file not found"
+        return 1
+    fi
+
+    # Extract bundle IDs where has_managed is false (apps not managed on any device)
+    local unmanaged_bundle_ids=$(jq -r '.[] | select(.has_managed == false and .has_unmanaged == true) | .identifier' "$app_tracking_file" 2>/dev/null | sort -u)
+
+    if [[ -z "$unmanaged_bundle_ids" ]]; then
+        echo "   [generate_mobileconfig_profile] No unmanaged-only apps found, skipping profile generation"
+        return 0
+    fi
+
+    local bundle_id_count=$(echo "$unmanaged_bundle_ids" | wc -l | xargs)
+    echo "   [generate_mobileconfig_profile] Found $bundle_id_count unmanaged-only bundle IDs"
+
+    # Create the profile file
+    instance_short=$(echo "$jss_instance" | sed -E 's#https?://##; s/[./]/-/g')
+    timestamp=$(date +%Y-%m-%d_%H%M%S)
+    profile_file="$workdir/$instance_short-unmanaged-apps-restriction-$timestamp.mobileconfig"
+
+    # Generate UUID for the profile
+    local profile_uuid=$(uuidgen)
+    local payload_uuid=$(uuidgen)
+
+    # Start building the plist
+    cat >"$profile_file" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PayloadContent</key>
+	<array>
+		<dict>
+			<key>PayloadDisplayName</key>
+			<string>Restrictions Payload</string>
+			<key>PayloadIdentifier</key>
+EOF
+    echo "			<string>$payload_uuid</string>" >>"$profile_file"
+    cat >>"$profile_file" <<'EOF'
+			<key>PayloadOrganization</key>
+			<string>Jamf</string>
+			<key>PayloadType</key>
+			<string>com.apple.applicationaccess</string>
+			<key>PayloadUUID</key>
+EOF
+    echo "			<string>$payload_uuid</string>" >>"$profile_file"
+    cat >>"$profile_file" <<'EOF'
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>blacklistedAppBundleIDs</key>
+			<array>
+EOF
+
+    # Add blacklisted bundle IDs
+    while IFS= read -r bundle_id; do
+        echo "				<string>$bundle_id</string>" >>"$profile_file"
+    done <<<"$unmanaged_bundle_ids"
+
+    cat >>"$profile_file" <<'EOF'
+			</array>
+			<key>blockedAppBundleIDs</key>
+			<array>
+EOF
+
+    # Add blocked bundle IDs (same list)
+    while IFS= read -r bundle_id; do
+        echo "				<string>$bundle_id</string>" >>"$profile_file"
+    done <<<"$unmanaged_bundle_ids"
+
+    cat >>"$profile_file" <<'EOF'
+			</array>
+		</dict>
+	</array>
+	<key>PayloadDescription</key>
+	<string>Blocks apps that are unmanaged on all devices</string>
+	<key>PayloadDisplayName</key>
+	<string>Managed Restrictions - Unmanaged Apps</string>
+	<key>PayloadEnabled</key>
+	<true/>
+	<key>PayloadIdentifier</key>
+EOF
+    echo "	<string>$profile_uuid</string>" >>"$profile_file"
+    cat >>"$profile_file" <<'EOF'
+	<key>PayloadOrganization</key>
+	<string>Jamf</string>
+	<key>PayloadRemovalDisallowed</key>
+	<true/>
+	<key>PayloadScope</key>
+	<string>System</string>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadUUID</key>
+EOF
+    echo "	<string>$profile_uuid</string>" >>"$profile_file"
+    cat >>"$profile_file" <<'EOF'
+	<key>PayloadVersion</key>
+	<integer>1</integer>
+</dict>
+</plist>
+EOF
+
+    echo "   [generate_mobileconfig_profile] Profile created: $profile_file"
+    echo "   [generate_mobileconfig_profile] Profile contains $bundle_id_count bundle IDs"
 }
 
 get_all_mobile_devices() {
@@ -335,11 +446,21 @@ finalize_reports() {
     echo
     echo "3. App tracking data (JSON): $app_tracking_file"
     echo "   - Shows which apps are managed/unmanaged across devices"
+
+    if [[ $generate_profile -eq 1 && -f "$profile_file" ]]; then
+        echo
+        echo "4. Configuration profile: $profile_file"
+        echo "   - Blocks apps that are unmanaged on all devices"
+    fi
+
     echo
     echo "You can open these files with:"
     echo "  open \"$devices_report_file\""
     echo "  open \"$apps_report_file\""
     echo "  open \"$app_tracking_file\""
+    if [[ $generate_profile -eq 1 && -f "$profile_file" ]]; then
+        echo "  open \"$profile_file\""
+    fi
 }
 
 # --------------------------------------------------------------------------------
@@ -349,6 +470,7 @@ finalize_reports() {
 # Initialize arrays for tracking
 tracked_apps=()
 list_apps=0
+generate_profile=0
 
 # Command line override for the above settings
 while [[ "$#" -gt 0 ]]; do
@@ -374,6 +496,9 @@ while [[ "$#" -gt 0 ]]; do
         ;;
     --list-apps)
         list_apps=1
+        ;;
+    --profile)
+        generate_profile=1
         ;;
     --limit)
         shift
@@ -417,6 +542,11 @@ for instance in "${instance_choice_array[@]}"; do
     # Process this instance
     process_instance
 done
+
+# Generate mobileconfig profile if requested
+if [[ $generate_profile -eq 1 ]]; then
+    generate_mobileconfig_profile
+fi
 
 # Finalize and display report summary
 finalize_reports
