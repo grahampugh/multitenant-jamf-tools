@@ -45,7 +45,8 @@ Options:
 --download-dir | -o DIR            - Directory to download files to 
                                      (default: /tmp/pkg-downloads)
 --file-extension | -e EXT          - File extension filter (default: all)
-                                     Specify an extension (e.g., pkg) to filter
+                                     'all' = pkg, mpkg, zip, dmg only
+                                     Or specify a single extension (e.g., pkg)
 --pattern | -p PATTERN             - Filename pattern to match (optional, regex)
 --il | --instance-list FILENAME    - Provide an instance list filename (without .txt)
                                      (must exist in the instance-lists folder)
@@ -145,7 +146,12 @@ get_file_list() {
         fi
 
         # Apply extension filter
-        if [[ "$file_extension" != "all" ]]; then
+        if [[ "$file_extension" == "all" ]]; then
+            # When 'all', restrict to supported package types
+            if [[ "$line" != *.pkg && "$line" != *.mpkg && "$line" != *.zip && "$line" != *.dmg ]]; then
+                continue
+            fi
+        else
             if [[ "$line" != *."$file_extension" ]]; then
                 continue
             fi
@@ -260,7 +266,12 @@ collect_existing_files() {
         filename=$(basename "$file")
 
         # Apply extension filter
-        if [[ "$file_extension" != "all" ]]; then
+        if [[ "$file_extension" == "all" ]]; then
+            # When 'all', restrict to supported package types
+            if [[ "$filename" != *.pkg && "$filename" != *.mpkg && "$filename" != *.zip && "$filename" != *.dmg ]]; then
+                continue
+            fi
+        else
             if [[ "$filename" != *."$file_extension" ]]; then
                 continue
             fi
