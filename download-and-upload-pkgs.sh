@@ -39,9 +39,9 @@ Usage:
 ./download-and-upload-pkgs.sh [OPTIONS]
 
 Options:
---url | -u URL                     - URL of the file share (required)
---share-user USER                  - Username for HTTP Basic Auth on the file share
---share-pass PASS                  - Password for HTTP Basic Auth on the file share
+--url | -u URL                     - URL of the file share (or set SHARE_URL in AutoPkg prefs)
+--share-user USER                  - Username for HTTP Basic Auth (or set SHARE_USER in AutoPkg prefs)
+--share-pass PASS                  - Password for HTTP Basic Auth (or set SHARE_PASS in AutoPkg prefs)
 --download-dir | -o DIR            - Directory to download files to 
                                      (default: /tmp/pkg-downloads)
 --file-extension | -e EXT          - File extension filter (default: all)
@@ -82,6 +82,18 @@ USAGE
 
 prompt_for_share_credentials() {
     # Prompt for file share credentials if not provided
+    # First check if values can be obtained from AutoPkg prefs
+    if [[ -z "$share_url" ]]; then
+        share_url=$(defaults read com.github.autopkg SHARE_URL 2>/dev/null)
+    fi
+    if [[ -z "$share_user" ]]; then
+        share_user=$(defaults read com.github.autopkg SHARE_USER 2>/dev/null)
+    fi
+    if [[ -z "$share_pass" ]]; then
+        share_pass=$(defaults read com.github.autopkg SHARE_PASS 2>/dev/null)
+    fi
+
+    # Prompt for any values not found
     if [[ -z "$share_url" ]]; then
         echo "Enter the HTTPS URL of the file share:"
         read -r -p "   URL: " share_url
@@ -510,7 +522,18 @@ echo "Download and Upload Packages Script"
 echo "=========================================="
 echo
 
-# Prompt for credentials if not provided via command line and not skipping download
+# Select instances first (if uploading) so user completes all prompts upfront
+if [[ "$skip_upload" -eq 0 ]]; then
+    if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+        chosen_instance="${chosen_instances[0]}"
+        echo "Running on instance: $chosen_instance"
+    elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+        echo "Running on instances: ${chosen_instances[*]}"
+    fi
+    choose_destination_instances
+fi
+
+# Prompt for share credentials if not provided via command line and not skipping download
 if [[ "$skip_download" -eq 0 ]]; then
     prompt_for_share_credentials
 fi
@@ -526,14 +549,6 @@ fi
 
 # Upload phase
 if [[ "$skip_upload" -eq 0 ]]; then
-    # Select the instances that will be used for uploads
-    if [[ ${#chosen_instances[@]} -eq 1 ]]; then
-        chosen_instance="${chosen_instances[0]}"
-        echo "Running on instance: $chosen_instance"
-    elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
-        echo "Running on instances: ${chosen_instances[*]}"
-    fi
-    choose_destination_instances
     upload_packages
 else
     echo "Skipping upload phase..."
