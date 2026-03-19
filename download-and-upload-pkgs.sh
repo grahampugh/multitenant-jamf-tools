@@ -44,8 +44,8 @@ Options:
 --share-pass PASS                  - Password for HTTP Basic Auth on the file share
 --download-dir | -o DIR            - Directory to download files to 
                                      (default: /tmp/pkg-downloads)
---file-extension | -e EXT          - File extension filter (default: pkg)
-                                     Use 'all' to download all files
+--file-extension | -e EXT          - File extension filter (default: all)
+                                     Specify an extension (e.g., pkg) to filter
 --pattern | -p PATTERN             - Filename pattern to match (optional, regex)
 --il | --instance-list FILENAME    - Provide an instance list filename (without .txt)
                                      (must exist in the instance-lists folder)
@@ -375,7 +375,7 @@ upload_packages() {
 
 # Default values
 download_dir="/tmp/pkg-downloads"
-file_extension="pkg"
+file_extension="all"
 file_pattern=""
 skip_download=0
 skip_upload=0
