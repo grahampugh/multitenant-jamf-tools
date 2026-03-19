@@ -339,6 +339,10 @@ upload_packages() {
                 upload_args+=("$dp_url_filter")
             fi
 
+            if [[ "$skip_dp_check" -eq 1 ]]; then
+                upload_args+=("--skip-dp")
+            fi
+
             if [[ -n "$autopkg_prefs" && -f "$autopkg_prefs" ]]; then
                 upload_args+=("--prefs")
                 upload_args+=("$autopkg_prefs")
@@ -442,6 +446,9 @@ while [[ "$#" -gt 0 ]]; do
     -d | --dp)
         shift
         dp_url_filter="$1"
+        ;;
+    --skip-dp)
+        skip_dp_check=1
         ;;
     --prefs)
         shift

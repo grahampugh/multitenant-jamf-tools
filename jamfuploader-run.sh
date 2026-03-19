@@ -116,6 +116,9 @@ while test $# -gt 0; do
         shift
         dp_url_filter="$1"
         ;;
+    --skip-dp)
+        skip_dp_check=1
+        ;;
     -j | --jamf-upload-path)
         shift
         jamf_upload_path="$1"

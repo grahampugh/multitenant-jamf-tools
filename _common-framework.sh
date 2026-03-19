@@ -2,7 +2,7 @@
 # shellcheck disable=SC2154
 
 # --------------------------------------------------------------------------------
-# This script is meant to be sourced in order to supply credentials and a token 
+# This script is meant to be sourced in order to supply credentials and a token
 # to Jamf Pro API scripts
 # --------------------------------------------------------------------------------
 
@@ -14,7 +14,7 @@
 set +H
 
 # Path to here
-this_script_dir="$( cd "$( dirname "${BASH_SOURCE[0]}" )" &> /dev/null && pwd )"
+this_script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" &>/dev/null && pwd)"
 if [[ ! -d "${this_script_dir}" ]]; then
     echo "ERROR: path to repo ambiguous. Aborting."
     exit 1
@@ -35,12 +35,12 @@ root_check() {
         echo "Please run without sudo."
         echo
         exit 4 # Running as root.
-    else 
+    else
         # check that user is an admin
-        if ! /usr/sbin/dseditgroup -o checkmember -m "$USER" admin ; then
+        if ! /usr/sbin/dseditgroup -o checkmember -m "$USER" admin; then
             echo "This particular action requires a user with admin privileges."
-        echo
-        exit 5 # Running as a standard user.
+            echo
+            exit 5 # Running as a standard user.
         else
             echo "Please enter your account password to continue:"
             sudo echo "Thank you."
@@ -54,7 +54,7 @@ get_slack_webhook() {
 
     webhook_found=0
     if [[ -f "$slack_webhook_file" ]]; then
-        # generate a standard "complete" list 
+        # generate a standard "complete" list
         slack_webhook_url=""
         while IFS= read -r slack_webhook_url; do
             if [[ "$slack_webhook_url" ]]; then
@@ -62,7 +62,7 @@ get_slack_webhook() {
                 echo "   [get_slack_webhook] Slack webhook found."
                 break
             fi
-        done < "$slack_webhook_file"
+        done <"$slack_webhook_file"
     fi
     if [[ $webhook_found -eq 0 ]]; then
         return 1
@@ -140,7 +140,7 @@ get_instance_list_files() {
                     match=1
                 fi
             done
-            if [[ $match -eq 0 ]] ; then
+            if [[ $match -eq 0 ]]; then
                 if [[ $filename == "$chosen_instance_list_file" ]]; then
                     chosen_instance_list_filepath="$file"
                 fi
@@ -161,7 +161,7 @@ get_instance_list() {
     instance_list_file="$1"
 
     if [[ -f "$instance_list_file" ]]; then
-        # generate a standard "complete" list 
+        # generate a standard "complete" list
         instances_list=()
         instances_list_inc_ios_instances=()
         while IFS= read -r; do
@@ -178,13 +178,13 @@ get_instance_list() {
                     # strip the URL back to remove failover or other supplied URL parameters
                     instance=$(strip_url "$instance")
                 fi
-                instances_list_inc_ios_instances+=("$instance") 
+                instances_list_inc_ios_instances+=("$instance")
                 if [[ "$note" != *"iOS"* ]]; then
                     instances_list+=("$instance")
                 fi
             fi
 
-        done < "$instance_list_file"
+        done <"$instance_list_file"
     else
         echo
         echo "No instance list found."
@@ -222,7 +222,7 @@ choose_instance_list() {
                         if [[ ! " ${temp_instance_list[*]} " =~ " $line " ]]; then
                             temp_instance_list+=("$line")
                         fi
-                    done < "${instance_list_files[$choice]}"
+                    done <"${instance_list_files[$choice]}"
                 fi
             done
             # sort the list alphabetically, but keeping the first entry first in the list
@@ -230,7 +230,7 @@ choose_instance_list() {
             if [[ ${#temp_instance_list[@]} -gt 0 ]]; then
                 # Keep the first entry
                 sorted_temp_instance_list+=("${temp_instance_list[0]}")
-                
+
                 # Sort the remaining entries alphabetically
                 if [[ ${#temp_instance_list[@]} -gt 1 ]]; then
                     while IFS= read -r line; do
@@ -241,9 +241,9 @@ choose_instance_list() {
 
             # create a temporary instance list file and populate with the entries of temp_instance_list with each entry as a single line
             instance_list_file="$output_location/combo_instance_list.txt"
-            echo "" > "$instance_list_file"
+            echo "" >"$instance_list_file"
             for temp_instance in "${sorted_temp_instance_list[@]}"; do
-                echo "$temp_instance" >> "$instance_list_file"
+                echo "$temp_instance" >>"$instance_list_file"
             done
         elif [[ -f "$default_instance_list" ]]; then
             instance_list_file="$default_instance_list"
@@ -275,7 +275,7 @@ choose_instance_list() {
 
 choose_source_instance() {
     choose_instance_list
-    
+
     # Ask which instance we need to process, check if it exists and go from there
     source_default_template_instance="${working_instances_list[0]}"
 
@@ -291,7 +291,7 @@ choose_source_instance() {
             read -r -p "   or press enter for '(0) $source_default_template_instance' : " instance_selection
         fi
         # Check for the default or non-context
-        if grep -qe "[A-Za-z]" <<< "$instance_selection"; then
+        if grep -qe "[A-Za-z]" <<<"$instance_selection"; then
             for instance in "${working_instances_list[@]}"; do
                 if [[ "$instance" == *"${instance_selection}."* || "$instance" == *"${instance_selection}-"* ]]; then
                     source_instance="$instance"
@@ -324,9 +324,9 @@ strip_url() {
     local url="${1}"
     while true; do
         case "$url" in
-            *\?*) url="${url%\?*}" ;;
-            */) url="${url%/}" ;;
-            *) break ;;
+        *\?*) url="${url%\?*}" ;;
+        */) url="${url%/}" ;;
+        *) break ;;
         esac
     done
 
@@ -393,14 +393,14 @@ choose_destination_instances() {
             instance_choice_array+=("${working_instances_list[@]}")
             # shellcheck disable=SC2034
             do_all_instances="yes"
-        elif grep -qe "[A-Za-z]" <<< "$instance_selection"; then
+        elif grep -qe "[A-Za-z]" <<<"$instance_selection"; then
             for instance in "${working_instances_list[@]}"; do
                 if [[ "$instance" == *"${instance_selection}."* || "$instance" == *"${instance_selection}-"* ]]; then
                     instance_choice_array+=("$instance")
                     break
                 fi
             done
-            if [[ ${#instance_choice_array[@]} -eq 0  ]]; then
+            if [[ ${#instance_choice_array[@]} -eq 0 ]]; then
                 echo "ERROR: could not find matching instance"
                 exit 1
             fi
@@ -409,7 +409,7 @@ choose_destination_instances() {
                 if [[ $instance == *"-"* ]]; then
                     list_first=$(echo "$instance" | cut -d'-' -f1)
                     list_last=$(echo "$instance" | cut -d'-' -f2)
-                    for (( i=list_first; i<=list_last; i++ )); do
+                    for ((i = list_first; i <= list_last; i++)); do
                         instance_choice_array+=("${working_instances_list[$i]}")
                     done
                 else
@@ -422,7 +422,6 @@ choose_destination_instances() {
             instance_choice_array+=("${working_instances_list[0]}")
         fi
     fi
-
 
     echo "Instances chosen:"
     echo
@@ -445,6 +444,13 @@ get_instance_distribution_point() {
         echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
     fi
     jss_url="${jss_instance}"
+
+    # skip dp check if the --skip-dp option is used
+    if [[ $skip_dp_check -eq 1 ]]; then
+        echo "   [get_instance_distribution_point] Skipping DP check as per --skip-dp option"
+        smb_url=""
+        return
+    fi
 
     # Check for DPs
     # send request
@@ -511,7 +517,6 @@ get_instance_distribution_point() {
     fi
 }
 
-
 get_smb_credentials() {
     # we need the new endpoints for the password. For now use the keychain
     if [[ "$dp_server" ]]; then
@@ -521,7 +526,7 @@ get_smb_credentials() {
         if [[ $dp_check ]]; then
             # echo "   [get_smb_credentials] Checking keychain entry for $dp_check" # TEMP
             # echo "   [get_smb_credentials] Checking $smb_url" # TEMP
-            smb_user=$(/usr/bin/grep "acct" <<< "$dp_check" | /usr/bin/cut -d \" -f 4)
+            smb_user=$(/usr/bin/grep "acct" <<<"$dp_check" | /usr/bin/cut -d \" -f 4)
             smb_pass=$(/usr/bin/security find-generic-password -a "$smb_user" -s "$dp_server" -w -g 2>/dev/null)
             # smb_pass=${smb_pass//\!/} # exclamation points are ignored and mess up the SMB command so we remove them
             # echo "   [get_smb_credentials] User: $smb_user - Pass: $smb_pass" # TEMP
@@ -540,9 +545,9 @@ send_slack_notification() {
     if get_slack_webhook "$slack_instance_list"; then
         response=$(
             curl -s -o /dev/null -S -i -X POST -H "Content-Type: application/json" \
-            --write-out '%{http_code}' \
-            --data "$slack_text" \
-            "$slack_webhook_url"
+                --write-out '%{http_code}' \
+                --data "$slack_text" \
+                "$slack_webhook_url"
         )
         echo "   [send_slack_notification] Sent Slack notification (response: $response)"
     else
@@ -586,7 +591,7 @@ set_credentials() {
 
     # check for password entry in login keychain
     # jss_api_password=$("${this_script_dir}/keychain.sh" -t internet -p -s "$jss_url")
-    jss_api_password=$(/usr/bin/security find-internet-password -s "$jss_url" -l "$instance_base ($jss_api_user)" -a "$jss_api_user" -w -g 2>&1 )
+    jss_api_password=$(/usr/bin/security find-internet-password -s "$jss_url" -l "$instance_base ($jss_api_user)" -a "$jss_api_user" -w -g 2>&1)
 
     if [[ ! $jss_api_password ]]; then
         echo "No password/Client Secret for $jss_api_user found. Please run the set_credentials.sh script to add the password/Client Secret to your keychain"
@@ -608,15 +613,15 @@ get_api_token() {
     if [[ $cred_type == "client-id" ]]; then
         http_response=$(
             curl --request POST \
-            --silent \
-            --url "$jss_url/api/v1/oauth/token" \
-            --header 'Content-Type: application/x-www-form-urlencoded' \
-            --data-urlencode "client_id=$jss_api_user" \
-            --data-urlencode "grant_type=client_credentials" \
-            --data-urlencode "client_secret=$jss_api_password" \
-            --write-out "%{http_code}" \
-            --header 'Accept: application/json' \
-            --output "$token_file"
+                --silent \
+                --url "$jss_url/api/v1/oauth/token" \
+                --header 'Content-Type: application/x-www-form-urlencoded' \
+                --data-urlencode "client_id=$jss_api_user" \
+                --data-urlencode "grant_type=client_credentials" \
+                --data-urlencode "client_secret=$jss_api_password" \
+                --write-out "%{http_code}" \
+                --header 'Accept: application/json' \
+                --output "$token_file"
         )
         if [[ $verbose -gt 0 ]]; then
             echo "   [get_api_token] Token request HTTP response: $http_response"
@@ -630,12 +635,12 @@ get_api_token() {
     else
         http_response=$(
             curl --request POST \
-            --silent \
-            --url "$jss_url/api/v1/auth/token" \
-            --header "authorization: Basic $b64_credentials" \
-            --write-out "%{http_code}" \
-            --header 'Accept: application/json' \
-            --output "$token_file"
+                --silent \
+                --url "$jss_url/api/v1/auth/token" \
+                --header "authorization: Basic $b64_credentials" \
+                --write-out "%{http_code}" \
+                --header 'Accept: application/json' \
+                --output "$token_file"
         )
         if [[ $verbose -gt 0 ]]; then
             echo "   [get_api_token] Token request HTTP response: $http_response"
@@ -648,8 +653,8 @@ get_api_token() {
         fi
     fi
 
-    echo "$jss_url" > "$server_check_file"
-    echo "$jss_api_user" > "$user_check_file"
+    echo "$jss_url" >"$server_check_file"
+    echo "$jss_api_user" >"$user_check_file"
 
     if [[ $verbose -gt 0 ]]; then
         echo "   [get_api_token] Token for $jss_api_user on $jss_url written to $token_file"
@@ -664,7 +669,7 @@ check_token() {
     curl_output_file="$output_location/output_${instance_id}_${jss_api_user}.txt"
     curl_headers_file="$output_location/headers_${instance_id}_${jss_api_user}.txt"
     cookie_jar="$output_location/jamf_cookie_jar_${instance_id}_${jss_api_user}.txt"
-    
+
     # determine account type
     if [[ $jss_api_user =~ ^\{?[A-F0-9a-f]{8}-[A-F0-9a-f]{4}-[A-F0-9a-f]{4}-[A-F0-9a-f]{4}-[A-F0-9a-f]{12}\}?$ ]]; then
         cred_type="client-id"
@@ -692,7 +697,7 @@ check_token() {
                     expiration_epoch="0"
                 fi
                 if [[ $expiration_epoch -gt $current_time_epoch ]]; then
-                    human_cutoff_time=$( /bin/date -r "$expiration_epoch" )
+                    human_cutoff_time=$(/bin/date -r "$expiration_epoch")
                     if [[ $verbose -gt 0 ]]; then
                         echo "   [check_token] Token is still valid (expires at $human_cutoff_time)"
                     fi
@@ -714,7 +719,7 @@ check_token() {
                 if jq -e .expires "$token_file" >/dev/null; then
                     expires=$(jq -r .expires "$token_file")
                     # shellcheck disable=SC2001
-                    expires_stripped=$(sed 's/\.[0-9]*Z$//' <<< "$expires") # strip the milliseconds and Z from the end of the date
+                    expires_stripped=$(sed 's/\.[0-9]*Z$//' <<<"$expires") # strip the milliseconds and Z from the end of the date
                     expiration_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "$expires_stripped" +"%s")
                 else
                     expiration_epoch="0"
@@ -731,7 +736,7 @@ check_token() {
                         return 1
                     fi
                 else
-                    human_cutoff_time=$( /bin/date -r "$expiration_epoch" )
+                    human_cutoff_time=$(/bin/date -r "$expiration_epoch")
                     if [[ $verbose -gt 0 ]]; then
                         echo "   [check_token] Token is still valid (expires at $human_cutoff_time)"
                     fi
@@ -780,7 +785,7 @@ handle_jpapi_get_request() {
     local endpoint="$1"
     local sort_or_filter="$2"
     local key="$3"
-    local match="$4" 
+    local match="$4"
 
     if [[ -z $endpoint ]]; then
         echo "   [handle_jpapi_get_request] No endpoint provided for handle_jpapi_get_request"
@@ -797,9 +802,9 @@ handle_jpapi_get_request() {
     if [[ $vpos -gt 0 ]]; then
         # Get substring after /v[number]
         rest="${endpoint:$vpos}"
-        slash_count=$(grep -o "/" <<< "$rest" | wc -l)
+        slash_count=$(grep -o "/" <<<"$rest" | wc -l)
     else
-        slash_count=$(grep -o "/" <<< "$endpoint" | wc -l)
+        slash_count=$(grep -o "/" <<<"$endpoint" | wc -l)
     fi
     if [[ $slash_count -gt 1 ]]; then
         echo "   [handle_jpapi_get_request] Endpoint already includes an ID or other subfilter, cannot add sort or filter"
@@ -810,11 +815,11 @@ handle_jpapi_get_request() {
         echo "   [handle_jpapi_get_request] Endpoint already includes parameters, cannot add more"
         filter_type="preset"
     elif [[ "$sort_or_filter" == "sort" ]]; then
-            filter_type="sort"
-            if [[ -z $key ]]; then
-                echo "   [handle_jpapi_get_request] No sort key provided for handle_jpapi_get_request, using id as default sorting method"
-                key="id"
-            fi
+        filter_type="sort"
+        if [[ -z $key ]]; then
+            echo "   [handle_jpapi_get_request] No sort key provided for handle_jpapi_get_request, using id as default sorting method"
+            key="id"
+        fi
     elif [[ "$sort_or_filter" == "filter" ]]; then
         if [[ ! "$key" || ! "$match" ]]; then
             echo "   [handle_jpapi_get_request] ERROR: No filter key or match provided for handle_jpapi_get_request"
@@ -841,9 +846,9 @@ handle_jpapi_get_request() {
         if [[ $paginated == "true" ]]; then
             # we need to run multiple loops to get all the devices if there are more than 1000
             # calculate how many loops we need
-            loop_count=$(( total_count / 100 ))
-            if (( total_count % 100 > 0 )); then
-                loop_count=$(( loop_count + 1 ))
+            loop_count=$((total_count / 100))
+            if ((total_count % 100 > 0)); then
+                loop_count=$((loop_count + 1))
             fi
             echo "   [handle_jpapi_get_request] Will loop through $loop_count times to get all items."
 
@@ -910,7 +915,7 @@ send_curl_request() {
     if [[ -n $max_tries_override ]]; then
         max_tries=$max_tries_override
     fi
-    
+
     if [[ $verbose -gt 0 ]]; then
         echo "Supplied URL: $curl_url"
     fi
@@ -957,14 +962,14 @@ send_curl_request() {
             echo "   [send_curl_request] Complete curl command sent:"
             printf 'curl'
             for arg in "${final_args[@]}"; do
-            printf ' %q' "$arg"
+                printf ' %q' "$arg"
             done
             printf '\n'
         fi
 
         http_response="$curl_request"
 
-        # These lines can be commented out if we need to see what the request was and what the response is 
+        # These lines can be commented out if we need to see what the request was and what the response is
         # echo "    REQUEST:" # TEMP
         # echo "curl ${final_args[*]}" # TEMP
         # echo "    RESPONSE:" # TEMP
@@ -991,7 +996,7 @@ send_curl_request() {
             echo "   [send_curl_request] Fail response ($http_response) - attempt #$try."
         fi
         sleep $try
-        (( try++ ))
+        ((try++))
     done
     if [[ $try -gt $max_tries ]]; then
         curl_failed="true"
@@ -1056,15 +1061,15 @@ choose_template_file() {
 }
 
 element_in() {
-  local e match="$1"
-  shift
-  for e; do [[ "$e" == "$match" ]] && return 0; done
-  return 1
+    local e match="$1"
+    shift
+    for e; do [[ "$e" == "$match" ]] && return 0; done
+    return 1
 }
 
 run_jamfupload() {
     instance_args=()
-    
+
     # specify the URL
     instance_args+=("--url")
     instance_args+=("$jss_instance")
@@ -1093,7 +1098,7 @@ run_jamfupload() {
 
     # Run the script and output to stdout
     # echo "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" # TEMP
-    "$jamf_upload_path" "${args[@]}" "${instance_args[@]}" 
+    "$jamf_upload_path" "${args[@]}" "${instance_args[@]}"
 
     # Send Slack notification
     slack_text="{'username': '$jss_instance', 'text': '*jamfuploader_run.sh*\nUser: $jss_api_user\nInstance: $jss_instance\nArguments: ${args[*]}'}"
@@ -1101,7 +1106,7 @@ run_jamfupload() {
 }
 
 encode_name() {
-    url_encoded_name="$( echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
+    url_encoded_name="$(echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g')"
     echo "$url_encoded_name"
 }
 
@@ -1134,7 +1139,6 @@ get_object_id_from_name() {
     existing_id=$(xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = '$object_name']/id/text()" "$curl_output_file" 2>/dev/null)
     # xmllint --xpath "//${api_xml_object_plural}/${api_xml_object}[name = 'Administrator Rights']" "$curl_output_file" # TEMP
 }
-
 
 get_computers_in_group() {
     # get token
@@ -1180,7 +1184,6 @@ get_computers_in_group() {
     fi
 }
 
-
 get_mobile_devices_in_group() {
     # get token
     if [[ "$chosen_id" ]]; then
@@ -1225,7 +1228,6 @@ get_mobile_devices_in_group() {
     fi
 }
 
-
 generate_computer_list() {
     # The Jamf Pro API returns a list of all computers.
     # first get the device count so we can find out how many loops we need
@@ -1257,15 +1259,15 @@ generate_computer_list() {
 
     # we need to run multiple loops to get all the devices if there are more than 100
     # calculate how many loops we need
-    loop_count=$(( total_count / 100 )) 
-    if (( total_count % 100 > 0 )); then
-        loop_count=$(( loop_count + 1 ))
+    loop_count=$((total_count / 100))
+    if ((total_count % 100 > 0)); then
+        loop_count=$((loop_count + 1))
     fi
     echo "Will loop through $loop_count times to get all computers."
 
     # now loop through
     combined_output_file="$output_location/jamf_computer_list_combined.json"
-    echo '{"results":[]}' > "$combined_output_file"
+    echo '{"results":[]}' >"$combined_output_file"
     i=0
     while [[ $i -lt $loop_count ]]; do
         # set the page number
@@ -1282,7 +1284,7 @@ generate_computer_list() {
             {
               results: (.[0].results + .[1].results)
             }
-            ' "$combined_output_file" "$curl_output_file" > "$combined_output_file.tmp" && mv "$combined_output_file.tmp" "$combined_output_file"
+            ' "$combined_output_file" "$curl_output_file" >"$combined_output_file.tmp" && mv "$combined_output_file.tmp" "$combined_output_file"
         ((i++))
     done
 
@@ -1316,11 +1318,11 @@ generate_computer_list() {
         elif [[ $serial ]]; then
             # allow for CSV list of serials
             if [[ $serial =~ "," ]]; then
-                count=$(grep -o "," <<< "$serial" | wc -l)
-                serial_count=$(( count + 1 ))
+                count=$(grep -o "," <<<"$serial" | wc -l)
+                serial_count=$((count + 1))
                 j=1
                 while [[ $j -le $serial_count ]]; do
-                    serial_in_csv=$( cut -d, -f$j <<< "$serial" )
+                    serial_in_csv=$(cut -d, -f$j <<<"$serial")
                     if [[ "$serial_in_list" == "$serial_in_csv" ]]; then
                         computer_choice+=("$i")
                     fi
@@ -1353,7 +1355,7 @@ generate_computer_list() {
             if [[ $computer == *"-"* ]]; then
                 list_first=$(echo "$computer" | cut -d'-' -f1)
                 list_last=$(echo "$computer" | cut -d'-' -f2)
-                for (( i=list_first; i<=list_last; i++ )); do
+                for ((i = list_first; i <= list_last; i++)); do
                     computer_choice+=("$i")
                 done
             else
@@ -1368,7 +1370,7 @@ generate_computer_list() {
     fi
 
     # show list of chosen computers
-    echo 
+    echo
     echo "Computers chosen:"
     for computer in "${computer_choice[@]}"; do
         computer_id="${computer_ids[$computer]}"
@@ -1410,18 +1412,18 @@ generate_mobile_device_list() {
 
     # we need to run multiple loops to get all the devices if there are more than 100
     # calculate how many loops we need
-    loop_count=$(( total_count / 100 )) 
-    if (( total_count % 100 > 0 )); then
-        loop_count=$(( loop_count + 1 ))
+    loop_count=$((total_count / 100))
+    if ((total_count % 100 > 0)); then
+        loop_count=$((loop_count + 1))
     fi
     echo "Will loop through $loop_count times to get all computers."
 
     # now loop through
-    echo '{"results":[]}' > "$combined_output_file"
+    echo '{"results":[]}' >"$combined_output_file"
     i=0
     while [[ $i -lt $loop_count ]]; do
         # set the page number
-        page_number=$(( i * 100 ))
+        page_number=$((i * 100))
         url_filter="?page=$page_number&page-size=100&sort=id"
         curl_url="$jss_url/$endpoint/$url_filter"
         curl_args=("--request")
@@ -1437,7 +1439,7 @@ generate_mobile_device_list() {
             {
               results: (.[0].results + .[1].results)
             }
-            ' "$combined_output_file" "$curl_output_file" > "$combined_output_file.tmp" && mv "$combined_output_file.tmp" "$combined_output_file"
+            ' "$combined_output_file" "$curl_output_file" >"$combined_output_file.tmp" && mv "$combined_output_file.tmp" "$combined_output_file"
         ((i++))
     done
 
@@ -1467,11 +1469,11 @@ generate_mobile_device_list() {
         elif [[ $serial ]]; then
             # allow for CSV list of serials
             if [[ $serial =~ "," ]]; then
-                count=$(grep -o "," <<< "$serial" | wc -l)
-                serial_count=$(( count + 1 ))
+                count=$(grep -o "," <<<"$serial" | wc -l)
+                serial_count=$((count + 1))
                 j=1
                 while [[ $j -le $serial_count ]]; do
-                    serial_in_csv=$( cut -d, -f$j <<< "$serial" )
+                    serial_in_csv=$(cut -d, -f$j <<<"$serial")
                     if [[ "$serial_in_list" == "$serial_in_csv" ]]; then
                         mobile_device_choice+=("$i")
                     fi
@@ -1504,7 +1506,7 @@ generate_mobile_device_list() {
             if [[ $mobile_device == *"-"* ]]; then
                 list_first=$(echo "$mobile_device" | cut -d'-' -f1)
                 list_last=$(echo "$mobile_device" | cut -d'-' -f2)
-                for (( i=list_first; i<=list_last; i++ )); do
+                for ((i = list_first; i <= list_last; i++)); do
                     mobile_device_choice+=("$i")
                 done
             else
@@ -1519,7 +1521,7 @@ generate_mobile_device_list() {
     fi
 
     # show list of chosen mobile_devices
-    echo 
+    echo
     echo "mobile_devices chosen:"
     for mobile_device in "${mobile_device_choice[@]}"; do
         mobile_device_id="${mobile_device_ids[$mobile_device]}"
@@ -1533,14 +1535,14 @@ get_api_object_type() {
     local api_xml_object=$1
 
     case "$api_xml_object" in
-        advanced_computer_search)        api_object_type="advancedcomputersearches";;
-        advanced_mobile_device_search)   api_object_type="advancedmobiledevicesearches";;
-        category)                        api_object_type="categories";;
-        configuration_profile)           api_object_type="mobiledeviceconfigurationprofiles";;
-        group|user)                      api_object_type="accounts";;
-        policy)                          api_object_type="policies";;
-        restricted_software)       api_object_type="restrictedsoftware";;
-        *)                               api_object_type=$( echo "${api_xml_object}s" | sed 's|_||g' );;
+    advanced_computer_search) api_object_type="advancedcomputersearches" ;;
+    advanced_mobile_device_search) api_object_type="advancedmobiledevicesearches" ;;
+    category) api_object_type="categories" ;;
+    configuration_profile) api_object_type="mobiledeviceconfigurationprofiles" ;;
+    group | user) api_object_type="accounts" ;;
+    policy) api_object_type="policies" ;;
+    restricted_software) api_object_type="restrictedsoftware" ;;
+    *) api_object_type=$(echo "${api_xml_object}s" | sed 's|_||g') ;;
 
     esac
     echo "$api_object_type"
@@ -1550,12 +1552,12 @@ get_plural_from_api_xml_object() {
     local api_xml_object=$1
 
     case "$api_xml_object" in
-        advanced_computer_search)        api_xml_object_plural="advanced_computer_searches";;
-        advanced_mobile_device_search)   api_xml_object_plural="advanced_mobile_device_searches";;
-        category)                        api_xml_object_plural="categories";;
-        policy)                          api_xml_object_plural="policies";;
-        restricted_software)       api_xml_object_plural="restricted_software";;
-        *)                               api_xml_object_plural="${api_xml_object}s"
+    advanced_computer_search) api_xml_object_plural="advanced_computer_searches" ;;
+    advanced_mobile_device_search) api_xml_object_plural="advanced_mobile_device_searches" ;;
+    category) api_xml_object_plural="categories" ;;
+    policy) api_xml_object_plural="policies" ;;
+    restricted_software) api_xml_object_plural="restricted_software" ;;
+    *) api_xml_object_plural="${api_xml_object}s" ;;
     esac
     echo "$api_xml_object_plural"
 }
@@ -1565,24 +1567,24 @@ get_api_object_from_type() {
 
     # shellcheck disable=SC2001
     case "$api_object_type" in
-        advancedcomputersearches)           api_xml_object="advanced_computer_search";;
-        advancedmobiledevicesearches)       api_xml_object="advanced_mobile_device_search";;
-        categories)                         api_xml_object="category";;
-        computerextensionattributes)        api_xml_object="computer_extension_attribute";;
-        computergroups)                     api_xml_object="computer_group";;
-        distributionpoints)                 api_xml_object="distribution_point";;
-        dockitems)                          api_xml_object="dock_item";;
-        ldapservers)                        api_xml_object="ldap_server";;
-        macapplications)                    api_xml_object="mac_application";;
-        mobiledeviceapplications)           api_xml_object="mobile_device_application";;
-        mobiledeviceconfigurationprofiles)  api_xml_object="configuration_profile";;
-        mobiledeviceextensionattributes)    api_xml_object="mobile_device_extension_attribute";;
-        mobiledevicegroups)                 api_xml_object="mobile_device_group";;
-        osxconfigurationprofiles)           api_xml_object="os_x_configuration_profile";;
-        policies)                           api_xml_object="policy";;
-        restrictedsoftware)                 api_xml_object="restricted_software";;
-        smtpserver)                         api_xml_object="smtp_server";;
-        *)                                  api_xml_object=$(sed 's|s$||' <<< "$api_object_type") ;; 
+    advancedcomputersearches) api_xml_object="advanced_computer_search" ;;
+    advancedmobiledevicesearches) api_xml_object="advanced_mobile_device_search" ;;
+    categories) api_xml_object="category" ;;
+    computerextensionattributes) api_xml_object="computer_extension_attribute" ;;
+    computergroups) api_xml_object="computer_group" ;;
+    distributionpoints) api_xml_object="distribution_point" ;;
+    dockitems) api_xml_object="dock_item" ;;
+    ldapservers) api_xml_object="ldap_server" ;;
+    macapplications) api_xml_object="mac_application" ;;
+    mobiledeviceapplications) api_xml_object="mobile_device_application" ;;
+    mobiledeviceconfigurationprofiles) api_xml_object="configuration_profile" ;;
+    mobiledeviceextensionattributes) api_xml_object="mobile_device_extension_attribute" ;;
+    mobiledevicegroups) api_xml_object="mobile_device_group" ;;
+    osxconfigurationprofiles) api_xml_object="os_x_configuration_profile" ;;
+    policies) api_xml_object="policy" ;;
+    restrictedsoftware) api_xml_object="restricted_software" ;;
+    smtpserver) api_xml_object="smtp_server" ;;
+    *) api_xml_object=$(sed 's|s$||' <<<"$api_object_type") ;;
     esac
     echo "$api_xml_object"
 }
@@ -1595,7 +1597,7 @@ find_all_internet_passwords() {
     local instance_base="${server/*:\/\//}"
 
     echo "   [find_all_internet_passwords] Searching for all internet passwords with server: $server"
-    
+
     # Get raw keychain data and process it
     while IFS= read -r line; do
         if [[ "$line" =~ keychain: ]]; then
@@ -1612,19 +1614,19 @@ find_all_internet_passwords() {
                 # echo "Entry #$count found in $current_keychain"
                 matching_entries+=("$(echo "$current_entry" | grep -E '0x00000007 <blob>' | sed 's/.*<blob>="\([^"]*\)".*/\1/' | sed 's/.*(\([^)]*\)).*/\1/')")
             fi
-            
+
             if [[ -z "$line" ]]; then
                 in_inet_entry=false
                 current_entry=""
             fi
         fi
     done < <(/usr/bin/security dump-keychain)
-    
+
     echo "   [find_all_internet_passwords] Total entries found: $count"
     # Set chosen_account based on the number of matches
     chosen_account=""
     if [ $count -eq 0 ]; then
-        echo "   [find_all_internet_passwords] No entries found for server: $server" 
+        echo "   [find_all_internet_passwords] No entries found for server: $server"
         return 1
     elif [ $count -eq 1 ]; then
         chosen_account="${matching_entries[0]}"
@@ -1632,7 +1634,7 @@ find_all_internet_passwords() {
     elif [ $count -gt 1 ]; then
         echo "   [find_all_internet_passwords] Multiple entries found for server $server:"
         echo "   [find_all_internet_passwords] ${matching_entries[*]}"
-        echo  "   [find_all_internet_passwords] Checking for matching display name"
+        echo "   [find_all_internet_passwords] Checking for matching display name"
         echo
         if [[ $no_interaction -eq 1 ]]; then
             echo "   [find_all_internet_passwords] No interaction mode enabled, cannot choose between multiple entries."
@@ -1689,7 +1691,7 @@ set_platform_api_credentials() {
     fi
 
     # check for secret entry in login keychain
-    platform_api_client_secret=$(/usr/bin/security find-internet-password -s "$api_base_url" -l "$instance_base ($platform_api_client_id)" -a "$platform_api_client_id" -w -g 2>&1 )
+    platform_api_client_secret=$(/usr/bin/security find-internet-password -s "$api_base_url" -l "$instance_base ($platform_api_client_id)" -a "$platform_api_client_id" -w -g 2>&1)
 
     if [[ $platform_api_client_secret ]]; then
         if [[ $verbose -gt 0 ]]; then
@@ -1774,8 +1776,8 @@ get_platform_api_token() {
         --request POST \
         "$api_base_url/auth/token" \
         --header 'Content-Type: application/x-www-form-urlencoded' \
-    	--data-urlencode 'grant_type=client_credentials' \
-    	--data-urlencode "client_id=$platform_api_client_id" \
+        --data-urlencode 'grant_type=client_credentials' \
+        --data-urlencode "client_id=$platform_api_client_id" \
         --data-urlencode "client_secret=$platform_api_client_secret" \
         --write-out "%{http_code}" \
         --output "$token_file"); then
@@ -1844,7 +1846,7 @@ check_platform_api_token() {
                 fi
                 if [[ $cutoff_epoch -gt $current_time_epoch ]]; then
                     # convert epoch to human readable
-                    human_cutoff_time=$( /bin/date -r "$cutoff_epoch" )
+                    human_cutoff_time=$(/bin/date -r "$cutoff_epoch")
                     if [[ $verbose -gt 0 ]]; then
                         echo "   [check_platform_api_token] Token is still valid (expires at $human_cutoff_time)"
                     fi
@@ -1890,7 +1892,7 @@ check_platform_api_token() {
 get_platform_api_region() {
     local instance_url="$1"
     echo "   [get_platform_api_region] Instance: $instance_url"
-    # check for .txt files in the platform-api-instance-lists directory and 
+    # check for .txt files in the platform-api-instance-lists directory and
     # see if the chosen instance is in one of those files
     finding_instance=0
     for instance_list in platform-api-instance-lists/*.txt; do
@@ -1910,20 +1912,20 @@ get_platform_api_region() {
 }
 
 get_region_url() {
-        case $chosen_region in
-        us)
-            api_base_url="https://us.apigw.jamf.com"
-            ;;
-        eu)
-            api_base_url="https://eu.apigw.jamf.com"
-            ;;
-        apac)
-            api_base_url="https://apac.apigw.jamf.com"
-            ;;
-        *)
-            echo "ERROR: Invalid region specified. Please use one of: us, eu, apac."
-            exit 1
-            ;;
+    case $chosen_region in
+    us)
+        api_base_url="https://us.apigw.jamf.com"
+        ;;
+    eu)
+        api_base_url="https://eu.apigw.jamf.com"
+        ;;
+    apac)
+        api_base_url="https://apac.apigw.jamf.com"
+        ;;
+    *)
+        echo "ERROR: Invalid region specified. Please use one of: us, eu, apac."
+        exit 1
+        ;;
     esac
     if [[ $verbose -gt 0 ]]; then
         echo "   [get_region_url] API Base URL: $api_base_url"
@@ -1937,7 +1939,7 @@ handle_platform_api_get_request() {
     local endpoint="$1"
     local sort_or_filter="$2"
     local key="$3"
-    local match="$4" 
+    local match="$4"
 
     if [[ -z $endpoint ]]; then
         echo "   [handle_platform_api_get_request] No endpoint provided for handle_platform_api_get_request"
@@ -1954,9 +1956,9 @@ handle_platform_api_get_request() {
     if [[ $vpos -gt 0 ]]; then
         # Get substring after /v[number]
         rest="${endpoint:$vpos}"
-        slash_count=$(grep -o "/" <<< "$rest" | wc -l)
+        slash_count=$(grep -o "/" <<<"$rest" | wc -l)
     else
-        slash_count=$(grep -o "/" <<< "$endpoint" | wc -l)
+        slash_count=$(grep -o "/" <<<"$endpoint" | wc -l)
     fi
     if [[ $slash_count -gt 1 ]]; then
         echo "   [handle_platform_api_get_request] Endpoint already includes an ID or other subfilter, cannot add sort or filter"
@@ -1967,11 +1969,11 @@ handle_platform_api_get_request() {
         echo "   [handle_platform_api_get_request] Endpoint already includes parameters, cannot add more"
         filter_type="preset"
     elif [[ "$sort_or_filter" == "sort" ]]; then
-            filter_type="sort"
-            if [[ -z $key ]]; then
-                echo "   [handle_platform_api_get_request] No sort key provided for handle_platform_api_get_request, using id as default sorting method"
-                key="id"
-            fi
+        filter_type="sort"
+        if [[ -z $key ]]; then
+            echo "   [handle_platform_api_get_request] No sort key provided for handle_platform_api_get_request, using id as default sorting method"
+            key="id"
+        fi
     elif [[ "$sort_or_filter" == "filter" ]]; then
         if [[ ! "$key" || ! "$match" ]]; then
             echo "   [handle_platform_api_get_request] ERROR: No filter key or match provided for handle_platform_api_get_request"
@@ -1997,9 +1999,9 @@ handle_platform_api_get_request() {
 
             # we need to run multiple loops to get all the devices if there are more than 1000
             # calculate how many loops we need
-            loop_count=$(( total_count / 100 ))
-            if (( total_count % 100 > 0 )); then
-                loop_count=$(( loop_count + 1 ))
+            loop_count=$((total_count / 100))
+            if ((total_count % 100 > 0)); then
+                loop_count=$((loop_count + 1))
             fi
             echo "   [handle_platform_api_get_request] Will loop through $loop_count times to get all items."
 
@@ -2051,4 +2053,3 @@ handle_platform_api_get_request() {
         combined_output=$(cat "$curl_output_file")
     fi
 }
-
