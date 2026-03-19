@@ -179,6 +179,12 @@ get_file_list() {
 download_files() {
     # Download all files from the list
     echo "Downloading files to $download_dir..."
+
+    # Clear the download directory to avoid uploading stale files
+    if [[ -d "$download_dir" ]]; then
+        echo "Clearing existing download directory..."
+        rm -rf "$download_dir"
+    fi
     mkdir -p "$download_dir"
 
     downloaded_files=()
