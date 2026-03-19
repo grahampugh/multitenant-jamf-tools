@@ -88,71 +88,71 @@ fi
 # get command line args
 args=()
 chosen_instances=()
-while test $# -gt 0 ; do
+while test $# -gt 0; do
     case "$1" in
-        -il|--instance-list)
-            shift
-            chosen_instance_list_file="$1"
-            ;;
-        -i|--instance)
-            shift
-            chosen_instances+=("$1")
-            ;;
-        -a|-ai|--all-instances)
-            all_instances=1
-            ;;
-        --id|--client-id|--user|--username)
-            shift
-            chosen_id="$1"
+    -il | --instance-list)
+        shift
+        chosen_instance_list_file="$1"
         ;;
-        -x|--nointeraction)
-            no_interaction=1
-            ;;
-        -s|--share)
-            shift
-            smb_url="$1"
-            ;;
-        -d|--dp)
-            shift
-            dp_url_filter="$1"
-            ;;
-        -j|--jamf-upload-path)
-            shift
-            jamf_upload_path="$1"
-            if [[ ! -f "$jamf_upload_path" ]]; then
-                echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"
-                exit 1
-            fi
-            ;;
-        --prefs)
-            shift
-            autopkg_prefs="$1"
-            if [[ ! -f "$autopkg_prefs" ]]; then
-                echo "ERROR: prefs file not found"
-                exit 1
-            fi
-            ;;
-        -q)
-            quiet_mode="yes"
-            ;;
-        -v*)
-            verbosity_mode="$1"
-            ;;
-        -h|--help)
-            echo "Outputting the help sheet for jamf-upload.sh"
-            echo
-            echo "==========================================="
-            echo
-            "$jamf_upload_path" --help
-            echo
-            echo "==========================================="
-            echo
-            usage
-            exit 0
-            ;;
-        *)
-            args+=("$1")
-            ;;
+    -i | --instance)
+        shift
+        chosen_instances+=("$1")
+        ;;
+    -a | -ai | --all-instances)
+        all_instances=1
+        ;;
+    --id | --client-id | --user | --username)
+        shift
+        chosen_id="$1"
+        ;;
+    -x | --nointeraction)
+        no_interaction=1
+        ;;
+    -s | --share)
+        shift
+        smb_url="$1"
+        ;;
+    -d | --dp)
+        shift
+        dp_url_filter="$1"
+        ;;
+    -j | --jamf-upload-path)
+        shift
+        jamf_upload_path="$1"
+        if [[ ! -f "$jamf_upload_path" ]]; then
+            echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"
+            exit 1
+        fi
+        ;;
+    --prefs)
+        shift
+        autopkg_prefs="$1"
+        if [[ ! -f "$autopkg_prefs" ]]; then
+            echo "ERROR: prefs file not found"
+            exit 1
+        fi
+        ;;
+    -q)
+        quiet_mode="yes"
+        ;;
+    -v*)
+        verbosity_mode="$1"
+        ;;
+    -h | --help)
+        echo "Outputting the help sheet for jamf-upload.sh"
+        echo
+        echo "==========================================="
+        echo
+        "$jamf_upload_path" --help
+        echo
+        echo "==========================================="
+        echo
+        usage
+        exit 0
+        ;;
+    *)
+        args+=("$1")
+        ;;
     esac
     shift
 done
@@ -199,6 +199,6 @@ for instance in "${instance_choice_array[@]}"; do
     run_jamfupload
 done
 
-echo 
+echo
 echo "Finished"
 echo
