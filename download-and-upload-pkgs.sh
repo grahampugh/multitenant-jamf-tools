@@ -63,6 +63,9 @@ Options:
 -j <path>                          - Alternative path to jamf-upload.sh script
 --skip-download                    - Skip download, only upload existing files in download dir
 --skip-upload                      - Skip upload, only download files
+--skip-orphans                     - Only download files that exist as packages on the destination server
+--migrate                          - Get URL from a distribution point on the source instance
+                                     (alternative to --url)
 --replace                          - Replace existing package if it exists
 --dry-run                          - Show what would be done without actually doing it
 -h | --help                        - Show this help message
@@ -112,6 +115,260 @@ prompt_for_share_credentials() {
         echo "Enter the password for HTTP Basic Auth:"
         read -r -s -p "   Password: " share_pass
         echo
+    fi
+}
+
+get_distribution_point_url() {
+    # Get distribution point details and extract HTTP URL for downloading
+    # This is used with the --migrate option
+
+    local jamfuploader_script="$this_script_dir/jamfuploader-run.sh"
+    if [[ ! -f "$jamfuploader_script" ]]; then
+        echo "ERROR: jamfuploader-run.sh not found at $jamfuploader_script"
+        exit 1
+    fi
+
+    # Use the first selected instance to get the distribution point list
+    local source_instance="${instance_choice_array[0]}"
+    echo "Fetching distribution points from $source_instance..."
+
+    # Extract subdomain from URL
+    local subdomain
+    subdomain=$(echo "$source_instance" | sed -E 's|https?://([^.]+)\..+|\1|')
+    local dp_list_file="/tmp/${subdomain}-distribution_points.json"
+
+    # Get the list of distribution points
+    local read_args=()
+    read_args+=("read")
+    read_args+=("--type")
+    read_args+=("distribution_point")
+    read_args+=("--list")
+    read_args+=("--output")
+    read_args+=("/tmp")
+    read_args+=("--instance")
+    read_args+=("$source_instance")
+    read_args+=("--nointeraction")
+
+    if [[ -n "$chosen_id" ]]; then
+        read_args+=("--user")
+        read_args+=("$chosen_id")
+    fi
+
+    read_args+=("-q")
+
+    "$jamfuploader_script" "${read_args[@]}" >/dev/null 2>&1
+
+    if [[ ! -f "$dp_list_file" ]]; then
+        echo "ERROR: Could not retrieve distribution point list from $source_instance"
+        exit 1
+    fi
+
+    # Extract distribution point names
+    local dp_names=()
+    while IFS= read -r dp_name; do
+        if [[ -n "$dp_name" ]]; then
+            dp_names+=("$dp_name")
+        fi
+    done < <(jq -r '.[].name' "$dp_list_file" 2>/dev/null)
+
+    if [[ ${#dp_names[@]} -eq 0 ]]; then
+        echo "ERROR: No distribution points found on $source_instance"
+        exit 1
+    fi
+
+    echo "Found ${#dp_names[@]} distribution point(s)"
+
+    # Select distribution point
+    local selected_dp=""
+
+    if [[ -n "$dp_url_filter" ]]; then
+        # Auto-select based on --dp filter
+        for dp in "${dp_names[@]}"; do
+            if [[ "$dp" == *"$dp_url_filter"* ]]; then
+                selected_dp="$dp"
+                echo "Auto-selected distribution point matching '$dp_url_filter': $selected_dp"
+                break
+            fi
+        done
+        if [[ -z "$selected_dp" ]]; then
+            echo "ERROR: No distribution point matches '$dp_url_filter'"
+            echo "Available distribution points:"
+            for dp in "${dp_names[@]}"; do
+                echo "   - $dp"
+            done
+            exit 1
+        fi
+    elif [[ ${#dp_names[@]} -eq 1 ]]; then
+        selected_dp="${dp_names[0]}"
+        echo "Using distribution point: $selected_dp"
+    else
+        # Show menu to select
+        echo
+        echo "Select a distribution point:"
+        local i=0
+        for dp in "${dp_names[@]}"; do
+            echo "   [$i] $dp"
+            ((i++))
+        done
+        echo
+        read -r -p "Enter number: " dp_selection
+        if [[ "$dp_selection" =~ ^[0-9]+$ ]] && [[ $dp_selection -lt ${#dp_names[@]} ]]; then
+            selected_dp="${dp_names[$dp_selection]}"
+        else
+            echo "ERROR: Invalid selection"
+            exit 1
+        fi
+        echo "Selected: $selected_dp"
+    fi
+
+    # Get the details of the selected distribution point
+    echo "Fetching details for distribution point: $selected_dp"
+    local dp_detail_file="/tmp/${subdomain}-distribution_points-${selected_dp}.xml"
+
+    local detail_args=()
+    detail_args+=("read")
+    detail_args+=("--type")
+    detail_args+=("distribution_point")
+    detail_args+=("--name")
+    detail_args+=("$selected_dp")
+    detail_args+=("--output")
+    detail_args+=("/tmp")
+    detail_args+=("--instance")
+    detail_args+=("$source_instance")
+    detail_args+=("--nointeraction")
+
+    if [[ -n "$chosen_id" ]]; then
+        detail_args+=("--user")
+        detail_args+=("$chosen_id")
+    fi
+
+    detail_args+=("-q")
+
+    "$jamfuploader_script" "${detail_args[@]}" >/dev/null 2>&1
+
+    if [[ ! -f "$dp_detail_file" ]]; then
+        echo "ERROR: Could not retrieve distribution point details for $selected_dp"
+        exit 1
+    fi
+
+    # Extract http_url and http_username from the XML
+    local dp_http_url
+    local dp_http_username
+    dp_http_url=$(xmllint --xpath 'string(//http_url)' "$dp_detail_file" 2>/dev/null)
+    dp_http_username=$(xmllint --xpath 'string(//http_username)' "$dp_detail_file" 2>/dev/null)
+
+    if [[ -z "$dp_http_url" ]]; then
+        echo "ERROR: No HTTP URL found for distribution point $selected_dp"
+        echo "HTTP downloads may not be enabled for this distribution point."
+        exit 1
+    fi
+
+    # add /Packages subfolder to HTTP URL
+    dp_http_url="${dp_http_url%/}/Packages"
+
+    echo "   HTTP URL: $dp_http_url"
+    echo "   HTTP Username: $dp_http_username"
+
+    # Set the share_url
+    share_url="$dp_http_url"
+
+    # Handle username and password
+    if [[ -n "$dp_http_username" ]]; then
+        if [[ -z "$share_user" ]]; then
+            # No user provided, use the one from DP
+            share_user="$dp_http_username"
+            # Check if we have a password from prefs
+            if [[ -z "$share_pass" ]]; then
+                share_pass=$(defaults read com.github.autopkg SHARE_PASS 2>/dev/null)
+            fi
+            if [[ -z "$share_pass" ]]; then
+                echo "Enter the password for HTTP user '$share_user':"
+                read -r -s -p "   Password: " share_pass
+                echo
+            fi
+        elif [[ "$share_user" == "$dp_http_username" ]]; then
+            # User matches, use existing password or prompt
+            if [[ -z "$share_pass" ]]; then
+                share_pass=$(defaults read com.github.autopkg SHARE_PASS 2>/dev/null)
+            fi
+            if [[ -z "$share_pass" ]]; then
+                echo "Enter the password for HTTP user '$share_user':"
+                read -r -s -p "   Password: " share_pass
+                echo
+            fi
+        else
+            # User doesn't match, need to prompt for correct password
+            echo "WARNING: Provided SHARE_USER ('$share_user') does not match DP HTTP username ('$dp_http_username')"
+            echo "Using DP HTTP username: $dp_http_username"
+            share_user="$dp_http_username"
+            echo "Enter the password for HTTP user '$share_user':"
+            read -r -s -p "   Password: " share_pass
+            echo
+        fi
+    fi
+
+    echo
+    echo "Distribution point configured:"
+    echo "   URL: $share_url"
+    echo "   User: $share_user"
+    echo
+}
+
+get_existing_packages() {
+    # Get list of existing packages from the Jamf server for each selected instance
+    # This populates the existing_packages array with package names
+    existing_packages=()
+
+    local jamfuploader_script="$this_script_dir/jamfuploader-run.sh"
+    if [[ ! -f "$jamfuploader_script" ]]; then
+        echo "ERROR: jamfuploader-run.sh not found at $jamfuploader_script"
+        exit 1
+    fi
+
+    for instance in "${instance_choice_array[@]}"; do
+        echo "Fetching existing packages from $instance..."
+
+        # Extract subdomain from URL (e.g., https://test.jamfcloud.com -> test)
+        local subdomain
+        subdomain=$(echo "$instance" | sed -E 's|https?://([^.]+)\..+|\1|')
+        local pkg_list_file="/tmp/${subdomain}-packages.json"
+
+        # Run jamfuploader-run.sh to get the package list
+        local read_args=()
+        read_args+=("read")
+        read_args+=("--type")
+        read_args+=("package")
+        read_args+=("--list")
+        read_args+=("--output")
+        read_args+=("/tmp")
+        read_args+=("--instance")
+        read_args+=("$instance")
+        read_args+=("--nointeraction")
+
+        if [[ -n "$chosen_id" ]]; then
+            read_args+=("--user")
+            read_args+=("$chosen_id")
+        fi
+
+        read_args+=("-q")
+
+        "$jamfuploader_script" "${read_args[@]}" >/dev/null 2>&1
+
+        if [[ -f "$pkg_list_file" ]]; then
+            # Extract package names from the JSON file
+            while IFS= read -r pkg_name; do
+                if [[ -n "$pkg_name" ]]; then
+                    existing_packages+=("$pkg_name")
+                fi
+            done < <(jq -r '.[].name' "$pkg_list_file" 2>/dev/null)
+            echo "   Found ${#existing_packages[@]} packages on $instance"
+        else
+            echo "   WARNING: Could not retrieve package list from $instance"
+        fi
+    done
+
+    if [[ ${#existing_packages[@]} -eq 0 ]]; then
+        echo "WARNING: No existing packages found on any instance. --skip-orphans will have no effect."
     fi
 }
 
@@ -178,6 +435,21 @@ get_file_list() {
 
         file_list+=("$line")
     done < <(echo "$response" | grep -oE 'href="[^"]*"' | sed 's/href="//g' | sed 's/"//g' | sort -u)
+
+    # If --skip-orphans is enabled, filter out files not on the server
+    if [[ "$skip_orphans" -eq 1 && ${#existing_packages[@]} -gt 0 ]]; then
+        local filtered_list=()
+        for file in "${file_list[@]}"; do
+            for pkg in "${existing_packages[@]}"; do
+                if [[ "$file" == "$pkg" ]]; then
+                    filtered_list+=("$file")
+                    break
+                fi
+            done
+        done
+        file_list=("${filtered_list[@]}")
+        echo "After filtering for existing packages: ${#file_list[@]} file(s) remain"
+    fi
 
     if [[ ${#file_list[@]} -eq 0 ]]; then
         echo "No files found matching criteria at $share_url"
@@ -412,6 +684,8 @@ file_extension="all"
 file_pattern=""
 skip_download=0
 skip_upload=0
+skip_orphans=0
+migrate_mode=0
 replace_pkg=0
 dry_run=0
 chosen_instances=()
@@ -497,6 +771,12 @@ while [[ "$#" -gt 0 ]]; do
     --skip-upload)
         skip_upload=1
         ;;
+    --skip-orphans)
+        skip_orphans=1
+        ;;
+    --migrate)
+        migrate_mode=1
+        ;;
     --replace)
         replace_pkg=1
         ;;
@@ -522,8 +802,8 @@ echo "Download and Upload Packages Script"
 echo "=========================================="
 echo
 
-# Select instances first (if uploading) so user completes all prompts upfront
-if [[ "$skip_upload" -eq 0 ]]; then
+# Select instances first (if uploading, using --skip-orphans, or using --migrate) so user completes all prompts upfront
+if [[ "$skip_upload" -eq 0 || "$skip_orphans" -eq 1 || "$migrate_mode" -eq 1 ]]; then
     if [[ ${#chosen_instances[@]} -eq 1 ]]; then
         chosen_instance="${chosen_instances[0]}"
         echo "Running on instance: $chosen_instance"
@@ -533,9 +813,20 @@ if [[ "$skip_upload" -eq 0 ]]; then
     choose_destination_instances
 fi
 
+# If --migrate is enabled, get the distribution point URL
+if [[ "$migrate_mode" -eq 1 && "$skip_download" -eq 0 ]]; then
+    get_distribution_point_url
+fi
+
 # Prompt for share credentials if not provided via command line and not skipping download
-if [[ "$skip_download" -eq 0 ]]; then
+# (skip if --migrate was used as credentials are already set)
+if [[ "$skip_download" -eq 0 && "$migrate_mode" -eq 0 ]]; then
     prompt_for_share_credentials
+fi
+
+# If --skip-orphans is enabled, get the list of existing packages first
+if [[ "$skip_orphans" -eq 1 && "$skip_download" -eq 0 ]]; then
+    get_existing_packages
 fi
 
 # Download phase
