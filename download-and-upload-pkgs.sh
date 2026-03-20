@@ -80,6 +80,9 @@ Examples:
     --download-dir /tmp/pkgs --file-extension pkg \\
     -i https://mycompany.jamfcloud.com --category "Apps"
 
+# Migrate packages from a distribution point to JCDS on the source instance, ignoring any packages in the DP that don't have matching metadata on the server:
+./download-and-upload-pkgs.sh --migrate --skip-orphans --skip-dp
+
 USAGE
 }
 
