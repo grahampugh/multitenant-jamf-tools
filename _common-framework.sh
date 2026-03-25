@@ -50,6 +50,16 @@ root_check() {
 
 get_slack_webhook() {
     instance_list_file="$1" # slack webhook filename should match the current instance list file
+    # allow a global slack webhook if found in the autopkg prefs
+    if [[ -f "$autopkg_prefs" ]]; then
+        slack_webhook_key=$(defaults read "$autopkg_prefs" slack_webhook_url 2>/dev/null)
+        if [[ "$slack_webhook_key" && ! "$slack_webhook_url" ]]; then
+            slack_webhook_url="$slack_webhook_key"
+            echo "   [get_slack_webhook] Using global Slack webhook from autopkg prefs."
+            return 0
+        fi
+    fi
+
     slack_webhook_file="$(dirname "$instance_list_file")/../slack-webhooks/$(basename "$instance_list_file")"
 
     webhook_found=0
