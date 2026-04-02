@@ -89,7 +89,7 @@ request() {
             handle_jpapi_get_request "$endpoint"
         fi
         # write combined output to curl output file
-        echo "$combined_output" > "$curl_output_file"
+        echo "$combined_output" >"$curl_output_file"
     else
         curl_args+=("--header")
         curl_args+=("Accept: application/json")
@@ -146,61 +146,65 @@ fi
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
-        -il|--instance-list)
-            shift
-            chosen_instance_list_file="$1"
-            ;;
-        -i|--instance)
-            shift
-            chosen_instances+=("$1")
-            ;;
-        -a|-ai|--all|--all-instances)
-            all_instances=1
-            ;;
-        --id|--client-id|--user|--username)
-            shift
-            chosen_id="$1"
+    -il | --instance-list)
+        shift
+        chosen_instance_list_file="$1"
         ;;
-        -x|--nointeraction)
-            no_interaction=1
-            ;;
-        -e|--endpoint)
-            shift
-            endpoint="$1"
+    -i | --instance)
+        shift
+        chosen_instances+=("$1")
         ;;
-        -f|--filter)
-            shift
-            filter_key="$1"
+    -a | -ai | --all | --all-instances)
+        all_instances=1
         ;;
-        -s|--sortkey)
-            shift
-            sort_key="$1"
+    --id | --client-id | --user | --username)
+        shift
+        chosen_id="$1"
         ;;
-        -m|--match)
-            shift
-            match="$1"
+    -x | --nointeraction)
+        no_interaction=1
         ;;
-        -r|--request)
-            shift
-            request_type="$1"
+    -e | --endpoint)
+        shift
+        endpoint="$1"
         ;;
-        -d|--data)
-            shift
-            data="$1"
+    -f | --filter)
+        shift
+        filter_key="$1"
         ;;
-        --datafile)
-            shift
-            datafile="$1"
+    -s | --sortkey)
+        shift
+        sort_key="$1"
         ;;
-        --xml)
-            xml_output=1
+    -m | --match)
+        shift
+        match="$1"
         ;;
-        -v|--verbose)
-            verbose=1
+    -r | --request)
+        shift
+        request_type="$1"
         ;;
-        -h|--help)
-            usage
-            exit
+    -d | --data)
+        shift
+        data="$1"
+        ;;
+    --datafile)
+        shift
+        datafile="$1"
+        ;;
+    --xml)
+        xml_output=1
+        ;;
+    -v | --verbose)
+        verbose=1
+        ;;
+    -o | --output)
+        shift
+        output_dir="$1"
+        ;;
+    -h | --help)
+        usage
+        exit
         ;;
     esac
     # Shift after checking all the cases to get the next option
@@ -243,9 +247,21 @@ for instance in "${instance_choice_array[@]}"; do
     request
 
     echo
-    echo "   [main] Output saved to $curl_output_file"
-    if [[ -f "$formatted_output_file" ]]; then
-        echo "   [main] Formatted output saved to $formatted_output_file"
+    if [[ -n "$output_dir" ]]; then
+        mkdir -p "$output_dir"
+        if [[ -f "$formatted_output_file" ]]; then
+            output_file_name="$(basename "$formatted_output_file")"
+            mv "$formatted_output_file" "$output_dir/"
+        else
+            output_file_name="$(basename "$curl_output_file")"
+            mv "$curl_output_file" "$output_dir/"
+        fi
+        echo "   [main] Output saved to $output_dir/$output_file_name"
+    else
+        echo "   [main] Output saved to $curl_output_file"
+        if [[ -f "$formatted_output_file" ]]; then
+            echo "   [main] Formatted output saved to $formatted_output_file"
+        fi
     fi
 done
 
