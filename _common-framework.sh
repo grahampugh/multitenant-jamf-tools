@@ -1731,6 +1731,9 @@ check_if_paginated() {
         curl_url="$jss_instance/$endpoint"
     fi
 
+    # remove any double-slashes from the URL (except for the https:// part)
+    curl_url=$(echo "$curl_url" | sed 's|^\(https://\)/\{2,\}|\1/|' | sed 's|/\{2,\}|/|g')
+
     curl_cmd=(curl
         --location
         --silent
@@ -1753,18 +1756,18 @@ check_if_paginated() {
     printf '\n'
 
     if ! http_response=$("${curl_cmd[@]}"); then
-        echo "   [check_if_paginated] ERROR: Failed to connect to the Platform API."
-        exit 1
+        echo "   [check_if_paginated] ERROR: Failed to connect to the API."
+        return 1
     fi
     # extract the token from the response
     if [[ "$http_response" -ge 400 ]]; then
-        echo "   [check_if_paginated] ERROR: Failed to get a response from the Platform API. HTTP response code: $http_response"
+        echo "   [check_if_paginated] ERROR: Failed to get a response from the API. HTTP response code: $http_response"
         if [[ -s "$token_file" ]]; then
             echo "   [check_if_paginated] Response:"
             cat "$token_file"
             echo
         fi
-        exit 1
+        return 1
     fi
     # check if the output includes a 'totalCount' key
     if jq -e .totalCount "$curl_output_file" >/dev/null; then
