@@ -181,7 +181,12 @@ run_autopkg() {
     fi
 
     if [[ $recipe_list ]]; then
-        "$autopkg_binary" run "$verbosity_mode" --recipe-list "$recipe_list" "${autopkg_run_options[@]}"
+        if ! "$autopkg_binary" run "$verbosity_mode" --recipe-list "$recipe_list" "${autopkg_run_options[@]}"; then
+            echo "ERROR: AutoPkg run failed"
+            return 1
+        else
+            echo "AutoPkg run completed"
+        fi
     elif  [[ $recipe ]]; then
         if ! "$autopkg_binary" run "$verbosity_mode" "$recipe" "${autopkg_run_options[@]}"; then
             echo "ERROR: AutoPkg run failed"
@@ -314,6 +319,7 @@ elif [[ "$recipe" == "" && "$recipe_list" == "" ]]; then
 fi
 
 # run on specified instances
+returncode=0
 for instance in "${instance_choice_array[@]}"; do
     jss_instance="$instance"
     # get token
@@ -326,10 +332,21 @@ for instance in "${instance_choice_array[@]}"; do
     fi
     echo "Running AutoPkg on $jss_instance..."
     if [[ $recipe_list ]]; then
-        run_autopkg
+        if ! run_autopkg; then
+            echo "ERROR: AutoPkg run failed for $jss_instance with recipe list $recipe_list"
+            returncode=1
+        else
+            echo "AutoPkg run completed for $jss_instance with recipe list $recipe_list"
+        fi
+
     elif [[ ${#recipes[@]} -gt 0 ]]; then
         for recipe in "${recipes[@]}"; do
-            run_autopkg
+            if ! run_autopkg; then
+                echo "ERROR: AutoPkg run failed for $jss_instance with recipe $recipe"
+                returncode=1
+            else
+                echo "AutoPkg run completed for $jss_instance with recipe $recipe"
+            fi
         done
     else
         echo "No recipes or recipe lists supplied"
@@ -340,3 +357,4 @@ done
 echo 
 echo "Finished"
 echo
+exit $returncode
