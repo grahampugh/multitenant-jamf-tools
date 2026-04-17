@@ -180,19 +180,21 @@ run_autopkg() {
         fi
     fi
 
+    echo
+
     if [[ $recipe_list ]]; then
         if ! "$autopkg_binary" run "$verbosity_mode" --recipe-list "$recipe_list" "${autopkg_run_options[@]}"; then
             echo "ERROR: AutoPkg run failed"
             return 1
         else
-            echo "AutoPkg run completed"
+            echo "AutoPkg run completed for recipe-list '$recipe_list'"
         fi
     elif  [[ $recipe ]]; then
         if ! "$autopkg_binary" run "$verbosity_mode" "$recipe" "${autopkg_run_options[@]}"; then
             echo "ERROR: AutoPkg run failed"
             return 1
         else
-            echo "AutoPkg run completed"
+            echo "AutoPkg run completed for recipe '$recipe'"
         fi
     else
         echo "ERROR: no recipe or recipe list supplied"
