@@ -3,9 +3,9 @@
 # --------------------------------------------------------------------------------
 # Script for changing policy names using AutoPkg
 # USAGE:
-# First download a list of policies using the DownloadPolicyList recipe, as follows:
+# First download a list of policies using the DownloadObjectList recipe, as follows:
 
-# ./autopkg-run.sh -r recipes/DownloadPolicyList.jamf.recipe.yaml
+# ./autopkg-run.sh -r recipes/DownloadObjectList.jamf.recipe.yaml --key OBJECT_TYPE=policy
 
 # then edit the JSON file to contain only the policies you want to rename, 
 # with their new names. The JSON file should be an array of objects with 

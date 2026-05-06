@@ -1,5 +1,9 @@
 Identifier: multitenant-jamf-tools.jamf.DownloadAllObjects
 MinimumVersion: "2.3"
+
+RequiredInputs:
+  - OBJECT_TYPE
+
 Input:
   OUTPUT_DIR: /Users/Shared/Jamf/JamfUploaderTests
 
