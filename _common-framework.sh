@@ -1951,8 +1951,8 @@ get_platform_api_region() {
         fi
     done
     if [[ $finding_instance -eq 0 ]]; then
-        echo "   [get_platform_api_region] ERROR: Chosen instance ($instance_url) not found in any platform-api-instance-lists/*.txt file."
-        exit 1
+        echo "   [get_platform_api_region] Chosen instance ($instance_url) not found in any platform-api-instance-lists/*.txt file - asking for region"
+        return 1
     fi
     echo "   [get_platform_api_region] Region: $chosen_region"
     echo
