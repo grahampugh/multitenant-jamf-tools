@@ -729,7 +729,7 @@ check_token() {
                 if jq -e .expires "$token_file" >/dev/null; then
                     expires=$(jq -r .expires "$token_file")
                     # shellcheck disable=SC2001
-                    expires_stripped=$(sed 's/\.[0-9]*Z$//' <<<"$expires") # strip the milliseconds and Z from the end of the date
+                    expires_stripped=$(sed 's/\(\.[0-9]*\)\{0,1\}Z$//' <<<"$expires") # strip optional milliseconds and Z from the end of the date
                     expiration_epoch=$(date -j -f "%Y-%m-%dT%H:%M:%S" "$expires_stripped" +"%s")
                 else
                     expiration_epoch="0"
