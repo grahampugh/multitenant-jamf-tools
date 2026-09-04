@@ -75,12 +75,161 @@ Usage:
 --dp                               - filter DPs on DP name
 -e | --enabled                     - Force policy to enabled (--key POLICY_ENABLED=True)
 -p | --replace                     - Replace existing pkg in Jamf Pro (for pkg uploads)
---dry-run                          - Run the processor in dry run mode. 
+--dry-run                          - Run the processor in dry run mode.
                                      No changes will be made to the Jamf Pro server.
+--analyse                          - Analyse a recipe and show its Input keys, indicating
+                                     which are required or optional. Does not run the recipe.
+--show-all                         - When used with --analyse, also show Other Input keys
+                                     that are not in RequiredInputs or OptionalInputs.
 -v[vvv]                            - add verbose output
 
 --[args]                           - Pass through any arguments for AutoPkg
 USAGE
+}
+
+analyse_recipe() {
+    local recipe="$1"
+    local temp_dir
+    temp_dir=$(mktemp -d)
+    local recipe_json_file="$temp_dir/recipe.json"
+    local autopkg_info_file="$temp_dir/autopkg_info.txt"
+
+    echo
+    echo "Analysing recipe: $recipe"
+
+    # Resolve full path to recipe file — if it's already a file path, use it directly
+    local recipe_path
+    if [[ -f "$recipe" ]]; then
+        recipe_path="$recipe"
+    else
+        recipe_path=$("$autopkg_binary" info "$recipe" 2>/dev/null | grep "^Recipe file:" | sed 's/^Recipe file:[[:space:]]*//')
+    fi
+
+    # Parse RequiredInputs and OptionalInputs directly from recipe file
+    local required_inputs=()
+    local optional_inputs=()
+    local optional_inputs_present=false
+
+    if [[ -n "$recipe_path" && -f "$recipe_path" ]]; then
+        case "$recipe_path" in
+            *.recipe.yaml)
+                /usr/local/autopkg/python -c "
+import sys, yaml, json
+with open(sys.argv[1], 'r') as f:
+    data = yaml.safe_load(f)
+print(json.dumps(data))
+" "$recipe_path" >"$recipe_json_file" 2>/dev/null
+                ;;
+            *.recipe | *.recipe.plist)
+                plutil -convert json -o "$recipe_json_file" "$recipe_path" 2>/dev/null
+                ;;
+        esac
+
+        if [[ -s "$recipe_json_file" ]]; then
+            while IFS= read -r item; do
+                [[ -n "$item" ]] && required_inputs+=("$item")
+            done < <(jq -r '.RequiredInputs[]? // empty' "$recipe_json_file" 2>/dev/null)
+
+            if jq -e 'has("OptionalInputs")' "$recipe_json_file" &>/dev/null; then
+                optional_inputs_present=true
+                while IFS= read -r item; do
+                    [[ -n "$item" ]] && optional_inputs+=("$item")
+                done < <(jq -r '.OptionalInputs[]? // empty' "$recipe_json_file" 2>/dev/null)
+            fi
+        fi
+    fi
+
+    # Get Input keys/values from autopkg info
+    "$autopkg_binary" info "$recipe" >"$autopkg_info_file" 2>/dev/null
+
+    if [[ ! -s "$autopkg_info_file" ]]; then
+        echo "ERROR: Failed to run 'autopkg info' for recipe: $recipe"
+        rm -rf "$temp_dir"
+        return 1
+    fi
+
+    local input_pairs_file="$temp_dir/input_pairs.txt"
+    /usr/local/autopkg/python -c "
+import sys, re
+text = open(sys.argv[1]).read()
+match = re.search(r'Input values:\s*\n(.*?)(?:\n\S|\Z)', text, re.DOTALL)
+if not match:
+    sys.exit(0)
+block = match.group(1)
+for m in re.finditer(r\"'([^']+)':\s*'([^']*)',?\", block):
+    key, value = m.group(1), m.group(2)
+    sys.stdout.write(key + '\t' + value + '\n')
+" "$autopkg_info_file" >"$input_pairs_file" 2>/dev/null
+
+    declare -a input_keys=()
+    declare -a input_values=()
+    while IFS=$'\t' read -r key value; do
+        [[ -z "$key" ]] && continue
+        input_keys+=("$key")
+        input_values+=("$value")
+    done <"$input_pairs_file"
+
+    echo
+    if [[ ${#required_inputs[@]} -gt 0 ]]; then
+        echo "Required inputs (no default value — must be supplied):"
+        for key in "${required_inputs[@]}"; do
+            echo "  [REQUIRED] $key"
+        done
+        echo
+    fi
+
+    if [[ ${#input_keys[@]} -gt 0 ]]; then
+        if [[ ${#required_inputs[@]} -eq 0 && "$optional_inputs_present" == "false" ]]; then
+            echo "Input keys (no RequiredInputs/OptionalInputs defined — all listed):"
+            for i in "${!input_keys[@]}"; do
+                echo "  ${input_keys[$i]}: ${input_values[$i]}"
+            done
+        else
+            # Show optional inputs (those in OptionalInputs list, or all non-required if no OptionalInputs)
+            local optional_label="Optional inputs:"
+            [[ "$optional_inputs_present" == "true" ]] && optional_label="Optional inputs (defined in OptionalInputs):"
+            local has_optional=0
+            local other_keys=()
+            local other_values=()
+            for i in "${!input_keys[@]}"; do
+                local key="${input_keys[$i]}"
+                local value="${input_values[$i]}"
+                local is_required=0
+                for req in "${required_inputs[@]}"; do
+                    [[ "$req" == "$key" ]] && is_required=1 && break
+                done
+                [[ $is_required -eq 1 ]] && continue
+                if [[ "$optional_inputs_present" == "true" ]]; then
+                    local in_optional=0
+                    for opt in "${optional_inputs[@]}"; do
+                        [[ "$opt" == "$key" ]] && in_optional=1 && break
+                    done
+                    if [[ $in_optional -eq 1 ]]; then
+                        [[ $has_optional -eq 0 ]] && echo "$optional_label" && has_optional=1
+                        echo "  $key: $value"
+                    else
+                        other_keys+=("$key")
+                        other_values+=("$value")
+                    fi
+                else
+                    [[ $has_optional -eq 0 ]] && echo "$optional_label" && has_optional=1
+                    echo "  $key: $value"
+                fi
+            done
+            if [[ ${#other_keys[@]} -gt 0 && $show_all -eq 1 ]]; then
+                echo
+                echo "Other inputs:"
+                for i in "${!other_keys[@]}"; do
+                    echo "  ${other_keys[$i]}: ${other_values[$i]}"
+                done
+            fi
+        fi
+    else
+        echo "No Input keys found."
+    fi
+
+    echo
+    rm -rf "$temp_dir"
 }
 
 run_autopkg() {
@@ -280,6 +429,12 @@ while [[ "$#" -gt 0 ]]; do
         --dry-run)
             dry_run=1
             ;;
+        --analyse|--analyze)
+            analyse_mode=1
+            ;;
+        --show-all)
+            show_all=1
+            ;;
         -h|--help)
             usage
             exit
@@ -299,6 +454,18 @@ elif [[ $verbosity_mode == "-vvvvv"* ]]; then
     verbosity_mode="-vvvv"
 elif [[ $quiet_mode ]]; then
     verbosity_mode=""
+fi
+
+# If --analyse mode, show recipe info and exit without running
+if [[ $analyse_mode -eq 1 ]]; then
+    if [[ ${#recipes[@]} -eq 0 ]]; then
+        echo "ERROR: no recipe supplied (use -r/--recipe)"
+        exit 1
+    fi
+    for recipe in "${recipes[@]}"; do
+        analyse_recipe "$recipe"
+    done
+    exit 0
 fi
 
 # Ask for the instance list, show list, ask to apply to one, multiple or all
