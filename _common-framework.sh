@@ -2226,7 +2226,9 @@ _parallel_dialog_monitor() {
 #   --worker <fn>          required; shell function name, called: <fn> <token> <idx>
 #   --log-dir <dir>        required; holds per-job logs and sentinel files
 #   --label-fn <fn>        optional; maps a token to a short label
-#                          (default: parallel_instance_shortname)
+#                          (default: parallel_instance_shortname). The label is
+#                          used in per-job log filenames, so it MUST be
+#                          filename-safe (no slashes or spaces).
 #   --max-concurrent <n>   optional; default 8
 #   --reporter <mode>      optional; terminal | dialog | none (default terminal)
 #   --dialog-log <file>    required when --reporter dialog; swiftDialog command file
@@ -2295,6 +2297,11 @@ run_parallel_jobs() {
     local job_labels=()
     local idx token label log_file status_file
 
+    # Pre-pass: derive each job's label and log/status paths and create the log
+    # files up front. This lets the progress reporter attach BEFORE the launch
+    # loop — the launch loop can block in _parallel_throttle when there are more
+    # jobs than slots, and a reporter started after it would miss all output
+    # from the first batch (which runs, and may finish, while later jobs queue).
     for (( idx = 0; idx < total; idx++ )); do
         token="${jobs[$idx]}"
         label=$("$label_fn" "$token")
@@ -2304,6 +2311,29 @@ run_parallel_jobs() {
         job_logs[$idx]="$log_file"
         : > "$log_file"
         rm -f "$status_file"
+    done
+
+    # Start the chosen progress reporter (all log files now exist, so tail -f can
+    # attach to every one without a race, and the dialog monitor's sentinel poll
+    # sees completions as they happen).
+    if [[ "$reporter" == "terminal" ]]; then
+        echo
+        echo "   [run_parallel_jobs] Live progress (streams below as jobs run):"
+        echo
+        tail -n +1 -f "${job_logs[@]}" &
+        _PARALLEL_TAIL_PID=$!
+    elif [[ "$reporter" == "dialog" && -n "$dialog_log" ]]; then
+        _parallel_dialog_monitor "$total" "$dialog_log" "$completed_file" "$title" &
+        _PARALLEL_MONITOR_PID=$!
+    fi
+
+    # Launch loop: throttle to max_concurrent, then start each worker in the
+    # background writing to its pre-created log file.
+    for (( idx = 0; idx < total; idx++ )); do
+        token="${jobs[$idx]}"
+        label="${job_labels[$idx]}"
+        log_file="${job_logs[$idx]}"
+        status_file="${log_dir}/.parallel_${idx}.status"
 
         # Block until a concurrency slot frees up before launching the next job.
         _parallel_throttle "$max_concurrent"
@@ -2320,18 +2350,6 @@ run_parallel_jobs() {
         job_pids[$idx]="$!"
         _PARALLEL_BG_PIDS+=("$!")
     done
-
-    # Start the chosen progress reporter.
-    if [[ "$reporter" == "terminal" ]]; then
-        echo
-        echo "   [run_parallel_jobs] Live progress (streams below as jobs run):"
-        echo
-        tail -n +1 -f "${job_logs[@]}" &
-        _PARALLEL_TAIL_PID=$!
-    elif [[ "$reporter" == "dialog" && -n "$dialog_log" ]]; then
-        _parallel_dialog_monitor "$total" "$dialog_log" "$completed_file" "$title" &
-        _PARALLEL_MONITOR_PID=$!
-    fi
 
     # Wait for every worker to finish (by recorded PID, in launch order).
     for (( idx = 0; idx < total; idx++ )); do
