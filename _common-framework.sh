@@ -2100,3 +2100,347 @@ handle_platform_api_get_request() {
         combined_output=$(cat "$curl_output_file")
     fi
 }
+
+# ===============================================================================
+# PARALLEL JOB RUNNER
+# ===============================================================================
+# A generic, bash-3.2-safe runner for launching independent units of work across
+# multiple instances (or recipes) concurrently, with per-job logging, a
+# concurrency throttle, live progress, and clean Ctrl-C teardown.
+#
+# macOS ships bash 3.2: no associative arrays and no `wait -n`. State is keyed by
+# integer job index into indexed arrays, and completion is tracked via a shared
+# sentinel file rather than `wait -n`. This design is portable to any newer shell
+# without change.
+#
+# Two layers:
+#   run_parallel_jobs   - generic core; you supply the job tokens and a worker fn
+#   run_autopkg_parallel- convenience wrapper for "one recipe across N instances"
+# ===============================================================================
+
+# Extract a short, stable label from a Jamf Pro URL (the subdomain), e.g.
+# https://customer.jamfcloud.com -> "customer". Used as the default job label.
+parallel_instance_shortname() {
+    local url="$1"
+    local tmp="${url#*://}"  # strip protocol
+    tmp="${tmp%%/*}"          # strip path
+    tmp="${tmp%%:*}"          # strip port
+    echo "${tmp%%.*}"         # first domain component only
+}
+
+# Recursively send a signal to a PID and all of its descendants. Background jobs
+# spawn autopkg-run.sh, which spawns python; killing only the recorded job PID
+# would orphan those children.
+if ! declare -f kill_tree >/dev/null 2>&1; then
+kill_tree() {
+    local pid="$1"
+    local sig="${2:-TERM}"
+    local child
+    for child in $(pgrep -P "$pid" 2>/dev/null); do
+        kill_tree "$child" "$sig"
+    done
+    kill -"$sig" "$pid" 2>/dev/null
+}
+fi
+
+# INT/TERM handler installed by run_parallel_jobs. Tears down every background
+# worker (and its process tree), the live-tail, and the dialog monitor, then
+# exits. Background jobs started with & ignore SIGINT in a non-interactive shell,
+# so the terminal Ctrl-C never reaches them on its own — forward SIGTERM here.
+_parallel_terminate() {
+    echo >&2
+    echo "   [run_parallel_jobs] Interrupt received — stopping all background jobs..." >&2
+    local pid
+    for pid in "${_PARALLEL_BG_PIDS[@]}"; do
+        [[ -n "$pid" ]] && kill_tree "$pid" TERM
+    done
+    [[ -n "${_PARALLEL_TAIL_PID:-}" ]] && kill "$_PARALLEL_TAIL_PID" 2>/dev/null
+    [[ -n "${_PARALLEL_MONITOR_PID:-}" ]] && kill "$_PARALLEL_MONITOR_PID" 2>/dev/null
+    sleep 1  # give children a moment, then escalate any survivors
+    for pid in "${_PARALLEL_BG_PIDS[@]}"; do
+        [[ -n "$pid" ]] && kill_tree "$pid" KILL
+    done
+    echo "   [run_parallel_jobs] All background jobs stopped." >&2
+    exit 130
+}
+
+# Restore whatever INT/TERM traps were in place before run_parallel_jobs ran.
+_parallel_restore_traps() {
+    if [[ -n "${_parallel_prev_int_trap:-}" ]]; then
+        eval "$_parallel_prev_int_trap"
+    else
+        trap - INT
+    fi
+    if [[ -n "${_parallel_prev_term_trap:-}" ]]; then
+        eval "$_parallel_prev_term_trap"
+    else
+        trap - TERM
+    fi
+}
+
+# Block until fewer than $1 background workers are still alive. Prunes dead PIDs
+# from _PARALLEL_BG_PIDS as it goes (dead PIDs need no teardown). bash 3.2 has no
+# `wait -n`, so poll with kill -0.
+_parallel_throttle() {
+    local max="$1"
+    local p alive
+    local still
+    while true; do
+        alive=0
+        still=()
+        for p in "${_PARALLEL_BG_PIDS[@]}"; do
+            if kill -0 "$p" 2>/dev/null; then
+                still+=("$p")
+                alive=$((alive + 1))
+            fi
+        done
+        _PARALLEL_BG_PIDS=("${still[@]}")
+        [[ $alive -lt $max ]] && break
+        sleep 0.3
+    done
+}
+
+# Background monitor for the swiftDialog reporter. Watches the completion sentinel
+# file and pushes progress + progresstext commands to the dialog command file.
+# Writes the swiftDialog command protocol directly (echo ... >> file), so it has
+# no dependency on the msp-toolkit dialog_command helper.
+_parallel_dialog_monitor() {
+    local total="$1" dlog="$2" completed_file="$3" title="$4"
+    local done_count=0
+    while true; do
+        if [[ -f "$completed_file" ]]; then
+            done_count=$(grep -c . "$completed_file" 2>/dev/null)
+            [[ "$done_count" =~ ^[0-9]+$ ]] || done_count=0
+        fi
+        echo "progress: $(( done_count * 100 / total ))" >> "$dlog"
+        echo "progresstext: ${title} (${done_count} of ${total} complete)" >> "$dlog"
+        [[ $done_count -ge $total ]] && break
+        sleep 0.5
+    done
+}
+
+# run_parallel_jobs — launch a set of independent jobs concurrently.
+#
+# Flags:
+#   --job <token>          repeatable; opaque string passed to the worker
+#   --worker <fn>          required; shell function name, called: <fn> <token> <idx>
+#   --log-dir <dir>        required; holds per-job logs and sentinel files
+#   --label-fn <fn>        optional; maps a token to a short label
+#                          (default: parallel_instance_shortname)
+#   --max-concurrent <n>   optional; default 8
+#   --reporter <mode>      optional; terminal | dialog | none (default terminal)
+#   --dialog-log <file>    required when --reporter dialog; swiftDialog command file
+#   --title <text>         optional; progress title for the dialog reporter
+#
+# The worker's exit code becomes the job status. Worker stdout/stderr go to the
+# job's log file. Results are returned via globals:
+#   PARALLEL_PASS_LABELS[]  labels of jobs that exited 0
+#   PARALLEL_FAIL_LABELS[]  labels of jobs that exited non-zero
+#   PARALLEL_JOB_STATUS[idx] exit code per job index
+# Returns 0 if every job passed, 1 otherwise.
+run_parallel_jobs() {
+    local worker="" log_dir="" label_fn="parallel_instance_shortname"
+    local max_concurrent=8 reporter="terminal" dialog_log="" title="Processing"
+    local jobs=()
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        --job) shift; jobs+=("$1") ;;
+        --worker) shift; worker="$1" ;;
+        --log-dir) shift; log_dir="$1" ;;
+        --label-fn) shift; label_fn="$1" ;;
+        --max-concurrent) shift; max_concurrent="$1" ;;
+        --reporter) shift; reporter="$1" ;;
+        --dialog-log) shift; dialog_log="$1" ;;
+        --title) shift; title="$1" ;;
+        *) echo "run_parallel_jobs: unknown argument '$1'" >&2; return 2 ;;
+        esac
+        shift
+    done
+
+    if [[ -z "$worker" ]]; then
+        echo "run_parallel_jobs: --worker is required" >&2; return 2
+    fi
+    if [[ -z "$log_dir" ]]; then
+        echo "run_parallel_jobs: --log-dir is required" >&2; return 2
+    fi
+    if ! [[ "$max_concurrent" =~ ^[0-9]+$ ]] || [[ "$max_concurrent" -lt 1 ]]; then
+        max_concurrent=8
+    fi
+    mkdir -p "$log_dir"
+
+    PARALLEL_PASS_LABELS=()
+    PARALLEL_FAIL_LABELS=()
+    PARALLEL_JOB_STATUS=()
+
+    local total=${#jobs[@]}
+    if [[ $total -eq 0 ]]; then
+        return 0
+    fi
+
+    local completed_file="${log_dir}/.parallel_completed"
+    : > "$completed_file"
+
+    # Reset teardown state and install the interrupt handler, saving any existing
+    # INT/TERM traps so they can be restored on normal completion.
+    _PARALLEL_BG_PIDS=()
+    _PARALLEL_TAIL_PID=""
+    _PARALLEL_MONITOR_PID=""
+    _parallel_prev_int_trap=$(trap -p INT)
+    _parallel_prev_term_trap=$(trap -p TERM)
+    trap _parallel_terminate INT TERM
+
+    local job_pids=()
+    local job_logs=()
+    local job_labels=()
+    local idx token label log_file status_file
+
+    for (( idx = 0; idx < total; idx++ )); do
+        token="${jobs[$idx]}"
+        label=$("$label_fn" "$token")
+        job_labels[$idx]="$label"
+        log_file="${log_dir}/.parallel_${idx}_${label}.log"
+        status_file="${log_dir}/.parallel_${idx}.status"
+        job_logs[$idx]="$log_file"
+        : > "$log_file"
+        rm -f "$status_file"
+
+        # Block until a concurrency slot frees up before launching the next job.
+        _parallel_throttle "$max_concurrent"
+
+        (
+            "$worker" "$token" "$idx"
+            rc=$?
+            echo "$rc" > "$status_file"
+            # Record completion (pass or fail) for the progress reporter.
+            printf '%s\n' "$label" >> "$completed_file"
+            exit "$rc"
+        ) > "$log_file" 2>&1 &
+
+        job_pids[$idx]="$!"
+        _PARALLEL_BG_PIDS+=("$!")
+    done
+
+    # Start the chosen progress reporter.
+    if [[ "$reporter" == "terminal" ]]; then
+        echo
+        echo "   [run_parallel_jobs] Live progress (streams below as jobs run):"
+        echo
+        tail -n +1 -f "${job_logs[@]}" &
+        _PARALLEL_TAIL_PID=$!
+    elif [[ "$reporter" == "dialog" && -n "$dialog_log" ]]; then
+        _parallel_dialog_monitor "$total" "$dialog_log" "$completed_file" "$title" &
+        _PARALLEL_MONITOR_PID=$!
+    fi
+
+    # Wait for every worker to finish (by recorded PID, in launch order).
+    for (( idx = 0; idx < total; idx++ )); do
+        local pid="${job_pids[$idx]:-}"
+        [[ -n "$pid" ]] && wait "$pid" 2>/dev/null
+    done
+
+    # Stop the reporters.
+    if [[ -n "$_PARALLEL_TAIL_PID" ]]; then
+        sleep 1  # allow tail to flush the final lines
+        kill "$_PARALLEL_TAIL_PID" 2>/dev/null
+        wait "$_PARALLEL_TAIL_PID" 2>/dev/null
+    fi
+    if [[ -n "$_PARALLEL_MONITOR_PID" ]]; then
+        kill "$_PARALLEL_MONITOR_PID" 2>/dev/null
+        wait "$_PARALLEL_MONITOR_PID" 2>/dev/null
+    fi
+
+    # Collect per-job results from the status sentinels.
+    local overall=0 rc
+    for (( idx = 0; idx < total; idx++ )); do
+        status_file="${log_dir}/.parallel_${idx}.status"
+        rc=$(cat "$status_file" 2>/dev/null)
+        [[ "$rc" =~ ^[0-9]+$ ]] || rc=1
+        PARALLEL_JOB_STATUS[$idx]="$rc"
+        if [[ "$rc" -eq 0 ]]; then
+            PARALLEL_PASS_LABELS+=("${job_labels[$idx]}")
+        else
+            PARALLEL_FAIL_LABELS+=("${job_labels[$idx]}")
+            overall=1
+        fi
+    done
+
+    _parallel_restore_traps
+    return $overall
+}
+
+# run_autopkg_parallel — convenience wrapper: run ONE recipe across many instances
+# concurrently. Builds the job list and worker for you and calls run_parallel_jobs.
+#
+# Flags:
+#   --recipe <id>          required; recipe identifier or path
+#   --instance <url>       repeatable; the instances to run against
+#   --key "KEY=value"      repeatable; --key passed to every run
+#   --id <client-id/user>  optional; passed to autopkg-run.sh as --user
+#   --verbosity <-v...>    optional; verbosity flag passed to autopkg-run.sh
+#   --log-dir <dir>        required; per-instance logs and sentinels
+#   --max-concurrent <n>   optional; default 8
+#   --reporter <mode>      optional; terminal | dialog | none (default terminal)
+#   --dialog-log <file>    required when --reporter dialog
+#   --title <text>         optional; progress title for the dialog reporter
+#
+# Results come back in the same globals as run_parallel_jobs, with labels being
+# instance shortnames.
+run_autopkg_parallel() {
+    _AP_RECIPE=""
+    _AP_KEYS=()
+    _AP_ID=""
+    _AP_VERBOSITY=""
+    local instances=()
+    local log_dir="" max_concurrent=8 reporter="terminal" dialog_log="" title="Processing instances"
+
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
+        --recipe) shift; _AP_RECIPE="$1" ;;
+        --instance) shift; instances+=("$1") ;;
+        --key) shift; _AP_KEYS+=("$1") ;;
+        --id | --client-id | --user | --username) shift; _AP_ID="$1" ;;
+        --verbosity) shift; _AP_VERBOSITY="$1" ;;
+        --log-dir) shift; log_dir="$1" ;;
+        --max-concurrent) shift; max_concurrent="$1" ;;
+        --reporter) shift; reporter="$1" ;;
+        --dialog-log) shift; dialog_log="$1" ;;
+        --title) shift; title="$1" ;;
+        *) echo "run_autopkg_parallel: unknown argument '$1'" >&2; return 2 ;;
+        esac
+        shift
+    done
+
+    if [[ -z "$_AP_RECIPE" ]]; then
+        echo "run_autopkg_parallel: --recipe is required" >&2; return 2
+    fi
+    if [[ ${#instances[@]} -eq 0 ]]; then
+        echo "run_autopkg_parallel: at least one --instance is required" >&2; return 2
+    fi
+
+    # Build the run_parallel_jobs argument list.
+    local rpj_args=(--worker _run_autopkg_worker --log-dir "$log_dir"
+        --max-concurrent "$max_concurrent" --reporter "$reporter" --title "$title")
+    [[ -n "$dialog_log" ]] && rpj_args+=(--dialog-log "$dialog_log")
+    local url
+    for url in "${instances[@]}"; do
+        rpj_args+=(--job "$url")
+    done
+
+    run_parallel_jobs "${rpj_args[@]}"
+}
+
+# Worker used by run_autopkg_parallel. Reads recipe/keys/id/verbosity from the
+# _AP_* globals (a backgrounded subshell inherits them at fork time). autopkg-run.sh
+# performs its own per-instance credential lookup, so no set_credentials here.
+_run_autopkg_worker() {
+    local instance="$1"
+    local args=(-r "$_AP_RECIPE" --instance "$instance" --nointeraction)
+    [[ -n "$_AP_ID" ]] && args+=(--user "$_AP_ID")
+    local k
+    for k in "${_AP_KEYS[@]}"; do
+        args+=(--key "$k")
+    done
+    [[ -n "$_AP_VERBOSITY" ]] && args+=("$_AP_VERBOSITY")
+    "$this_script_dir/autopkg-run.sh" "${args[@]}"
+}
