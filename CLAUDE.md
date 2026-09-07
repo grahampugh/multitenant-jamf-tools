@@ -33,6 +33,16 @@ source "$DIR/_common-framework.sh"
 
 `_common-framework.sh` (~84KB) provides credential management, instance list discovery and selection, bearer token handling, curl request wrappers with retry logic, paginated Jamf Pro API requests, Slack webhook integration, and URL normalization. New scripts must source this file rather than re-implementing these functions.
 
+### Parallel Job Runner (reuse before hand-rolling `&`)
+
+`_common-framework.sh` provides a generic, bash-3.2-safe parallel runner. Use it instead of writing per-script background-job/`wait`/`tail -f` loops. Because msp-toolkit tools source this framework via `source_mjt_repo`, these functions are available to msp-toolkit `.command` tools too.
+
+- **`run_autopkg_parallel`** — run ONE recipe across many instances concurrently. Flags: `--recipe <id>`, `--instance <url>` (repeatable), `--key "K=V"` (repeatable, applied to every run), `--id <client-id/user>`, `--verbosity <-v...>`, `--log-dir <dir>` (required), `--max-concurrent <n>` (default 8), `--reporter terminal|dialog|none`, `--dialog-log <file>` (swiftDialog command file, for `--reporter dialog`), `--title <text>`. autopkg-run.sh does its own per-instance credential lookup, so no `set_credentials` is needed.
+- **`run_parallel_jobs`** — generic core for anything else (multi-step per-instance pipelines, N recipes on one instance, etc.). Supply `--job <token>` (repeatable, opaque string) + `--worker <fn>` (called as `<fn> <token> <idx>`, stdout/stderr captured to a per-job log). Same `--log-dir`/`--max-concurrent`/`--reporter`/`--label-fn` options.
+- Both return results in globals: `PARALLEL_PASS_LABELS[]`, `PARALLEL_FAIL_LABELS[]`, `PARALLEL_JOB_STATUS[idx]` (exit code per job, in launch order); return code is 0 only if every job passed.
+- Handles concurrency throttling (poll-based; bash 3.2 has no `wait -n`), completion sentinels, and a `kill_tree` INT/TERM teardown trap that restores any pre-existing traps.
+- Reference callers: `managed-device-counter.command` (msp-toolkit, dialog reporter); the `_Playground/jamf-auto-update-titles-batch-update.sh` pattern is what this generalises.
+
 ### Key Scripts
 
 - **`jocads.sh`** — Copy/delete API objects between instances (source → one or many destinations); handles policies, computer and mobile device groups, scripts, packages, computer and mobile device configuration profiles, EAs, categories, icons, computer and mobile device App Store apps, computer and mobile device advanced searches.
