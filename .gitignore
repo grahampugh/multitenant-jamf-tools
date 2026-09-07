@@ -11,3 +11,4 @@ instance-lists/*.json
 exclusion-lists/*.txt
 platform-api-instance-lists/*.txt
 **/.DS_Store
+session-summary.md
