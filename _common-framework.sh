@@ -2396,6 +2396,9 @@ run_parallel_jobs() {
 #   --key "KEY=value"      repeatable; --key passed to every run
 #   --id <client-id/user>  optional; passed to autopkg-run.sh as --user
 #   --verbosity <-v...>    optional; verbosity flag passed to autopkg-run.sh
+#   --no-smb               optional; skip the distribution point (SMB) lookup in
+#                          autopkg-run.sh. Safe for recipes with no package upload
+#                          step (e.g. read-only object/inventory recipes) and faster.
 #   --log-dir <dir>        required; per-instance logs and sentinels
 #   --max-concurrent <n>   optional; default 8
 #   --reporter <mode>      optional; terminal | dialog | none (default terminal)
@@ -2409,6 +2412,7 @@ run_autopkg_parallel() {
     _AP_KEYS=()
     _AP_ID=""
     _AP_VERBOSITY=""
+    _AP_NO_SMB=""
     local instances=()
     local log_dir="" max_concurrent=8 reporter="terminal" dialog_log="" title="Processing instances"
 
@@ -2419,6 +2423,7 @@ run_autopkg_parallel() {
         --key) shift; _AP_KEYS+=("$1") ;;
         --id | --client-id | --user | --username) shift; _AP_ID="$1" ;;
         --verbosity) shift; _AP_VERBOSITY="$1" ;;
+        --no-smb) _AP_NO_SMB=1 ;;
         --log-dir) shift; log_dir="$1" ;;
         --max-concurrent) shift; max_concurrent="$1" ;;
         --reporter) shift; reporter="$1" ;;
@@ -2455,10 +2460,23 @@ _run_autopkg_worker() {
     local instance="$1"
     local args=(-r "$_AP_RECIPE" --instance "$instance" --nointeraction)
     [[ -n "$_AP_ID" ]] && args+=(--user "$_AP_ID")
-    local k
+    local k caller_set_cache_dir=""
     for k in "${_AP_KEYS[@]}"; do
         args+=(--key "$k")
+        [[ "$k" == RECIPE_CACHE_DIR=* ]] && caller_set_cache_dir=1
     done
+    # Every instance runs the SAME recipe, so autopkg computes the SAME default
+    # RECIPE_CACHE_DIR for all of them. Concurrent runs then race on autopkg's
+    # check-then-makedirs of that shared directory, and whichever workers lose
+    # the race die with "[Errno 17] File exists". Give each instance its own
+    # cache dir (unique leaf keyed by instance shortname) so there is no shared
+    # path to race on. Skip if the caller already supplied a RECIPE_CACHE_DIR.
+    if [[ -z "$caller_set_cache_dir" ]]; then
+        local short
+        short=$(parallel_instance_shortname "$instance")
+        args+=(--key "RECIPE_CACHE_DIR=${HOME}/Library/AutoPkg/Cache/${_AP_RECIPE}/parallel-${short}")
+    fi
+    [[ -n "$_AP_NO_SMB" ]] && args+=(--no-smb)
     [[ -n "$_AP_VERBOSITY" ]] && args+=("$_AP_VERBOSITY")
     "$this_script_dir/autopkg-run.sh" "${args[@]}"
 }

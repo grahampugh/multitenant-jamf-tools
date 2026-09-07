@@ -77,6 +77,9 @@ Usage:
 -p | --replace                     - Replace existing pkg in Jamf Pro (for pkg uploads)
 --dry-run                          - Run the processor in dry run mode.
                                      No changes will be made to the Jamf Pro server.
+--no-smb | --skip-dp               - Skip the distribution point (SMB share) lookup.
+                                     Use for recipes with no package upload step to
+                                     speed up the run.
 --analyse                          - Analyse a recipe and show its Input keys, indicating
                                      which are required or optional. Does not run the recipe.
 --show-all                         - When used with --analyse, also show Other Input keys
@@ -255,8 +258,16 @@ run_autopkg() {
     # echo verbosity
     echo "AutoPkg verbosity mode: $verbosity_mode"
 
-    # determine the share
-    get_instance_distribution_point
+    # determine the share (unless the caller has opted out). Looking up the
+    # distribution point is only needed for recipes that upload a package
+    # (JamfPackageUploader/SMB_URL). Tools that know no package upload is
+    # involved can pass --no-smb to skip this lookup for speed.
+    if [[ $skip_smb -eq 1 ]]; then
+        echo "Skipping distribution point lookup (--no-smb)"
+        smb_url=""
+    else
+        get_instance_distribution_point
+    fi
     if [[ "$smb_url" ]]; then
         autopkg_run_options+=("--key")
         autopkg_run_options+=("SMB_URL=$smb_url")
@@ -428,6 +439,9 @@ while [[ "$#" -gt 0 ]]; do
             ;;
         --dry-run)
             dry_run=1
+            ;;
+        --no-smb|--skip-dp)
+            skip_smb=1
             ;;
         --analyse|--analyze)
             analyse_mode=1
