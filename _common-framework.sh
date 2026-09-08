@@ -2154,6 +2154,9 @@ _parallel_terminate() {
     for pid in "${_PARALLEL_BG_PIDS[@]}"; do
         [[ -n "$pid" ]] && kill_tree "$pid" TERM
     done
+    # Stop the tail supervisor loop relaunching, then kill it (its EXIT trap
+    # kills the live tail child).
+    [[ -n "${_PARALLEL_TAIL_STOP:-}" ]] && : > "$_PARALLEL_TAIL_STOP" 2>/dev/null
     [[ -n "${_PARALLEL_TAIL_PID:-}" ]] && kill "$_PARALLEL_TAIL_PID" 2>/dev/null
     [[ -n "${_PARALLEL_MONITOR_PID:-}" ]] && kill "$_PARALLEL_MONITOR_PID" 2>/dev/null
     sleep 1  # give children a moment, then escalate any survivors
@@ -2287,6 +2290,7 @@ run_parallel_jobs() {
     # INT/TERM traps so they can be restored on normal completion.
     _PARALLEL_BG_PIDS=()
     _PARALLEL_TAIL_PID=""
+    _PARALLEL_TAIL_STOP=""
     _PARALLEL_MONITOR_PID=""
     _parallel_prev_int_trap=$(trap -p INT)
     _parallel_prev_term_trap=$(trap -p TERM)
@@ -2313,14 +2317,35 @@ run_parallel_jobs() {
         rm -f "$status_file"
     done
 
-    # Start the chosen progress reporter (all log files now exist, so tail -f can
+    # Start the chosen progress reporter (all log files now exist, so tail -F can
     # attach to every one without a race, and the dialog monitor's sentinel poll
     # sees completions as they happen).
     if [[ "$reporter" == "terminal" ]]; then
         echo
         echo "   [run_parallel_jobs] Live progress (streams below as jobs run):"
         echo
-        tail -n +1 -f "${job_logs[@]}" &
+        # Use a supervised tail so terminal visibility survives the whole run.
+        # Two failure modes made the old single `tail -f` the sole point of
+        # failure: (1) `-f` follows the open descriptor and can silently stop
+        # emitting if a log is truncated/rotated; `-F` re-opens by name and keeps
+        # going. (2) A one-off tail death (SIGPIPE, a sleep/wake tty hiccup) used
+        # to black out all output while long jobs kept writing — so we run tail
+        # inside a loop that relaunches it until asked to stop. A relaunch may
+        # re-dump a log from the top (harmless duplication, and rare); silence
+        # would be far worse.
+        _PARALLEL_TAIL_STOP="${log_dir}/.parallel_tail_stop"
+        rm -f "$_PARALLEL_TAIL_STOP"
+        (
+            tail_child=""
+            trap 'kill "$tail_child" 2>/dev/null' EXIT TERM
+            while [[ ! -f "$_PARALLEL_TAIL_STOP" ]]; do
+                tail -n +1 -F "${job_logs[@]}" &
+                tail_child=$!
+                wait "$tail_child"
+                [[ -f "$_PARALLEL_TAIL_STOP" ]] && break
+                sleep 1
+            done
+        ) &
         _PARALLEL_TAIL_PID=$!
     elif [[ "$reporter" == "dialog" && -n "$dialog_log" ]]; then
         _parallel_dialog_monitor "$total" "$dialog_log" "$completed_file" "$title" &
@@ -2360,8 +2385,12 @@ run_parallel_jobs() {
     # Stop the reporters.
     if [[ -n "$_PARALLEL_TAIL_PID" ]]; then
         sleep 1  # allow tail to flush the final lines
+        # Signal the supervisor loop to stop relaunching, then kill it; its EXIT
+        # trap kills the live tail child.
+        [[ -n "$_PARALLEL_TAIL_STOP" ]] && : > "$_PARALLEL_TAIL_STOP"
         kill "$_PARALLEL_TAIL_PID" 2>/dev/null
         wait "$_PARALLEL_TAIL_PID" 2>/dev/null
+        [[ -n "$_PARALLEL_TAIL_STOP" ]] && rm -f "$_PARALLEL_TAIL_STOP"
     fi
     if [[ -n "$_PARALLEL_MONITOR_PID" ]]; then
         kill "$_PARALLEL_MONITOR_PID" 2>/dev/null
