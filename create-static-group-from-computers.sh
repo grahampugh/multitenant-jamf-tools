@@ -109,17 +109,30 @@ is_mobile_device_type() {
     esac
 }
 
+xml_escape() {
+    local s="$1"
+    s="${s//&/&amp;}"
+    s="${s//</&lt;}"
+    s="${s//>/&gt;}"
+    s="${s//\"/&quot;}"
+    s="${s//\'/&apos;}"
+    echo "$s"
+}
+
 create_static_group_xml() {
     local group_name="$1"
     local device_ids_string="$2"
     local output_file="$3"
     local is_mobile_device="$4"
 
+    local escaped_group_name
+    escaped_group_name=$(xml_escape "$group_name")
+
     if [[ "$is_mobile_device" == "true" ]]; then
         cat > "$output_file" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <mobile_device_group>
-    <name>$group_name</name>
+    <name>$escaped_group_name</name>
     <is_smart>false</is_smart>
     <mobile_devices>
 EOF
@@ -142,7 +155,7 @@ EOF
         cat > "$output_file" <<EOF
 <?xml version="1.0" encoding="UTF-8"?>
 <computer_group>
-    <name>$group_name</name>
+    <name>$escaped_group_name</name>
     <is_smart>false</is_smart>
     <computers>
 EOF
@@ -230,8 +243,10 @@ create_object_scope_xml() {
     fi
     # Add new target group if specified
     if [[ -n "$target_group_name" ]]; then
+        local escaped_target_group_name
+        escaped_target_group_name=$(xml_escape "$target_group_name")
         echo "            <$device_group_element>" >> "$output_file"
-        echo "                <name>$target_group_name</name>" >> "$output_file"
+        echo "                <name>$escaped_target_group_name</name>" >> "$output_file"
         echo "            </$device_group_element>" >> "$output_file"
     fi
     echo "        </$device_groups_element>" >> "$output_file"
@@ -270,8 +285,10 @@ create_object_scope_xml() {
     fi
     # Add new exclusion group if specified
     if [[ -n "$exclusion_group_name" ]]; then
+        local escaped_exclusion_group_name
+        escaped_exclusion_group_name=$(xml_escape "$exclusion_group_name")
         echo "                <$device_group_element>" >> "$output_file"
-        echo "                    <name>$exclusion_group_name</name>" >> "$output_file"
+        echo "                    <name>$escaped_exclusion_group_name</name>" >> "$output_file"
         echo "                </$device_group_element>" >> "$output_file"
     fi
     echo "            </$device_groups_element>" >> "$output_file"
@@ -557,8 +574,12 @@ process_objects() {
     echo "Step 2: Analyzing ${object_type_plural} for individually scoped computers..."
     
     # Find all object files for this instance
-    object_files=("$output_dir/$subdomain-${object_type_plural}-"*.xml)
-    
+    if [[ -n "$OBJECT_NAME" ]]; then
+        object_files=("$output_dir/$subdomain-${object_type_plural}-${OBJECT_NAME}.xml")
+    else
+        object_files=("$output_dir/$subdomain-${object_type_plural}-"*.xml)
+    fi
+
     if [[ ! -e "${object_files[0]}" ]]; then
         echo "No policy files found for $subdomain"
         return 0
