@@ -47,20 +47,10 @@ A script for counting managed and unmanaged devices and computers on one or more
 -x | --nointeraction               - run without checking instance is in an instance list 
                                      (prevents interactive mode)
 --user | --client-id CLIENT_ID     - use the specified client ID or username
--v | --verbose                     - add verbose curl output
+-v | --verbose                     - add verbose AutoPkg output
 -h | --help                        - Show this help message
 
 USAGE
-}
-
-get_computer_count() {
-    # determine jss_url
-    jss_url="${jss_instance}"
-    # send request
-    curl_url="$jss_url/api/v1/inventory-information"
-    curl_args=("--header")
-    curl_args+=("Accept: application/json")
-    send_curl_request
 }
 
 if [[ ! -d "${this_script_dir}" ]]; then
@@ -165,45 +155,61 @@ echo
 echo "Building List..."
 echo
 
-instance_count=0
+# create a temporary output directory for the parallel inventory runs
+parallel_output_dir=$(mktemp -d /tmp/managed-device-counter.XXXXXX)
+
+# Run the inventory-information recipe against every selected instance in
+# parallel. autopkg-run.sh handles credentials per instance and writes
+# "<subdomain>-inventory-information.json" per instance into parallel_output_dir
+# (distinct filenames, no collision). run_autopkg_parallel is defined in
+# _common-framework.sh and throttles concurrency (default 8). The terminal
+# reporter streams each instance's log live as it runs.
+ap_args=(
+    --recipe "multitenant-jamf-tools.jamf.DownloadInventoryInformation"
+    --key "OUTPUT_DIR=${parallel_output_dir}"
+    --log-dir "${parallel_output_dir}/parallel-logs"
+    --reporter terminal
+    --no-smb
+)
+[[ "$chosen_id" ]] && ap_args+=(--id "$chosen_id")
+[[ "$verbose" ]] && ap_args+=(--verbosity "-v")
 for jss_instance in "${instance_choice_array[@]}"; do
+    ap_args+=(--instance "$jss_instance")
+done
+
+run_autopkg_parallel "${ap_args[@]}"
+
+# Accumulate per-instance results. PARALLEL_JOB_STATUS[$idx] holds the exit code
+# for instance_choice_array[$idx] (the runner preserves --instance order).
+instance_count=0
+failed_count=0
+for idx in "${!instance_choice_array[@]}"; do
+    jss_instance="${instance_choice_array[$idx]}"
     ((instance_count++))
-    # get token
-    if [[ "$chosen_id" ]]; then
-        set_credentials "$jss_instance" "$chosen_id"
-        echo "   [request] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+
+    subdomain=$(echo "$jss_instance" | sed -E 's~https?://([^./]+)\..*~\1~')
+    inventory_file="${parallel_output_dir}/${subdomain}-inventory-information.json"
+
+    if [[ "${PARALLEL_JOB_STATUS[$idx]:-1}" -ne 0 || ! -f "$inventory_file" ]]; then
+        echo "   [error] inventory run failed or output missing for $jss_instance"
+        ((failed_count++))
+        # mark the row as unread rather than reporting a misleading 0, and do
+        # not fold it into the totals
+        managed_computers="-"
+        unmanaged_computers="-"
+        managed_devices="-"
+        unmanaged_devices="-"
     else
-        set_credentials "$jss_instance"
-        echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
+        managed_computers=$(/usr/bin/plutil -extract managedComputers raw -o - "$inventory_file" 2>/dev/null || echo 0)
+        unmanaged_computers=$(/usr/bin/plutil -extract unmanagedComputers raw -o - "$inventory_file" 2>/dev/null || echo 0)
+        managed_devices=$(/usr/bin/plutil -extract managedDevices raw -o - "$inventory_file" 2>/dev/null || echo 0)
+        unmanaged_devices=$(/usr/bin/plutil -extract unmanagedDevices raw -o - "$inventory_file" 2>/dev/null || echo 0)
+
+        total_managed_computers=$((total_managed_computers + managed_computers))
+        total_unmanaged_computers=$((total_unmanaged_computers + unmanaged_computers))
+        total_managed_devices=$((total_managed_devices + managed_devices))
+        total_unmanaged_devices=$((total_unmanaged_devices + unmanaged_devices))
     fi
-
-    get_computer_count
-    # cat "$curl_output_file"  # TEMP
-    managed_computers=0
-    unmanaged_computers=0
-    managed_devices=0
-    unmanaged_devices=0
-    while read -r line ; do
-        if [[ $line == *"unmanagedComputers"* ]]; then
-            unmanaged_computers=$( grep "unmanagedComputers" <<< "$line" | cut -d' ' -f3 | cut -d, -f1 )
-        elif [[ $line == *"managedComputers"* ]]; then
-            managed_computers=$( grep "managedComputers" <<< "$line" | cut -d' ' -f3 | cut -d, -f1 )
-        elif [[ $line == *"unmanagedDevices"* ]]; then
-            unmanaged_devices=$( grep "unmanagedDevices" <<< "$line" | cut -d' ' -f3 | cut -d, -f1 )
-        elif [[ $line == *"managedDevices"* ]]; then
-            managed_devices=$( grep "managedDevices" <<< "$line" | cut -d' ' -f3 | cut -d, -f1 )
-        fi
-    done < "$curl_output_file"
-
-    # echo $unmanaged_computers
-    # echo $managed_computers
-    # echo $unmanaged_devices
-    # echo $managed_devices
-
-    total_managed_computers=$((total_managed_computers + managed_computers))
-    total_unmanaged_computers=$((total_unmanaged_computers + unmanaged_computers))
-    total_managed_devices=$((total_managed_devices + managed_devices))
-    total_unmanaged_devices=$((total_unmanaged_devices + unmanaged_devices))
 
     # Anonymous output
     [[ $anonymous ]] && instance_show="$instance_count" || instance_show="$jss_instance"
@@ -215,15 +221,22 @@ for jss_instance in "${instance_choice_array[@]}"; do
     "$instance_show" "$managed_computers" "$unmanaged_computers" "$managed_devices" "$unmanaged_devices" >> "$output_file"
 done
 
+# clean up the temporary inventory output
+rm -rf "$parallel_output_dir"
+
 # summary for csv
-echo "Sum of $instance_count contexts,$total_managed_computers,$total_unmanaged_computers,$total_managed_devices,$total_unmanaged_devices" >> "$output_csv"
+echo "Sum of $((instance_count - failed_count)) contexts,$total_managed_computers,$total_unmanaged_computers,$total_managed_devices,$total_unmanaged_devices" >> "$output_csv"
 # summary for text file
 (
     echo "-------------------------------------------------------------------------------------"
     printf "Total: Contexts: %-28s %+8s %+10s %+8s %+10s\n" \
-    "$instance_count" "$total_managed_computers" "$total_unmanaged_computers" "$total_managed_devices" "$total_unmanaged_devices"
+    "$((instance_count - failed_count))" "$total_managed_computers" "$total_unmanaged_computers" "$total_managed_devices" "$total_unmanaged_devices"
     echo "-------------------------------------------------------------------------------------"
     echo
+    if [[ "$failed_count" -gt 0 ]]; then
+        echo "Note: $failed_count of $instance_count context(s) could not be read (shown as '-') and are excluded from the totals."
+        echo
+    fi
 ) >> "$output_file"
 
 # now echo the file

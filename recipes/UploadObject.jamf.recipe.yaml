@@ -1,0 +1,20 @@
+Description: Creates an object using a template and supplied payload
+Comment: |
+  Requires:
+  - OBJECT_NAME
+  - OBJECT_TYPE
+  - OBJECT_TEMPLATE
+
+Identifier: multitenant-jamf-tools.jamf.UploadObject
+MinimumVersion: "2.3"
+
+Input:
+  REPLACE_OBJECT: "True"
+
+Process:
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectUploader
+    Arguments:
+      object_name: "%OBJECT_NAME%"
+      object_type: "%OBJECT_TYPE%"
+      object_template: "%OBJECT_TEMPLATE%"
+      replace_object: "%REPLACE_OBJECT%"

@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # --------------------------------------------------------------------------------
-# A wrapper script for running the jamf-upload.sh script
+# A wrapper script for running jamf-cli using credentials saved in the Keychain
 # --------------------------------------------------------------------------------
 
 # set instance list type
@@ -30,14 +30,12 @@ fi
 usage() {
     echo "
 
-# JamfUploader-Run
-A script for uploading items to a Jamf Pro instance using the AutoPkg framework and JamfUploader processors, without having to write AutoPkg recipes. 
+# Jamf-CLI-Run
+A script for performing actions using the Jamf-CLI tool, with credentials saved in the Keychain.
 
 # Requirements
-- AutoPkg must be installed and configured
-- JamfUploader processors must be available (e.g. by running 'autopkg repo-add grahampugh/jamf-upload')
-- Credentials for the Jamf Pro instance must be set in the AutoPkg preferences or in the Keychain (the script will prompt you to run the set_credentials.sh script if not found)
-- The jamf-upload.sh script must be available (the script will look for it in ~/Library/AutoPkg/RecipeRepos/com.github.grahampugh.jamf-upload/jamf-upload.sh or in ../jamf-upload/jamf-upload.sh)
+- jamf-cli must be installed, configured, and be in the path
+- Credentials for the Jamf Pro instance must be set in the Keychain (the script will prompt you to run the set_credentials.sh script if not found)
 
 # Usage
 UPLOADTYPE                         - type of upload (e.g. pkg, policy, script, etc. 
@@ -51,23 +49,16 @@ UPLOADTYPE                         - type of upload (e.g. pkg, policy, script, e
 -x | --nointeraction               - run without checking instance is in an instance list 
                                      (prevents interactive mode)
 --user | --client-id CLIENT_ID     - use the specified client ID or username
---dp                               - filter fileshare distribution points on DP name
 --prefs <path>                     - Inherit AutoPkg prefs file provided by the full path to the file
--v[vvv]                            - Set value of verbosity (default is -v)
--q                                 - Quiet mode (verbosity 0)
--j <path>                          - Alternative path to jamf-upload.sh script 
-                                     (default is ~/Library/AutoPkg/RecipeRepos/
-                                     com.github.grahampugh.jamf-upload/jamf-upload.sh)
-                                     (if not found, will look in ../jamf-upload/jamf-upload.sh)
+-v[vv]                             - Set value of verbosity (default is not verbose)
+-j <path>                          - Alternative path to jamf-cli
 -h | --help                        - Show this help message
---[args]                           - Pass through required arguments for jamf-upload.sh. 
+[args]                             - Pass through required arguments for jamf-upload.sh. 
 
 Scroll up for a full list of valid arguments.
 
 # Notes
 Credentials set in the AutoPkg preferences file will be used if they exist. If not, the keychain will be used. If there is no keychain entry, the script will prompt for you to run the set_credentials.sh script.
-
-The --dp argument can be bypassed by setting the environment variable 'dp_url_filter' to the desired value in the AutoPkg preferences.
 "
 }
 
@@ -75,14 +66,13 @@ The --dp argument can be bypassed by setting the environment variable 'dp_url_fi
 # MAIN
 # --------------------------------------------------------------------------------
 
-if [[ ! -f "$jamf_upload_path" ]]; then
-    # default path to jamf-upload.sh
-    jamf_upload_path="$HOME/Library/AutoPkg/RecipeRepos/com.github.grahampugh.jamf-upload/jamf-upload.sh"
+if [[ ! -f "$jamf_cli_path" ]]; then
+    # default path to jamf-cli
+    jamf_cli_path=$(which jamf-cli)
 fi
 # ensure the path exists, revert to defaults otherwise
 if [[ ! -f "$jamf_upload_path" ]]; then
     cd "$(dirname "${BASH_SOURCE[0]}")" || exit
-    jamf_upload_path="../jamf-upload/jamf-upload.sh"
 fi
 
 # get command line args
@@ -108,22 +98,11 @@ while test $# -gt 0; do
     -x | --nointeraction)
         no_interaction=1
         ;;
-    -s | --share)
+    -j | --jamf-cli-path)
         shift
-        smb_url="$1"
-        ;;
-    -d | --dp)
-        shift
-        dp_url_filter="$1"
-        ;;
-    --skip-dp)
-        skip_dp_check=1
-        ;;
-    -j | --jamf-upload-path)
-        shift
-        jamf_upload_path="$1"
-        if [[ ! -f "$jamf_upload_path" ]]; then
-            echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"
+        jamf_cli_path="$1"
+        if [[ ! -f "$jamf_cli_path" ]]; then
+            echo "ERROR: jamf-cli not found. Please ensure jamf-cli is installed and the path is correct."
             exit 1
         fi
         ;;
@@ -135,27 +114,6 @@ while test $# -gt 0; do
             exit 1
         fi
         ;;
-    -q)
-        quiet_mode="yes"
-        ;;
-    -v*)
-        verbosity_mode="$1"
-        ;;
-    --dry-run)
-        dry_run=1
-        ;;
-    -h | --help)
-        echo "Outputting the help sheet for jamf-upload.sh"
-        echo
-        echo "==========================================="
-        echo
-        "$jamf_upload_path" --help
-        echo
-        echo "==========================================="
-        echo
-        usage
-        exit 0
-        ;;
     *)
         args+=("$1")
         ;;
@@ -165,25 +123,34 @@ done
 echo
 
 # fail if no valid path found
-if [[ ! -f "$jamf_upload_path" ]]; then
-    echo "ERROR: jamf-upload.sh not found. Please either run 'autopkg repo-add grahampugh/jamf-upload' or clone the grahampugh/jamf-upload repo to the parent folder of this repo"
+if [[ ! -f "$jamf_cli_path" ]]; then
+    echo "ERROR: jamf-cli not found. Please ensure jamf-cli is installed and the path is correct."
     exit 1
 fi
 
-if [[ ! $verbosity_mode && ! $quiet_mode ]]; then
-    # default verbosity
-    args+=("-v")
-elif [[ ! $quiet_mode ]]; then
-    args+=("$verbosity_mode")
+# requires at least one argument to be passed to jamf-cli
+if [[ ${#args[@]} -eq 0 ]]; then
+    echo "ERROR: No arguments provided. Please provide arguments for jamf-cli."
+    usage
+    exit 1
 fi
 
+# if help, -h or --help is passed, or --profile, or multi, then we bypass the instance selection and run the jamf-cli command with the provided arguments
+raw_output=0
+for arg in "${args[@]}"; do
+    if [[ "$arg" == "help" || "$arg" == "-h" || "$arg" == "--help" || "$arg" == "--profile" || "$arg" == "multi" ]]; then
+        raw_output=1
+        break
+    fi
+done
 
-# option to run in dry run mode
-if [[ $dry_run -eq 1 ]]; then
-    args+=("--dry-run")
+# if help command is passed, output the help sheet for jamf-cli and exit
+if [[ $raw_output -eq 1 ]]; then
+    "$jamf_cli_path" "${args[@]}"
+    exit 0
 fi
 
-echo "This script will run grahampugh/jamf-upload/jamf-upload.sh on the instance(s) you choose."
+echo "This script will run jamf-cli on the instance(s) you choose."
 
 if [[ ${#chosen_instances[@]} -eq 1 ]]; then
     chosen_instance="${chosen_instances[0]}"
@@ -207,8 +174,8 @@ for instance in "${instance_choice_array[@]}"; do
         echo "   [request] Using stored credentials for $jss_instance ($jss_api_user)"
     fi
     echo "Running on $jss_instance..."
-    echo "jamf-upload.sh ${args[*]}"
-    run_jamfupload
+    echo "jamf-cli ${args[*]}"
+    run_jamfcli
 done
 
 echo

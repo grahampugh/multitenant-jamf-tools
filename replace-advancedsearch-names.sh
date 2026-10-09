@@ -1,10 +1,10 @@
 #!/bin/bash
 
 # --------------------------------------------------------------------------------
-# Script for replacing a string within policy names across multiple instances
+# Script for replacing a string within advanced search names across multiple instances
 #
 # USAGE:
-# ./replace-policy-names.sh -o "Old String" -n "New String"
+# ./replace-advancedsearch-names.sh -o "Old String" -n "New String"
 # --------------------------------------------------------------------------------
 
 # --------------------------------------------------------------------------------
@@ -28,7 +28,7 @@ usage() {
     echo "Usage: $0 -o <old_string> -n <new_string> [options]"
     echo ""
     echo "Required:"
-    echo "  -o | --old-string      String to find within policy names"
+    echo "  -o | --old-string      String to find within advanced search names"
     echo "  -n | --new-string      Replacement string"
     echo ""
     echo "Options:"
@@ -49,45 +49,57 @@ run_autopkg() {
     subdomain=$(echo "$jss_instance" | awk -F[/:] '{print $4}' | cut -d'.' -f1)
     output_dir="/Users/Shared/Jamf/JamfUploader"
 
-    # Download the full policy list
-    "$this_script_dir/autopkg-run.sh" \
-        --recipe "$this_script_dir/recipes/DownloadObjectList.jamf.recipe.yaml" \
-        --key "OBJECT_TYPE=policy" \
-        --key "OUTPUT_DIR=$output_dir" \
-        --instance "$jss_instance" \
-        --nointeraction \
-        ${verbosity_mode:+"$verbosity_mode"}
+    # Repeat for advanced computer and mobile device searches
+    for object_type in "advanced_computer_search" "advanced_mobile_device_search"; do
 
-    json_file="$output_dir/$subdomain-policies.json"
-    if [[ ! -f "$json_file" ]]; then
-        echo "No policy list found at $json_file for $jss_instance."
-        return
-    fi
-
-    # Loop through each policy, rename those whose name contains OLD_STRING
-    jq -c '.[]' "$json_file" | while read -r obj; do
-        id=$(echo "$obj" | jq -r '.id')
-        name=$(echo "$obj" | jq -r '.name')
-
-        if [[ "$name" != *"$OLD_STRING"* ]]; then
-            continue
+        if [[ "$object_type" == "advanced_computer_search" ]]; then
+            json_key="advanced_computer_searches"
+            change_recipe="$this_script_dir/recipes/ChangeAdvancedComputerSearchName.jamf.recipe.yaml"
+        else
+            json_key="advanced_mobile_device_searches"
+            change_recipe="$this_script_dir/recipes/ChangeAdvancedMobileDeviceSearchName.jamf.recipe.yaml"
         fi
 
-        new_name="${name//$OLD_STRING/$NEW_STRING}"
-        if [[ "$name" == "$new_name" ]]; then
-            continue
-        fi
-
-        echo "Renaming '$name' -> '$new_name' (ID: $id)"
-        echo "Running: \"$this_script_dir/autopkg-run.sh\" --recipe \"$this_script_dir/recipes/ChangePolicyName.jamf.recipe.yaml\" --instance \"$jss_instance\" --nointeraction --key \"OBJECT_ID=$id\" --key \"NEW_NAME=$new_name\" --replace${verbosity_mode:+ $verbosity_mode}"
+        # Download the full list for this search type
         "$this_script_dir/autopkg-run.sh" \
-            --recipe "$this_script_dir/recipes/ChangePolicyName.jamf.recipe.yaml" \
+            --recipe "$this_script_dir/recipes/DownloadObjectList.jamf.recipe.yaml" \
+            --key "OBJECT_TYPE=$object_type" \
+            --key "OUTPUT_DIR=$output_dir" \
             --instance "$jss_instance" \
             --nointeraction \
-            --key "OBJECT_ID=$id" \
-            --key "NEW_NAME=$new_name" \
-            --replace \
             ${verbosity_mode:+"$verbosity_mode"}
+
+        json_file="$output_dir/$subdomain-$json_key.json"
+        if [[ ! -f "$json_file" ]]; then
+            echo "No $object_type list found at $json_file for $jss_instance."
+            continue
+        fi
+
+        # Loop through each search, rename those whose name contains OLD_STRING
+        jq -c '.[]' "$json_file" | while read -r obj; do
+            id=$(echo "$obj" | jq -r '.id')
+            name=$(echo "$obj" | jq -r '.name')
+
+            if [[ "$name" != *"$OLD_STRING"* ]]; then
+                continue
+            fi
+
+            new_name="${name//$OLD_STRING/$NEW_STRING}"
+            if [[ "$name" == "$new_name" ]]; then
+                continue
+            fi
+
+            echo "Renaming '$name' -> '$new_name' (ID: $id)"
+            echo "Running: \"$this_script_dir/autopkg-run.sh\" --recipe \"$change_recipe\" --instance \"$jss_instance\" --nointeraction --key \"OBJECT_ID=$id\" --key \"NEW_NAME=$new_name\" --replace${verbosity_mode:+ $verbosity_mode}"
+            "$this_script_dir/autopkg-run.sh" \
+                --recipe "$change_recipe" \
+                --instance "$jss_instance" \
+                --nointeraction \
+                --key "OBJECT_ID=$id" \
+                --key "NEW_NAME=$new_name" \
+                --replace \
+                ${verbosity_mode:+"$verbosity_mode"}
+        done
     done
 }
 

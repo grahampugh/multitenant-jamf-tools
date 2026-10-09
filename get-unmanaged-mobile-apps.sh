@@ -1,0 +1,555 @@
+#!/bin/bash
+
+# --------------------------------------------------------------------------------
+# Script for identifying unmanaged mobile device applications across Jamf instances
+# This script queries all mobile devices and identifies apps that are not managed
+# by Jamf Pro, then generates reports showing:
+# 1. Devices with unmanaged apps (CSV listing each device and its unmanaged apps)
+# 2. Unmanaged apps with devices (CSV listing each app and which devices have it)
+# --------------------------------------------------------------------------------
+
+# set instance list type
+instance_list_type="ios"
+
+# reduce the curl tries
+max_tries_override=2
+
+# --------------------------------------------------------------------------------
+# ENVIRONMENT CHECKS
+# --------------------------------------------------------------------------------
+
+# source the _common-framework.sh file
+DIR=$(dirname "$0")
+source "$DIR/_common-framework.sh"
+
+if [[ ! -d "${this_script_dir}" ]]; then
+    echo "ERROR: path to repo ambiguous. Aborting."
+    exit 1
+fi
+
+# prepare working directory
+workdir="/Users/Shared/Jamf/UnmanagedMobileApps"
+mkdir -p "$workdir"
+
+# --------------------------------------------------------------------------------
+# FUNCTIONS
+# --------------------------------------------------------------------------------
+
+usage() {
+    cat <<'USAGE'
+Usage:
+./set_credentials.sh prd           - set the Keychain credentials
+
+[no arguments]                     - interactive mode
+--il FILENAME (without .txt)       - provide a server-list filename
+                                     (must exist in the instance-lists folder)
+--i JSS_URL                        - perform action on a single instance
+                                     (must exist in the relevant instance list)
+--all                              - perform action on ALL instances in the instance list
+--user | --client-id CLIENT_ID     - use the specified client ID or username
+--list-apps                        - list all apps for each device with management status
+--limit VALUE                      - limit the number of devices processed (for testing), e.g. 5
+--profile                          - generate a mobileconfig plist with unmanaged-only apps
+-v                                 - add verbose curl output
+USAGE
+}
+
+track_app_management_status() {
+    local app_name="$1"
+    local app_version="$2"
+    local app_identifier="$3"
+    local management_status="$4"
+
+    # Check if tracking file exists, if not create empty JSON array
+    if [[ ! -f "$app_tracking_file" ]]; then
+        echo '[]' >"$app_tracking_file"
+    fi
+
+    # Check if this app already exists in the tracking file
+    local existing_entry=$(jq --arg name "$app_name" --arg version "$app_version" --arg identifier "$app_identifier" \
+        '.[] | select(.name == $name and .version == $version and .identifier == $identifier)' "$app_tracking_file" 2>/dev/null)
+
+    if [[ -n "$existing_entry" ]]; then
+        # Update existing entry based on management status
+        if [[ "$management_status" == "Managed" ]]; then
+            jq --arg name "$app_name" --arg version "$app_version" --arg identifier "$app_identifier" \
+                'map(if .name == $name and .version == $version and .identifier == $identifier then .has_managed = true else . end)' \
+                "$app_tracking_file" >"${app_tracking_file}.tmp" && mv "${app_tracking_file}.tmp" "$app_tracking_file"
+        elif [[ "$management_status" == "Unmanaged" ]]; then
+            jq --arg name "$app_name" --arg version "$app_version" --arg identifier "$app_identifier" \
+                'map(if .name == $name and .version == $version and .identifier == $identifier then .has_unmanaged = true else . end)' \
+                "$app_tracking_file" >"${app_tracking_file}.tmp" && mv "${app_tracking_file}.tmp" "$app_tracking_file"
+        fi
+    else
+        # Add new entry
+        local has_managed="false"
+        local has_unmanaged="false"
+        if [[ "$management_status" == "Managed" ]]; then
+            has_managed="true"
+        elif [[ "$management_status" == "Unmanaged" ]]; then
+            has_unmanaged="true"
+        fi
+        jq --arg name "$app_name" --arg version "$app_version" --arg identifier "$app_identifier" --argjson managed "$has_managed" --argjson unmanaged "$has_unmanaged" \
+            '. += [{"name": $name, "version": $version, "identifier": $identifier, "has_managed": $managed, "has_unmanaged": $unmanaged}]' \
+            "$app_tracking_file" >"${app_tracking_file}.tmp" && mv "${app_tracking_file}.tmp" "$app_tracking_file"
+    fi
+}
+
+get_app_managed_status() {
+    local app_name="$1"
+    local app_version="$2"
+    local app_identifier="$3"
+
+    if [[ ! -f "$app_tracking_file" ]]; then
+        echo "No"
+        return
+    fi
+
+    local has_managed=$(jq -r --arg name "$app_name" --arg version "$app_version" --arg identifier "$app_identifier" \
+        '.[] | select(.name == $name and .version == $version and .identifier == $identifier) | .has_managed' \
+        "$app_tracking_file" 2>/dev/null)
+
+    if [[ "$has_managed" == "true" ]]; then
+        echo "Yes"
+    else
+        echo "No"
+    fi
+}
+
+generate_mobileconfig_profile() {
+    echo
+    echo "   [generate_mobileconfig_profile] Generating mobileconfig profile..."
+
+    if [[ ! -f "$app_tracking_file" ]]; then
+        echo "   [generate_mobileconfig_profile] ERROR: App tracking file not found"
+        return 1
+    fi
+
+    # Extract bundle IDs where has_managed is false (apps not managed on any device)
+    local unmanaged_bundle_ids=$(jq -r '.[] | select(.has_managed == false and .has_unmanaged == true) | .identifier' "$app_tracking_file" 2>/dev/null | sort -u)
+
+    if [[ -z "$unmanaged_bundle_ids" ]]; then
+        echo "   [generate_mobileconfig_profile] No unmanaged-only apps found, skipping profile generation"
+        return 0
+    fi
+
+    local bundle_id_count=$(echo "$unmanaged_bundle_ids" | wc -l | xargs)
+    echo "   [generate_mobileconfig_profile] Found $bundle_id_count unmanaged-only bundle IDs"
+
+    # Create the profile file
+    instance_short=$(echo "$jss_instance" | sed -E 's#https?://##; s/[./]/-/g')
+    timestamp=$(date +%Y-%m-%d_%H%M%S)
+    profile_file="$workdir/$instance_short-unmanaged-apps-restriction-$timestamp.mobileconfig"
+
+    # Generate UUID for the profile
+    local profile_uuid=$(uuidgen)
+    local payload_uuid=$(uuidgen)
+
+    # Start building the plist
+    cat >"$profile_file" <<'EOF'
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+	<key>PayloadContent</key>
+	<array>
+		<dict>
+			<key>PayloadDisplayName</key>
+			<string>Restrictions Payload</string>
+			<key>PayloadIdentifier</key>
+EOF
+    echo "			<string>$payload_uuid</string>" >>"$profile_file"
+    cat >>"$profile_file" <<'EOF'
+			<key>PayloadOrganization</key>
+			<string>Jamf</string>
+			<key>PayloadType</key>
+			<string>com.apple.applicationaccess</string>
+			<key>PayloadUUID</key>
+EOF
+    echo "			<string>$payload_uuid</string>" >>"$profile_file"
+    cat >>"$profile_file" <<'EOF'
+			<key>PayloadVersion</key>
+			<integer>1</integer>
+			<key>blacklistedAppBundleIDs</key>
+			<array>
+EOF
+
+    # Add blacklisted bundle IDs
+    while IFS= read -r bundle_id; do
+        echo "				<string>$bundle_id</string>" >>"$profile_file"
+    done <<<"$unmanaged_bundle_ids"
+
+    cat >>"$profile_file" <<'EOF'
+			</array>
+			<key>blockedAppBundleIDs</key>
+			<array>
+EOF
+
+    # Add blocked bundle IDs (same list)
+    while IFS= read -r bundle_id; do
+        echo "				<string>$bundle_id</string>" >>"$profile_file"
+    done <<<"$unmanaged_bundle_ids"
+
+    cat >>"$profile_file" <<'EOF'
+			</array>
+		</dict>
+	</array>
+	<key>PayloadDescription</key>
+	<string>Blocks apps that are unmanaged on all devices</string>
+	<key>PayloadDisplayName</key>
+	<string>Managed Restrictions - Unmanaged Apps</string>
+	<key>PayloadEnabled</key>
+	<true/>
+	<key>PayloadIdentifier</key>
+EOF
+    echo "	<string>$profile_uuid</string>" >>"$profile_file"
+    cat >>"$profile_file" <<'EOF'
+	<key>PayloadOrganization</key>
+	<string>Jamf</string>
+	<key>PayloadRemovalDisallowed</key>
+	<true/>
+	<key>PayloadScope</key>
+	<string>System</string>
+	<key>PayloadType</key>
+	<string>Configuration</string>
+	<key>PayloadUUID</key>
+EOF
+    echo "	<string>$profile_uuid</string>" >>"$profile_file"
+    cat >>"$profile_file" <<'EOF'
+	<key>PayloadVersion</key>
+	<integer>1</integer>
+</dict>
+</plist>
+EOF
+
+    echo "   [generate_mobileconfig_profile] Profile created: $profile_file"
+    echo "   [generate_mobileconfig_profile] Profile contains $bundle_id_count bundle IDs"
+}
+
+get_all_mobile_devices() {
+    # Get a list of all mobile device IDs
+    echo "   [get_all_mobile_devices] Fetching all mobile devices for $jss_instance..."
+
+    curl_url="$jss_url/JSSResource/mobiledevices"
+    curl_args=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+
+    if [[ $http_response -eq 200 ]]; then
+        device_count=$(jq -r '.mobile_devices | length' "$curl_output_file" 2>/dev/null)
+        echo "   [get_all_mobile_devices] Found $device_count mobile devices"
+
+        mobile_device_ids=()
+        mobile_device_names=()
+
+        i=0
+        while [[ $i -lt $device_count ]]; do
+            device_id=$(jq -r ".mobile_devices[$i].id" "$curl_output_file" 2>/dev/null)
+            device_name=$(jq -r ".mobile_devices[$i].name" "$curl_output_file" 2>/dev/null)
+            mobile_device_ids+=("$device_id")
+            mobile_device_names+=("$device_name")
+            ((i++))
+        done
+    else
+        echo "   [get_all_mobile_devices] ERROR: Failed to fetch mobile devices (HTTP $http_response)"
+        return 1
+    fi
+}
+
+get_device_applications() {
+    local device_id="$1"
+    local device_name="$2"
+
+    # Fetch the Applications subset for this device
+    curl_url="$jss_url/JSSResource/mobiledevices/id/${device_id}/subset/Applications+General"
+    curl_args=("--header")
+    curl_args+=("Accept: application/json")
+    send_curl_request
+
+    if [[ $http_response -eq 200 ]]; then
+        # get the device's serial number for reporting
+        serial_number=$(jq -r ".mobile_device.general.serial_number" "$curl_output_file" 2>/dev/null)
+        # Parse the applications and identify unmanaged ones
+        app_count=$(jq -r '.mobile_device.applications | length' "$curl_output_file" 2>/dev/null)
+
+        if [[ "$app_count" == "null" || -z "$app_count" ]]; then
+            echo "   [get_device_applications] Device '$device_name' (ID: $device_id) - no applications data found"
+            if [[ $list_apps -eq 1 ]]; then
+                echo "      DEBUG: Response structure:"
+                jq -r '.mobile_device | keys' "$curl_output_file" 2>/dev/null || echo "      ERROR: Failed to parse JSON"
+            fi
+            return
+        fi
+
+        echo "   [get_device_applications] Device '$device_name' (ID: $device_id) has $app_count total apps"
+
+        if [[ $app_count -gt 0 ]]; then
+            # Debug: show keys of first app to identify correct field names
+            if [[ $list_apps -eq 1 ]]; then
+                echo "      DEBUG: Available keys in first app object:"
+                jq -r ".mobile_device.applications[0] | keys" "$curl_output_file" 2>/dev/null
+                echo "      DEBUG: First app full object:"
+                jq -r ".mobile_device.applications[0]" "$curl_output_file" 2>/dev/null
+                echo ""
+            fi
+
+            local unmanaged_apps=()
+            local managed_count=0
+            local unmanaged_count=0
+            i=0
+            while [[ $i -lt $app_count ]]; do
+                app_name=$(jq -r ".mobile_device.applications[$i].application_name" "$curl_output_file" 2>/dev/null)
+                app_version=$(jq -r ".mobile_device.applications[$i].application_version" "$curl_output_file" 2>/dev/null)
+                app_identifier=$(jq -r ".mobile_device.applications[$i].identifier" "$curl_output_file" 2>/dev/null)
+                management_status=$(jq -r ".mobile_device.applications[$i].application_status" "$curl_output_file" 2>/dev/null)
+
+                # Track whether this app is managed on ANY device using JSON file
+                track_app_management_status "$app_name" "$app_version" "$app_identifier" "$management_status"
+
+                # List apps if requested
+                if [[ $list_apps -eq 1 ]]; then
+                    printf "      %-50s %-15s [%s]\n" "$app_name" "$app_version" "$management_status"
+                fi
+
+                # Check if app is Unmanaged
+                if [[ "$management_status" == "Unmanaged" ]]; then
+                    unmanaged_apps+=("${app_name}|${app_version}|${app_identifier}")
+                    ((unmanaged_count++))
+                elif [[ "$management_status" == "Managed" ]]; then
+                    ((managed_count++))
+                fi
+                ((i++))
+            done
+
+            echo "   [get_device_applications] Device '$device_name': Managed=$managed_count, Unmanaged=$unmanaged_count"
+
+            # If device has unmanaged apps, add to report data
+            if [[ ${#unmanaged_apps[@]} -gt 0 ]]; then
+                # Add to devices-with-apps report
+                for app_data in "${unmanaged_apps[@]}"; do
+                    # Parse the app data (name|version|identifier)
+                    app_name="$(echo "$app_data" | cut -d'|' -f1)"
+                    app_version="$(echo "$app_data" | cut -d'|' -f2)"
+                    app_identifier="$(echo "$app_data" | cut -d'|' -f3)"
+                    # Escape commas and quotes in names for CSV
+                    escaped_device_name=$(echo "$device_name" | sed 's/"/""/g')
+                    escaped_app_name=$(echo "$app_name" | sed 's/"/""/g')
+                    escaped_app_identifier=$(echo "$app_identifier" | sed 's/"/""/g')
+                    echo "\"$escaped_device_name\",\"$device_id\",\"$serial_number\",\"$escaped_app_name\",\"$app_version\",\"$escaped_app_identifier\"" >>"$devices_report_file"
+
+                    # Track for apps-with-devices report
+                    app_key="${app_name}::${app_version}::${app_identifier}"
+                    if [[ ! " ${tracked_apps[*]} " =~ " ${app_key} " ]]; then
+                        tracked_apps+=("$app_key")
+                    fi
+                    # Get managed status for this app from tracking file
+                    managed_anywhere=$(get_app_managed_status "$app_name" "$app_version" "$app_identifier")
+                    # Store device info for this app (will aggregate later)
+                    echo "\"$escaped_app_name\",\"$app_version\",\"$escaped_app_identifier\",\"$managed_anywhere\",\"$escaped_device_name\",\"$device_id\",\"$serial_number\"" >>"$apps_report_file"
+                done
+            fi
+        else
+            echo "   [get_device_applications] Device '$device_name' (ID: $device_id) has no applications"
+        fi
+    else
+        echo "   [get_device_applications] WARNING: Failed to fetch applications for device ID $device_id (HTTP $http_response)"
+        if [[ -f "$curl_output_file" ]]; then
+            echo "      Response: $(cat "$curl_output_file")"
+        fi
+    fi
+}
+
+process_instance() {
+    echo
+    echo "========================================="
+    echo "Processing instance: $jss_instance"
+    echo "========================================="
+
+    # Get token
+    if [[ "$chosen_id" ]]; then
+        set_credentials "$jss_instance" "$chosen_id"
+        echo "   [process_instance] Using provided Client ID and stored secret for $jss_instance ($jss_api_user)"
+    else
+        set_credentials "$jss_instance"
+        echo "   [process_instance] Using stored credentials for $jss_instance ($jss_api_user)"
+    fi
+    jss_url="$jss_instance"
+
+    # Get all mobile devices
+    get_all_mobile_devices
+
+    if [[ ${#mobile_device_ids[@]} -eq 0 ]]; then
+        echo "   [process_instance] No mobile devices found for this instance"
+        return
+    fi
+
+    # Process each device
+    local device_index=0
+    for device_id in "${mobile_device_ids[@]}"; do
+        device_name="${mobile_device_names[$device_index]}"
+        echo "   [process_instance] Processing device $((device_index + 1))/${#mobile_device_ids[@]}: $device_name (ID: $device_id)"
+
+        get_device_applications "$device_id" "$device_name"
+
+        ((device_index++))
+        # Check if we have a limit for testing
+        if [[ $device_index -ge $device_limit && $device_limit -gt 0 ]]; then
+            echo "   [process_instance] Device processing limit of $device_limit reached, stopping for testing purposes"
+            break
+        fi
+    done
+
+    echo "   [process_instance] Completed processing $jss_instance"
+}
+
+create_csv_files() {
+    # Create CSV for devices with unmanaged apps
+    # instance short name for file naming (remove protocol and dots and keep only the subdomain/host part)
+    instance_short=$(echo "$jss_instance" | sed -E 's#https?://##; s/[./]/-/g')
+    timestamp=$(date +%Y-%m-%d_%H%M%S)
+
+    devices_report_file="$workdir/$instance_short-unmanaged-apps-$timestamp.csv"
+    echo "Device Name,Device ID,Serial Number,App Name,App Version,App Identifier" >"$devices_report_file"
+    echo "   [create_csv_files] Created devices report: $devices_report_file"
+
+    # Create CSV for apps with devices
+    apps_report_file="$workdir/$instance_short-unmanaged-apps-with-devices-$timestamp.csv"
+    echo "App Name,App Version,App Identifier,Managed on Any Device,Device Name,Device ID,Serial Number" >"$apps_report_file"
+    echo "   [create_csv_files] Created apps report: $apps_report_file"
+
+    # Create app tracking JSON file
+    app_tracking_file="$workdir/$instance_short-app-tracking-$timestamp.json"
+    echo '[]' >"$app_tracking_file"
+    echo "   [create_csv_files] Created app tracking file: $app_tracking_file"
+}
+
+finalize_reports() {
+    echo
+    echo "========================================="
+    echo "Report Generation Complete"
+    echo "========================================="
+    echo
+    echo "Reports saved to:"
+    echo "1. Devices with unmanaged apps: $devices_report_file"
+
+    # Count unique devices
+    device_count=$(tail -n +2 "$devices_report_file" | cut -d',' -f2,3 | sort -u | wc -l | xargs)
+    echo "   - Total devices with unmanaged apps: $device_count"
+
+    echo
+    echo "2. Unmanaged apps with devices: $apps_report_file"
+
+    # Count unique apps
+    app_count=$(tail -n +2 "$apps_report_file" | cut -d',' -f2,3 | sort -u | wc -l | xargs)
+    echo "   - Total unique unmanaged apps: $app_count"
+
+    echo
+    echo "3. App tracking data (JSON): $app_tracking_file"
+    echo "   - Shows which apps are managed/unmanaged across devices"
+
+    if [[ $generate_profile -eq 1 && -f "$profile_file" ]]; then
+        echo
+        echo "4. Configuration profile: $profile_file"
+        echo "   - Blocks apps that are unmanaged on all devices"
+    fi
+
+    echo
+    echo "You can open these files with:"
+    echo "  open \"$devices_report_file\""
+    echo "  open \"$apps_report_file\""
+    echo "  open \"$app_tracking_file\""
+    if [[ $generate_profile -eq 1 && -f "$profile_file" ]]; then
+        echo "  open \"$profile_file\""
+    fi
+}
+
+# --------------------------------------------------------------------------------
+# MAIN
+# --------------------------------------------------------------------------------
+
+# Initialize arrays for tracking
+tracked_apps=()
+list_apps=0
+generate_profile=0
+
+# Command line override for the above settings
+while [[ "$#" -gt 0 ]]; do
+    key="$1"
+    case $key in
+    -il | --instance-list)
+        shift
+        chosen_instance_list_file="$1"
+        ;;
+    -i | --instance)
+        shift
+        chosen_instances+=("$1")
+        ;;
+    -a | -ai | --all | --all-instances)
+        all_instances=1
+        ;;
+    --id | --client-id | --user | --username)
+        shift
+        chosen_id="$1"
+        ;;
+    -x | --nointeraction)
+        no_interaction=1
+        ;;
+    --list-apps)
+        list_apps=1
+        ;;
+    --profile)
+        generate_profile=1
+        ;;
+    --limit)
+        shift
+        device_limit="$1"
+        ;;
+    -v | --verbose)
+        verbose=1
+        ;;
+    -h | --help)
+        usage
+        exit
+        ;;
+    *)
+        usage
+        exit
+        ;;
+    esac
+    # Shift after checking all the cases to get the next option
+    shift
+done
+echo
+
+if [[ ${#chosen_instances[@]} -eq 1 ]]; then
+    chosen_instance="${chosen_instances[0]}"
+    echo "Running on instance: $chosen_instance"
+elif [[ ${#chosen_instances[@]} -gt 1 ]]; then
+    echo "Running on instances: ${chosen_instances[*]}"
+fi
+
+# Select the instances that will be processed
+choose_destination_instances
+
+# Process all chosen instances
+for instance in "${instance_choice_array[@]}"; do
+    # set the instance variable
+    jss_instance="$instance"
+
+    # Create CSV files
+    create_csv_files
+
+    # Process this instance
+    process_instance
+done
+
+# Generate mobileconfig profile if requested
+if [[ $generate_profile -eq 1 ]]; then
+    generate_mobileconfig_profile
+fi
+
+# Finalize and display report summary
+finalize_reports
+
+echo
+echo "Done!"

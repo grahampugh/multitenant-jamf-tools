@@ -1,0 +1,12 @@
+Identifier: multitenant-jamf-tools.jamf.DownloadInventoryInformation
+Description: Downloads the inventory-information settings (managed/unmanaged computer and device counts) for an instance to the specified directory as "<subdomain>-inventory-information.json".
+MinimumVersion: "2.3"
+
+Input:
+  OUTPUT_DIR: /Users/Shared/Jamf/JamfUploaderTests
+
+Process:
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectReader
+    Arguments:
+      object_type: inventory_information_settings
+      output_dir: "%OUTPUT_DIR%"

@@ -1,0 +1,14 @@
+Description: Downloads an object to the specified directory.
+Comment: |
+  Requires:
+  - OBJECT_NAME
+  - OBJECT_TYPE
+Identifier: multitenant-jamf-tools.jamf.DeleteObject
+MinimumVersion: "2.3"
+Input: {}
+
+Process:
+  - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectDeleter
+    Arguments:
+      object_type: "%OBJECT_TYPE%"
+      object_name: "%OBJECT_NAME%"

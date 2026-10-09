@@ -1,8 +1,9 @@
-Identifier: multitenant-jamf-tools.jamf.DownloadObjectList
-Description: Downloads a list of objects to the specified directory. Requires the object type to be specified.
+Description: Downloads an object to the specified directory.
+Identifier: multitenant-jamf-tools.jamf.DownloadObject
 MinimumVersion: "2.3"
 
 RequiredInputs:
+  - OBJECT_NAME
   - OBJECT_TYPE
 
 Input:
@@ -11,6 +12,6 @@ Input:
 Process:
   - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectReader
     Arguments:
-      list_only: True
       object_type: "%OBJECT_TYPE%"
+      object_name: "%OBJECT_NAME%"
       output_dir: "%OUTPUT_DIR%"

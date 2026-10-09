@@ -57,7 +57,7 @@ USAGE
 }
 
 encode_name() {
-    app_name_encoded="$( echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
+    app_name_encoded="$(echo "$1" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g')"
 }
 
 do_the_counting() {
@@ -79,19 +79,19 @@ do_the_counting() {
 
     # temp dump to file
     working_file="$workdir/${app_name_capitalised} - Working.xml"
-    /usr/bin/xmllint --format "$curl_output_file" 2>/dev/null > "$working_file"
+    /usr/bin/xmllint --format "$curl_output_file" 2>/dev/null >"$working_file"
 
     # get version information
     if [[ $get_versions ]]; then
         versions_list=$(/usr/bin/xmllint --xpath '//versions/version/number' "$working_file" 2>/dev/null | sed 's|<number>||g' | sed 's|<\/number>| |g' | sed 's| $||')
         versions=()
-        while read -r line ; do
+        while read -r line; do
             versions+=("$line")
-        done <<< "$versions_list"
+        done <<<"$versions_list"
 
         versions_counts=()
         for ver in "${versions[@]}"; do
-            version_count=$(/usr/bin/xmllint --xpath "//versions/version[number='$ver']/computers/computer/id" "$working_file" 2>/dev/null | sed 's|<id>||g' | sed 's|<\/id>| |g' | sed 's| $||'  | wc -w | sed -e 's/^[[:space:]]*//')
+            version_count=$(/usr/bin/xmllint --xpath "//versions/version[number='$ver']/computers/computer/id" "$working_file" 2>/dev/null | sed 's|<id>||g' | sed 's|<\/id>| |g' | sed 's| $||' | wc -w | sed -e 's/^[[:space:]]*//')
             # echo "Version Count: $version_count"  # TEMP
             versions_counts+=("$ver,$version_count")
             n=0
@@ -100,11 +100,11 @@ do_the_counting() {
                 summary_version=${pair%,*}
                 summary_count=${pair#*,}
                 if [[ "$ver" == "$summary_version" ]]; then
-                    new_count=$((summary_count+version_count))
+                    new_count=$((summary_count + version_count))
                     summary_versions_counts[$n]="$summary_version,$new_count"
                     found=1
                 fi
-                (( n++ ))
+                ((n++))
             done
             if [[ $found -eq 0 ]]; then
                 summary_versions_counts+=("$ver,$version_count")
@@ -114,21 +114,21 @@ do_the_counting() {
     fi
 
     # get the number of computers in this instance
-    instance_computers=$( /usr/bin/xmllint --xpath '//unique_computers' "$working_file" 2>/dev/null | /usr/bin/xmllint --format - 2>/dev/null )
+    instance_computers=$(/usr/bin/xmllint --xpath '//unique_computers' "$working_file" 2>/dev/null | /usr/bin/xmllint --format - 2>/dev/null)
     computers=0
-    while read -r line ; do
-        if grep -q "<udid>" <<< "$line"; then
+    while read -r line; do
+        if grep -q "<udid>" <<<"$line"; then
             computers=$((computers + 1))
         fi
-    done <<< "$instance_computers"
+    done <<<"$instance_computers"
 
     if [[ $total_only != "yes" ]]; then
-        instance_pretty=$(echo "$jss_instance" | rev | cut -d"/" -f1 | rev )
-        printf "%-54s %+4s\n" "$instance_pretty" "$computers" >> "$output_file"
+        instance_pretty=$(echo "$jss_instance" | rev | cut -d"/" -f1 | rev)
+        printf "%-54s %+4s\n" "$instance_pretty" "$computers" >>"$output_file"
         if [[ $get_versions ]]; then
-            if [[ $version_restriction =~ ^[-+]?[0-9]+$ ]]; then 
+            if [[ $version_restriction =~ ^[-+]?[0-9]+$ ]]; then
                 cutoff=$version_restriction
-            else 
+            else
                 cutoff=0
             fi
             # print count of each version
@@ -136,9 +136,9 @@ do_the_counting() {
                 version=${pair%,*}
                 version_count=${pair#*,}
                 if [[ "$version_count" -gt 0 ]]; then
-                    version_percent=$(( version_count * 100 / computers ))
+                    version_percent=$((version_count * 100 / computers))
                     if [[ $version_percent -gt $cutoff ]]; then
-                        printf '   %-15s %-3s %s%%\n' "$version" "$version_count" "$version_percent" >> "$output_file"
+                        printf '   %-15s %-3s %s%%\n' "$version" "$version_count" "$version_percent" >>"$output_file"
                     fi
                 fi
             done
@@ -149,7 +149,6 @@ do_the_counting() {
     total_computers=$((total_computers + computers))
 }
 
-
 # --------------------------------------------------------------------------------
 # MAIN
 # --------------------------------------------------------------------------------
@@ -158,47 +157,47 @@ do_the_counting() {
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
-        -il|--instance-list)
-            shift
-            chosen_instance_list_file="$1"
-            ;;
-        -i|--instance)
-            shift
-            chosen_instances+=("$1")
-            ;;
-        -a|-ai|--all|--all-instances)
-            all_instances=1
-            ;;
-        --id|--client-id|--user|--username)
-            shift
-            chosen_id="$1"
+    -il | --instance-list)
+        shift
+        chosen_instance_list_file="$1"
         ;;
-        -x|--nointeraction)
-            no_interaction=1
-            ;;
-        -t|--total)
-            total_only="yes"
+    -i | --instance)
+        shift
+        chosen_instances+=("$1")
         ;;
-        --versions)
-            get_versions="yes"
+    -a | -ai | --all | --all-instances)
+        all_instances=1
         ;;
-        --versions=*)
-            get_versions="yes"
-            version_restriction="${key#*=}"
+    --id | --client-id | --user | --username)
+        shift
+        chosen_id="$1"
         ;;
-        -o|--output)
-            shift
-            output_file="$1"
+    -x | --nointeraction)
+        no_interaction=1
         ;;
-        -v|--verbose)
-            verbose=1
+    -t | --total)
+        total_only="yes"
         ;;
-        -h|--help)
-            usage
-            exit
+    --versions)
+        get_versions="yes"
         ;;
-        *)
-            app_name="$1"
+    --versions=*)
+        get_versions="yes"
+        version_restriction="${key#*=}"
+        ;;
+    -o | --output)
+        shift
+        output_file="$1"
+        ;;
+    -v | --verbose)
+        verbose=1
+        ;;
+    -h | --help)
+        usage
+        exit
+        ;;
+    *)
+        app_name="$1"
         ;;
     esac
     # Shift after checking all the cases to get the next option
@@ -227,7 +226,7 @@ encode_name "$app_name"
 if [[ $os == 1 ]]; then
     app_name_capitalised="macOS"
 else
-    app_name_capitalised=$(awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1' <<< "$app_name")
+    app_name_capitalised=$(awk '{for(i=1;i<=NF;i++){ $i=toupper(substr($i,1,1)) substr($i,2) }}1' <<<"$app_name")
 fi
 
 # set default output file
@@ -237,7 +236,7 @@ fi
 
 # ensure the directories can be written to, and empty the files
 mkdir -p "$(dirname "$output_file")"
-echo "" > "$output_file"
+echo "" >"$output_file"
 
 if [[ ${#chosen_instances[@]} -eq 1 ]]; then
     chosen_instance="${chosen_instances[0]}"
@@ -252,13 +251,13 @@ choose_destination_instances
 
 # start the count
 (
-    echo "Timestamp: $( date )"
+    echo "Timestamp: $(date)"
     echo "-----------------------------------------------------------"
     echo "Jamf Pro App Count - $app_name_capitalised"
     echo "-----------------------------------------------------------"
     echo "Context                                               Count"
     echo "-----------------------------------------------------------"
-) > "$output_file"
+) >"$output_file"
 
 # set up the summary arrays
 summary_versions_counts=()
@@ -274,7 +273,7 @@ if [[ ${#chosen_instances[@]} -gt 1 ]]; then
         echo "-----------------------------------------------------------"
         printf "%-54s %+4s\n" "Total across all contexts:" "$total_computers"
         echo "-----------------------------------------------------------"
-    ) >> "$output_file"
+    ) >>"$output_file"
 fi
 
 # summary of all the versions
@@ -282,7 +281,7 @@ if [[ $get_versions ]]; then
     (
         echo "Summary of versions:"
         echo "-----------------------------------------------------------"
-    ) >> "$output_file"
+    ) >>"$output_file"
 
     # sort the array
     IFS=$'\n' sorted_summary_versions_counts=($(sort <<<"${summary_versions_counts[*]}"))
@@ -293,16 +292,16 @@ if [[ $get_versions ]]; then
         version=${pair%,*}
         version_count=${pair#*,}
         if [[ "$version_count" -gt 0 ]]; then
-            version_percent=$(( version_count * 100 / total_computers ))
+            version_percent=$((version_count * 100 / total_computers))
             if [[ $version_percent -gt $cutoff ]]; then
-                printf '   %-15s %-3s %s%%\n' "$version" "$version_count" "$version_percent" >> "$output_file"
+                printf '   %-15s %-3s %s%%\n' "$version" "$version_count" "$version_percent" >>"$output_file"
             fi
         fi
     done
     (
         echo "-----------------------------------------------------------"
         echo
-    ) >> "$output_file"
+    ) >>"$output_file"
 fi
 
 # now echo the file

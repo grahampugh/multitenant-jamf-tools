@@ -21,6 +21,9 @@ api_obj_action=""
 # reduce the curl tries
 max_tries_override=4
 
+# define autopkg_prefs
+autopkg_prefs="${HOME}/Library/Preferences/com.github.autopkg.plist"
+
 # -------------------------------------------------------------------------
 # ENVIRONMENT CHECKS
 # -------------------------------------------------------------------------
@@ -89,7 +92,7 @@ add_icon_to_copied_policy() {
     if [[ -f "$xml_folder/$icon_filename" ]]; then
         echo "   [add_icon_to_copied_policy] Downloaded icon: ${icon_filename}"
 
-        chosen_api_obj_name_url_encoded="$( echo "$chosen_api_obj_name" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' )"
+        chosen_api_obj_name_url_encoded="$(echo "$chosen_api_obj_name" | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g')"
 
         # send request
         curl_url="$jss_url/JSSResource/policies/name/${chosen_api_obj_name_url_encoded}"
@@ -103,7 +106,7 @@ add_icon_to_copied_policy() {
         if [[ $policy_id ]]; then
             echo "   [add_icon_to_copied_policy] Policy number ${policy_id} identified..."
         else
-            echo  "   [add_icon_to_copied_policy] ERROR: Policy ${chosen_api_obj_name} not found, so cannot upload icon. Aborting..."
+            echo "   [add_icon_to_copied_policy] ERROR: Policy ${chosen_api_obj_name} not found, so cannot upload icon. Aborting..."
             cleanup_and_exit
         fi
 
@@ -180,8 +183,8 @@ check_eas_in_groups() {
 
     criterion_array=$(
         xmllint --xpath '//computer_group/criteria/criterion/name' \
-        "${group_file}" 2>/dev/null \
-        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+            "${group_file}" 2>/dev/null |
+            sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
     )
 
     if [[ $criterion_array ]]; then
@@ -201,15 +204,15 @@ check_eas_in_groups() {
                         echo
                         if [[ $ask_for_dependencies == "yes" ]]; then
                             printf '%s' "WARNING! This will update computer_extension_attribute $extension_attribute_name. Are you sure? (Y/N) : "
-                            read -r are_you_sure_computer_extension_attribute < /dev/tty
+                            read -r are_you_sure_computer_extension_attribute </dev/tty
                             echo
                             case "$are_you_sure_computer_extension_attribute" in
-                                Y|y)
-                                    echo "   [check_eas_in_groups] Confirmed, copying $extension_attribute_name"
-                                    copy_api_object_by_name "computer_extension_attribute" "$extension_attribute_name"
+                            Y | y)
+                                echo "   [check_eas_in_groups] Confirmed, copying $extension_attribute_name"
+                                copy_api_object_by_name "computer_extension_attribute" "$extension_attribute_name"
                                 ;;
-                                *)
-                                    echo "   [check_eas_in_groups] Skipping $extension_attribute_name"
+                            *)
+                                echo "   [check_eas_in_groups] Skipping $extension_attribute_name"
                                 ;;
                             esac
                         else
@@ -222,7 +225,7 @@ check_eas_in_groups() {
                     fi
                 fi
             fi
-        done <<< "${criterion_array}"
+        done <<<"${criterion_array}"
     else
         echo "   [check_eas_in_groups] No extension attributes found in this group."
     fi
@@ -260,8 +263,8 @@ check_eas_in_mobile_device_groups() {
 
     criterion_array=$(
         xmllint --xpath '//mobile_device_group/criteria/criterion/name' \
-        "${group_file}" 2>/dev/null \
-        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+            "${group_file}" 2>/dev/null |
+            sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
     )
 
     if [[ $criterion_array ]]; then
@@ -281,15 +284,15 @@ check_eas_in_mobile_device_groups() {
                         echo
                         if [[ $ask_for_dependencies == "yes" ]]; then
                             printf '%s' "WARNING! This will update mobile_device_extension_attribute $extension_attribute_name. Are you sure? (Y/N) : "
-                            read -r are_you_sure_mobile_device_extension_attribute < /dev/tty
+                            read -r are_you_sure_mobile_device_extension_attribute </dev/tty
                             echo
                             case "$are_you_sure_mobile_device_extension_attribute" in
-                                Y|y)
-                                    echo "   [check_eas_in_mobile_device_groups] Confirmed, copying $extension_attribute_name"
-                                    copy_api_object_by_name "mobile_device_extension_attribute" "$extension_attribute_name"
+                            Y | y)
+                                echo "   [check_eas_in_mobile_device_groups] Confirmed, copying $extension_attribute_name"
+                                copy_api_object_by_name "mobile_device_extension_attribute" "$extension_attribute_name"
                                 ;;
-                                *)
-                                    echo "   [check_eas_in_mobile_device_groups] Skipping $extension_attribute_name"
+                            *)
+                                echo "   [check_eas_in_mobile_device_groups] Skipping $extension_attribute_name"
                                 ;;
                             esac
                         else
@@ -302,7 +305,7 @@ check_eas_in_mobile_device_groups() {
                     fi
                 fi
             fi
-        done <<< "${criterion_array}"
+        done <<<"${criterion_array}"
     else
         echo "   [check_eas_in_mobile_device_groups] No extension attributes found in this group."
     fi
@@ -316,8 +319,8 @@ check_groups_in_groups() {
 
     embedded_group_array=$(
         xmllint --xpath '//computer_group/criteria/criterion[name = "Computer Group"]/value' \
-        "${xml_folder}/computer_group-${group_name}-fetched.xml" 2>/dev/null \
-        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+            "${xml_folder}/computer_group-${group_name}-fetched.xml" 2>/dev/null |
+            sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
     )
 
     f=${#final_group_list[@]}
@@ -332,7 +335,7 @@ check_groups_in_groups() {
                     f=$((f + 1))
                 fi
             fi
-        done <<< "${embedded_group_array}"
+        done <<<"${embedded_group_array}"
     else
         echo "   [check_groups_in_groups] No embedded computer group found."
     fi
@@ -346,8 +349,8 @@ check_groups_in_mobile_device_groups() {
 
     embedded_group_array=$(
         xmllint --xpath '//mobile_device_group/criteria/criterion[name = "Mobile Device Group"]/value' \
-        "${xml_folder}/mobile_device_group-${group_name}-fetched.xml" 2>/dev/null \
-        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+            "${xml_folder}/mobile_device_group-${group_name}-fetched.xml" 2>/dev/null |
+            sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
     )
 
     f=${#final_group_list[@]}
@@ -362,7 +365,7 @@ check_groups_in_mobile_device_groups() {
                     f=$((f + 1))
                 fi
             fi
-        done <<< "${embedded_group_array}"
+        done <<<"${embedded_group_array}"
     else
         echo "   [check_groups_in_mobile_device_groups] No embedded mobile device group found."
     fi
@@ -384,11 +387,11 @@ contains_element() {
     # From https://stackoverflow.com/questions/3685970/check-if-a-bash-array-contains-a-value
     local element="$1"
 
-    while read -r EA ; do
+    while read -r EA; do
         if [[ "${element}" == "${EA}" ]]; then
             return 0
         fi
-    done <<< "${2}"
+    done <<<"${2}"
     return 1
 }
 
@@ -402,7 +405,7 @@ copy_api_object() {
     local chosen_api_obj_id=$2
     local chosen_api_obj_name="$3"
 
-    api_object_type=$( get_api_object_type "$api_xml_object" )
+    api_object_type=$(get_api_object_type "$api_xml_object")
 
     local parsed_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_id}-parsed.xml"
 
@@ -418,15 +421,15 @@ copy_api_object() {
         if [[ "${api_xml_object}" == "script" || "${api_xml_object}" == "package" ]]; then
             # Look for category in script info and create if necessary
             local category_name
-            category_name=$( 
-                xmllint --xpath '//category/text()' "${parsed_file}" 2>/dev/null 
+            category_name=$(
+                xmllint --xpath '//category/text()' "${parsed_file}" 2>/dev/null
             )
             create_category "$category_name"
         elif [[ "${api_xml_object}" == "os_x_configuration_profile" || "${api_xml_object}" == "mac_application" ]]; then
             # Look for categories and create them if necessary
             echo "   [copy_api_object] Checking the category in '${chosen_api_obj_name}'"
-            category_name=$( 
-                xmllint --xpath '//general/category/name/text()' "${parsed_file}" 2>/dev/null 
+            category_name=$(
+                xmllint --xpath '//general/category/name/text()' "${parsed_file}" 2>/dev/null
             )
             category_name_decoded="${category_name//&amp;/&}"
             if [[ $category_name_decoded == "" ]]; then
@@ -443,13 +446,13 @@ copy_api_object() {
 
             group_array=$(
                 xmllint --xpath '//scope/computer_groups/computer_group/name' \
-                "${parsed_file}" 2>/dev/null \
-                | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+                    "${parsed_file}" 2>/dev/null |
+                    sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
             )
             excluded_group_array=$(
-                xmllint --xpath  '//scope/exclusions/computer_groups/computer_group/name' \
-                "${parsed_file}" 2>/dev/null \
-                | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+                xmllint --xpath '//scope/exclusions/computer_groups/computer_group/name' \
+                    "${parsed_file}" 2>/dev/null |
+                    sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
             )
 
             # Combine the two into a list of unique groups
@@ -465,7 +468,7 @@ copy_api_object() {
                             u=$((u + 1))
                         fi
                     fi
-                done <<< "${excluded_group_array}"
+                done <<<"${excluded_group_array}"
             fi
 
             if [[ $group_array ]]; then
@@ -477,20 +480,20 @@ copy_api_object() {
                             u=$((u + 1))
                         fi
                     fi
-                done <<< "${group_array}"
+                done <<<"${group_array}"
             fi
 
             # transfer the unique list to a new list so that we can add further groups from
             # embedded groups whilst iterating through the unique list
             final_group_list=()
-            for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
+            for ((i = 0; i < ${#unique_group_list[@]}; i++)); do
                 final_group_list[i]="${unique_group_list[$i]}"
             done
 
             echo "   [copy_api_object] Total ${#unique_group_list[@]} groups found."
 
             # Read all the groups to find groups within
-            for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+            for ((i = 0; i < ${#unique_group_list[@]}; i++)); do
                 echo "   [copy_api_object] Fetching '${unique_group_list[$i]}'."
                 fetch_api_object_by_name "computer_group" "${unique_group_list[$i]}"
                 check_groups_in_groups "${unique_group_list[$i]}"
@@ -498,21 +501,21 @@ copy_api_object() {
 
             # Process all the groups in reverse order, since the embedded groups
             # will then appear first, which should be safer for avoiding failed group creation
-            for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
+            for ((i = ${#final_group_list[@]} - 1; i >= 0; i--)); do
                 echo "   [copy_api_object] Computer group to process: ${final_group_list[$i]}"
                 check_eas_in_groups "${final_group_list[$i]}"
                 parse_api_object_by_name_for_copying "computer_group" "${final_group_list[$i]}"
                 echo
                 if [[ $ask_for_dependencies == "yes" ]]; then
                     printf '%s' "WARNING! This will update computer_group ${final_group_list[$i]}. Are you sure? (Y/N) : "
-                    read -r are_you_sure_copy_api_object < /dev/tty
+                    read -r are_you_sure_copy_api_object </dev/tty
                     case "$are_you_sure_copy_api_object" in
-                        Y|y)
-                            echo "   [main] Confirmed, copying ${final_group_list[$i]}"
-                            copy_computer_group "${final_group_list[$i]}"
+                    Y | y)
+                        echo "   [main] Confirmed, copying ${final_group_list[$i]}"
+                        copy_computer_group "${final_group_list[$i]}"
                         ;;
-                        *)
-                            echo "   [main] Skipping ${final_group_list[$i]}"
+                    *)
+                        echo "   [main] Skipping ${final_group_list[$i]}"
                         ;;
                     esac
                 else
@@ -523,8 +526,8 @@ copy_api_object() {
         elif [[ "${api_xml_object}" == "configuration_profile" || "${api_xml_object}" == "mobile_device_application" ]]; then
             # Look for categories and create them if necessary
             echo "   [copy_api_object] Checking the category in '${chosen_api_obj_name}'"
-            category_name=$( 
-                xmllint --xpath '//general/category/name/text()' "${parsed_file}" 2>/dev/null 
+            category_name=$(
+                xmllint --xpath '//general/category/name/text()' "${parsed_file}" 2>/dev/null
             )
             category_name_decoded="${category_name//&amp;/&}"
             if [[ $category_name_decoded == "" ]]; then
@@ -541,13 +544,13 @@ copy_api_object() {
 
             group_array=$(
                 xmllint --xpath '//scope/mobile_devices/mobile_device/name' \
-                "${parsed_file}" 2>/dev/null \
-                | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+                    "${parsed_file}" 2>/dev/null |
+                    sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
             )
             excluded_group_array=$(
-                xmllint --xpath  '//scope/exclusions/mobile_device_groups/mobile_device_group/name' \
-                "${parsed_file}" 2>/dev/null \
-                | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+                xmllint --xpath '//scope/exclusions/mobile_device_groups/mobile_device_group/name' \
+                    "${parsed_file}" 2>/dev/null |
+                    sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
             )
 
             # Combine the two into a list of unique groups
@@ -563,7 +566,7 @@ copy_api_object() {
                             u=$((u + 1))
                         fi
                     fi
-                done <<< "${excluded_group_array}"
+                done <<<"${excluded_group_array}"
             fi
 
             if [[ $group_array ]]; then
@@ -575,20 +578,20 @@ copy_api_object() {
                             u=$((u + 1))
                         fi
                     fi
-                done <<< "${group_array}"
+                done <<<"${group_array}"
             fi
 
             # transfer the unique list to a new list so that we can add further groups from
             # embedded groups whilst iterating through the unique list
             final_group_list=()
-            for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
+            for ((i = 0; i < ${#unique_group_list[@]}; i++)); do
                 final_group_list[i]="${unique_group_list[$i]}"
             done
 
             echo "   [copy_api_object] Total ${#unique_group_list[@]} groups found."
 
             # Read all the groups to find groups within
-            for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+            for ((i = 0; i < ${#unique_group_list[@]}; i++)); do
                 echo "   [copy_api_object] Fetching '${unique_group_list[$i]}'."
                 fetch_api_object_by_name "mobile_device_group" "${unique_group_list[$i]}"
                 check_groups_in_mobile_device_groups "${unique_group_list[$i]}"
@@ -596,21 +599,21 @@ copy_api_object() {
 
             # Process all the groups in reverse order, since the embedded groups
             # will then appear first, which should be safer for avoiding failed group creation
-            for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
+            for ((i = ${#final_group_list[@]} - 1; i >= 0; i--)); do
                 echo "   [copy_api_object] Mobile device group to process: ${final_group_list[$i]}"
                 check_eas_in_mobile_device_groups "${final_group_list[$i]}"
                 parse_api_object_by_name_for_copying "mobile_device_group" "${final_group_list[$i]}"
                 echo
                 if [[ $ask_for_dependencies == "yes" ]]; then
                     printf '%s' "WARNING! This will update mobile_device_group ${final_group_list[$i]}. Are you sure? (Y/N) : "
-                    read -r are_you_sure_copy_api_object < /dev/tty
+                    read -r are_you_sure_copy_api_object </dev/tty
                     case "$are_you_sure_copy_api_object" in
-                        Y|y)
-                            echo "   [main] Confirmed, copying ${final_group_list[$i]}"
-                            copy_mobile_device_group "${final_group_list[$i]}"
+                    Y | y)
+                        echo "   [main] Confirmed, copying ${final_group_list[$i]}"
+                        copy_mobile_device_group "${final_group_list[$i]}"
                         ;;
-                        *)
-                            echo "   [main] Skipping ${final_group_list[$i]}"
+                    *)
+                        echo "   [main] Skipping ${final_group_list[$i]}"
                         ;;
                     esac
                 else
@@ -627,7 +630,7 @@ copy_api_object() {
     api_object_type="${api_object_type_temp}"
 
     # look for existing entry and update it rather than create a new one if it exists
-    source_name_escaped="$( grep "<name>" "${parsed_file}" | head -n 1 | xargs | sed 's/<[^>]*>//g' )"
+    source_name_escaped="$(grep "<name>" "${parsed_file}" | head -n 1 | xargs | sed 's/<[^>]*>//g')"
     source_name="${source_name_escaped//\&amp;/&}"
 
     # Set the dest server
@@ -666,7 +669,7 @@ copy_api_object() {
         echo "   [copy_api_object] Existing ${api_xml_object} named '${source_name}' found; id=${existing_id}. Updating..."
 
         if [[ "${api_xml_object}" == "os_x_configuration_profile" || "${api_xml_object}" == "configuration_profile" ]]; then
-            # for profiles, we need to ensure that the UUID in the destination profile is maintained, so we do not want to overwrite it. 
+            # for profiles, we need to ensure that the UUID in the destination profile is maintained, so we do not want to overwrite it.
             # The UUID is mentioned three times, so it needs to be parsed directly from the destination, and written into the parsed file in each location...
 
             parsed_uuid=$(xmllint --xpath "//uuid/text()" "${parsed_file}" 2>/dev/null)
@@ -687,9 +690,9 @@ copy_api_object() {
             substituted_parsed_file="$(dirname "$parsed_file")/$(basename "$dest_instance")-$(basename "$parsed_file")"
             if [[ $ask_for_uuid = 1 && $entered_uuid != "" ]]; then
                 echo "   [copy_api_object] Entered UUID will be injected: ${entered_uuid}"
-                sed 's/'"${parsed_uuid}"'/'"${entered_uuid}"'/g' "${parsed_file}" > "${substituted_parsed_file}"
+                sed 's/'"${parsed_uuid}"'/'"${entered_uuid}"'/g' "${parsed_file}" >"${substituted_parsed_file}"
             else
-                sed 's/'"${parsed_uuid}"'/'"${existing_uuid}"'/g' "${parsed_file}" > "${substituted_parsed_file}"
+                sed 's/'"${parsed_uuid}"'/'"${existing_uuid}"'/g' "${parsed_file}" >"${substituted_parsed_file}"
             fi
 
             echo "   [copy_api_object] Substituted UUID into ${substituted_parsed_file}"
@@ -773,7 +776,7 @@ copy_api_object_by_name() {
 
     local parsed_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_name}-parsed.xml"
 
-    api_object_type=$( get_api_object_type "$api_xml_object" )
+    api_object_type=$(get_api_object_type "$api_xml_object")
 
     echo "   [copy_api_object_by_name] Copying ${api_xml_object} object '${chosen_api_obj_name}'"
 
@@ -864,9 +867,9 @@ copy_groups_in_group() {
 
     group_array=$(
         xmllint --xpath \
-        '//computer_group/criteria/criterion[name = "Computer Group"]/value' \
-        "$fetched_group_file" 2>/dev/null \
-        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+            '//computer_group/criteria/criterion[name = "Computer Group"]/value' \
+            "$fetched_group_file" 2>/dev/null |
+            sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
     )
 
     # Create list of unique groups
@@ -882,20 +885,20 @@ copy_groups_in_group() {
                     u=$((u + 1))
                 fi
             fi
-        done <<< "${group_array}"
+        done <<<"${group_array}"
     fi
 
     # transfer the unique list to a new list so that we can add further groups from
     # embedded groups whilst iterating through the unique list
     final_group_list=()
-    for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+    for ((i = 0; i < ${#unique_group_list[@]}; i++)); do
         final_group_list[i]="${unique_group_list[$i]}"
     done
 
     echo "   [copy_groups_in_group] Total ${#unique_group_list[@]} groups found in group."
 
     # Read all the groups to find groups within
-    for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+    for ((i = 0; i < ${#unique_group_list[@]}; i++)); do
         echo "   [copy_groups_in_group] Fetching '${unique_group_list[$i]}'."
         fetch_api_object_by_name computer_group "${unique_group_list[$i]}"
         check_groups_in_groups "${unique_group_list[$i]}"
@@ -903,21 +906,21 @@ copy_groups_in_group() {
 
     # Process all the groups in reverse order, since the embedded groups
     # will then appear first, which should be safer for avoiding failed group creation
-    for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
+    for ((i = ${#final_group_list[@]} - 1; i >= 0; i--)); do
         echo "   [copy_groups_in_group] Computer group to process: ${final_group_list[$i]}"
         check_eas_in_groups "${final_group_list[$i]}"
         parse_api_object_by_name_for_copying computer_group "${final_group_list[$i]}"
         echo
         if [[ $ask_for_dependencies == "yes" ]]; then
             printf '%s' "WARNING! This will update computer_group ${final_group_list[$i]}. Are you sure? (Y/N) : "
-            read -r are_you_sure_copy_groups_in_group < /dev/tty
+            read -r are_you_sure_copy_groups_in_group </dev/tty
             case "$are_you_sure_copy_groups_in_group" in
-                Y|y)
-                    echo "   [main] Confirmed, copying ${final_group_list[$i]}"
-                    copy_computer_group "${final_group_list[$i]}"
+            Y | y)
+                echo "   [main] Confirmed, copying ${final_group_list[$i]}"
+                copy_computer_group "${final_group_list[$i]}"
                 ;;
-                *)
-                    echo "   [main] Skipping ${final_group_list[$i]}"
+            *)
+                echo "   [main] Skipping ${final_group_list[$i]}"
                 ;;
             esac
         else
@@ -938,9 +941,9 @@ copy_groups_in_mobile_device_group() {
 
     group_array=$(
         xmllint --xpath \
-        '//mobile_device_group/criteria/criterion[name = "Mobile Device Group"]/value' \
-        "$fetched_group_file" 2>/dev/null \
-        | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+            '//mobile_device_group/criteria/criterion[name = "Mobile Device Group"]/value' \
+            "$fetched_group_file" 2>/dev/null |
+            sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
     )
 
     # Create list of unique groups
@@ -956,20 +959,20 @@ copy_groups_in_mobile_device_group() {
                     u=$((u + 1))
                 fi
             fi
-        done <<< "${group_array}"
+        done <<<"${group_array}"
     fi
 
     # transfer the unique list to a new list so that we can add further groups from
     # embedded groups whilst iterating through the unique list
     final_group_list=()
-    for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+    for ((i = 0; i < ${#unique_group_list[@]}; i++)); do
         final_group_list[i]="${unique_group_list[$i]}"
     done
 
     echo "   [copy_groups_in_mobile_device_group] Total ${#unique_group_list[@]} groups found in group."
 
     # Read all the groups to find groups within
-    for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+    for ((i = 0; i < ${#unique_group_list[@]}; i++)); do
         echo "   [copy_groups_in_mobile_device_group] Fetching '${unique_group_list[$i]}'."
         fetch_api_object_by_name mobile_device_group "${unique_group_list[$i]}"
         check_groups_in_mobile_device_groups "${unique_group_list[$i]}"
@@ -977,21 +980,21 @@ copy_groups_in_mobile_device_group() {
 
     # Process all the groups in reverse order, since the embedded groups
     # will then appear first, which should be safer for avoiding failed group creation
-    for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
+    for ((i = ${#final_group_list[@]} - 1; i >= 0; i--)); do
         echo "   [copy_groups_in_mobile_device_group] Mobile device group to process: ${final_group_list[$i]}"
         check_eas_in_mobile_device_groups "${final_group_list[$i]}"
         parse_api_object_by_name_for_copying mobile_device_group "${final_group_list[$i]}"
         echo
         if [[ $ask_for_dependencies == "yes" ]]; then
             printf '%s' "WARNING! This will update mobile_device_group ${final_group_list[$i]}. Are you sure? (Y/N) : "
-            read -r are_you_sure_copy_groups_in_mobile_device_group < /dev/tty
+            read -r are_you_sure_copy_groups_in_mobile_device_group </dev/tty
             case "$are_you_sure_copy_groups_in_mobile_device_group" in
-                Y|y)
-                    echo "   [main] Confirmed, copying ${final_group_list[$i]}"
-                    copy_mobile_device_group "${final_group_list[$i]}"
+            Y | y)
+                echo "   [main] Confirmed, copying ${final_group_list[$i]}"
+                copy_mobile_device_group "${final_group_list[$i]}"
                 ;;
-                *)
-                    echo "   [main] Skipping ${final_group_list[$i]}"
+            *)
+                echo "   [main] Skipping ${final_group_list[$i]}"
                 ;;
             esac
         else
@@ -1003,19 +1006,19 @@ copy_groups_in_mobile_device_group() {
 }
 
 get_exclusion_list() {
-    exclusion_list_type="$1"  # policies or computergroups
+    exclusion_list_type="$1" # policies or computergroups
 
     # import relevant exclusion list
     exclusion_lists_folder="$this_script_dir/exclusion-lists"
 
     if [[ -f "$exclusion_lists_folder/$exclusion_list_type.txt" ]]; then
-        # generate a standard "complete" list 
+        # generate a standard "complete" list
         exclusion_list=()
         while IFS= read -r exclusion; do
             if [[ "$exclusion" ]]; then
                 exclusion_list+=("$exclusion")
             fi
-        done < "$exclusion_lists_folder/$exclusion_list_type.txt"
+        done <"$exclusion_lists_folder/$exclusion_list_type.txt"
     else
         echo
         echo "No exclusion list for $exclusion_list_type found."
@@ -1026,11 +1029,11 @@ copy_computer_group() {
     local group_name="$1"
 
     # look for existing entry and update it rather than create a new one if it exists
-    source_name="$( 
-                    xmllint --xpath \
-                    '/computer_group/name/text()' \
-                    "${xml_folder}/computer_group-${group_name}-fetched.xml" 2>/dev/null 
-                )"
+    source_name="$(
+        xmllint --xpath \
+            '/computer_group/name/text()' \
+            "${xml_folder}/computer_group-${group_name}-fetched.xml" 2>/dev/null
+    )"
     # source_name_url_encoded=$( encode_name "${source_name}" )
 
     # Set the dest server
@@ -1103,11 +1106,11 @@ copy_mobile_device_group() {
     local group_name="$1"
 
     # look for existing entry and update it rather than create a new one if it exists
-    source_name="$( 
-                    xmllint --xpath \
-                    '/mobile_device_group/name/text()' \
-                    "${xml_folder}/mobile_device_group-${group_name}-fetched.xml" 2>/dev/null 
-                )"
+    source_name="$(
+        xmllint --xpath \
+            '/mobile_device_group/name/text()' \
+            "${xml_folder}/mobile_device_group-${group_name}-fetched.xml" 2>/dev/null
+    )"
     # source_name_url_encoded=$( encode_name "${source_name}" )
 
     # Set the dest server
@@ -1176,7 +1179,6 @@ copy_mobile_device_group() {
     echo
 }
 
-
 copy_policy() {
     local chosen_api_obj_name="$1"
     local chosen_api_obj_id=$2
@@ -1190,21 +1192,21 @@ copy_policy() {
     if [[ $skip_dependencies == "no" ]]; then
         # Look for packages and copy them if necessary
         echo "   [copy_policy] Checking for packages in ${chosen_api_obj_name}"
-        packages_count=$( 
+        packages_count=$(
             xmllint --xpath '//package_configuration/packages/size/text()' \
-            "${fetched_policy_file}" 2>/dev/null 
+                "${fetched_policy_file}" 2>/dev/null
         )
         [[ ! $packages_count ]] && packages_count=0
 
-        for (( n=1; n<=packages_count; n++ )); do
-            package_id=$( 
+        for ((n = 1; n <= packages_count; n++)); do
+            package_id=$(
                 xmllint --xpath "//package_configuration/packages/package[$n]/id/text()" \
-                "${fetched_policy_file}" 2>/dev/null 
+                    "${fetched_policy_file}" 2>/dev/null
             )
             if [[ ${package_id} ]]; then
-                package_name=$( 
+                package_name=$(
                     xmllint --xpath "//package_configuration/packages/package[$n]/name/text()" \
-                    "${fetched_policy_file}" 2>/dev/null 
+                        "${fetched_policy_file}" 2>/dev/null
                 )
                 echo "   [copy_policy] Package to check: $package_name (ID ${package_id})"
                 fetch_api_object "package" "${package_id}"
@@ -1212,14 +1214,14 @@ copy_policy() {
                 echo
                 if [[ $ask_for_dependencies == "yes" ]]; then
                     printf '%s' "WARNING! This will update package $package_name. Are you sure? (Y/N) : "
-                    read -r are_you_sure_copy_package < /dev/tty
+                    read -r are_you_sure_copy_package </dev/tty
                     case "$are_you_sure_copy_package" in
-                        Y|y)
-                            echo "   [main] Confirmed, copying $package_name"
-                            copy_api_object "package" "${package_id}" "$package_name"
+                    Y | y)
+                        echo "   [main] Confirmed, copying $package_name"
+                        copy_api_object "package" "${package_id}" "$package_name"
                         ;;
-                        *)
-                            echo "   [main] Skipping $package_name"
+                    *)
+                        echo "   [main] Skipping $package_name"
                         ;;
                     esac
                 else
@@ -1231,9 +1233,9 @@ copy_policy() {
 
         # Look for categories and create them if necessary
         echo "   [copy_policy] Checking the category in '${chosen_api_obj_name}'"
-        category_name=$( 
+        category_name=$(
             xmllint --xpath '//general/category/name/text()' \
-            "${fetched_policy_file}" 2>/dev/null 
+                "${fetched_policy_file}" 2>/dev/null
         )
         category_name_decoded="${category_name//&amp;/&}"
         if [[ $category_name_decoded == "" ]]; then
@@ -1244,24 +1246,24 @@ copy_policy() {
             echo "   [copy_policy] Category to check: ${category_name_decoded}"
             create_category "$category_name"
         fi
-    
+
         # Look for scripts and copy them if necessary
         echo "   [copy_policy] Checking for scripts in ${chosen_api_obj_name}"
         script_count=$(
             xmllint --xpath '//scripts/size/text()' \
-            "${fetched_policy_file}" 2>/dev/null 
+                "${fetched_policy_file}" 2>/dev/null
         )
 
         if [[ $script_count -gt 0 ]]; then
-            for (( n=1; n<=script_count; n++ )); do
-                script_id=$( 
+            for ((n = 1; n <= script_count; n++)); do
+                script_id=$(
                     xmllint --xpath "//scripts/script[$n]/id/text()" \
-                    "${fetched_policy_file}" 2>/dev/null 
+                        "${fetched_policy_file}" 2>/dev/null
                 )
                 if [[ $script_id ]]; then
-                    script_name=$( 
+                    script_name=$(
                         xmllint --xpath "//scripts/script[$n]/name/text()" \
-                        "${fetched_policy_file}" 2>/dev/null 
+                            "${fetched_policy_file}" 2>/dev/null
                     )
                     echo "   [copy_policy] Script to check: $script_name (ID ${script_id})"
                     fetch_api_object script "${script_id}"
@@ -1269,14 +1271,14 @@ copy_policy() {
                     echo
                     if [[ $ask_for_dependencies == "yes" ]]; then
                         printf '%s' "WARNING! This will update script $script_name. Are you sure? (Y/N) : "
-                        read -r are_you_sure_copy_script < /dev/tty
+                        read -r are_you_sure_copy_script </dev/tty
                         case "$are_you_sure_copy_script" in
-                            Y|y)
-                                echo "   [main] Confirmed, copying $script_name"
-                                copy_api_object "script" "${script_id}" "$script_name"
+                        Y | y)
+                            echo "   [main] Confirmed, copying $script_name"
+                            copy_api_object "script" "${script_id}" "$script_name"
                             ;;
-                            *)
-                                echo "   [main] Skipping $script_name"
+                        *)
+                            echo "   [main] Skipping $script_name"
                             ;;
                         esac
                     else
@@ -1292,13 +1294,13 @@ copy_policy() {
 
         group_array=$(
             xmllint --xpath '//scope/computer_groups/computer_group/name' \
-            "${fetched_policy_file}" 2>/dev/null \
-            | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+                "${fetched_policy_file}" 2>/dev/null |
+                sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
         )
         excluded_group_array=$(
             xmllint --xpath '//scope/exclusions/computer_groups/computer_group/name' \
-            "${fetched_policy_file}" 2>/dev/null \
-            | sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
+                "${fetched_policy_file}" 2>/dev/null |
+                sed 's|><|>,<|g' | sed 's|<[^>]*>||g' | tr "," "\n"
         )
 
         # Combine the two into a list of unique groups
@@ -1314,7 +1316,7 @@ copy_policy() {
                         u=$((u + 1))
                     fi
                 fi
-            done <<< "${excluded_group_array}"
+            done <<<"${excluded_group_array}"
         fi
 
         if [[ $group_array ]]; then
@@ -1326,20 +1328,20 @@ copy_policy() {
                         u=$((u + 1))
                     fi
                 fi
-            done <<< "${group_array}"
+            done <<<"${group_array}"
         fi
 
         # transfer the unique list to a new list so that we can add further groups from
         # embedded groups whilst iterating through the unique list
         final_group_list=()
-        for (( i = 0; i < ${#unique_group_list[@]}; i++ )); do
+        for ((i = 0; i < ${#unique_group_list[@]}; i++)); do
             final_group_list[i]="${unique_group_list[$i]}"
         done
 
         echo "   [copy_policy] Total ${#unique_group_list[@]} groups found in policy."
 
         # Read all the groups to find groups within
-        for (( i=0; i<${#unique_group_list[@]}; i++ )); do
+        for ((i = 0; i < ${#unique_group_list[@]}; i++)); do
             echo "   [copy_policy] Fetching '${unique_group_list[$i]}'."
             fetch_api_object_by_name "computer_group" "${unique_group_list[$i]}"
             check_groups_in_groups "${unique_group_list[$i]}"
@@ -1347,21 +1349,21 @@ copy_policy() {
 
         # Process all the groups in reverse order, since the embedded groups
         # will then appear first, which should be safer for avoiding failed group creation
-        for (( i=${#final_group_list[@]}-1; i>=0; i-- )); do
+        for ((i = ${#final_group_list[@]} - 1; i >= 0; i--)); do
             echo "   [copy_policy] Computer group to process: ${final_group_list[$i]}"
             check_eas_in_groups "${final_group_list[$i]}"
             parse_api_object_by_name_for_copying "computer_group" "${final_group_list[$i]}"
             echo
             if [[ $ask_for_dependencies == "yes" ]]; then
                 printf '%s' "WARNING! This will update computer_group ${final_group_list[$i]}. Are you sure? (Y/N) : "
-                read -r are_you_sure_copy_computer_group < /dev/tty
+                read -r are_you_sure_copy_computer_group </dev/tty
                 case "$are_you_sure_copy_computer_group" in
-                    Y|y)
-                        echo "   [main] Confirmed, copying ${final_group_list[$i]}"
-                        copy_computer_group "${final_group_list[$i]}"
+                Y | y)
+                    echo "   [main] Confirmed, copying ${final_group_list[$i]}"
+                    copy_computer_group "${final_group_list[$i]}"
                     ;;
-                    *)
-                        echo "   [main] Skipping ${final_group_list[$i]}"
+                *)
+                    echo "   [main] Skipping ${final_group_list[$i]}"
                     ;;
                 esac
             else
@@ -1509,10 +1511,10 @@ create_category() {
         category_template="$this_script_dir/templates/CategoryTemplate.xml"
 
         while read -r line || [[ -n "$line" ]]; do
-            echo "$line" \
-            | sed -e 's|%CATEGORY_NAME%|'"${category_name_for_sed}"'|' \
-            | sed -e 's|%PRIORITY%|9|'
-        done < "$category_template" > "${xml_folder}/CategoryTemplate-Parsed.xml"
+            echo "$line" |
+                sed -e 's|%CATEGORY_NAME%|'"${category_name_for_sed}"'|' |
+                sed -e 's|%PRIORITY%|9|'
+        done <"$category_template" >"${xml_folder}/CategoryTemplate-Parsed.xml"
 
         # send request
         curl_url="$jss_url/JSSResource/categories/id/0"
@@ -1531,7 +1533,7 @@ delete_api_object() {
     local api_xml_object="$1"
     local chosen_api_obj_name="$2"
     chosen_api_obj_name_decoded=${chosen_api_obj_name//&amp;/\&}
-    api_object_type=$( get_api_object_type "$api_xml_object" )
+    api_object_type=$(get_api_object_type "$api_xml_object")
     api_xml_object_plural=$(get_plural_from_api_xml_object "$api_xml_object")
 
     # Set the dest server
@@ -1569,7 +1571,7 @@ delete_api_object() {
             curl_url="$jss_url/JSSResource/accounts/${api_xml_object}id/${existing_id}"
         else
             curl_url="$jss_url/JSSResource/${api_object_type}/id/${existing_id}"
-        fi            
+        fi
         curl_args=("--request")
         curl_args+=("DELETE")
         curl_args+=("--header")
@@ -1621,12 +1623,12 @@ delete_pkg() {
             else
                 read -r -p "Do you want to delete the actual package from the SMB repo (requires inputting admin password)? (Y/N) : " delete_pkg_from_repo
                 case "$delete_pkg_from_repo" in
-                    Y|y)
-                        echo "   [delete_pkg] Deleting package '$pkg_name' from $smb_url..."
-                        do_delete_pkg "$pkg_name"
+                Y | y)
+                    echo "   [delete_pkg] Deleting package '$pkg_name' from $smb_url..."
+                    do_delete_pkg "$pkg_name"
                     ;;
-                    *)
-                        echo "   [delete_pkg] Not deleting - package '$pkg_name' will remain on $smb_url"
+                *)
+                    echo "   [delete_pkg] Not deleting - package '$pkg_name' will remain on $smb_url"
                     ;;
                 esac
             fi
@@ -1638,12 +1640,12 @@ delete_pkg() {
             else
                 read -r -p "Do you want to delete the package object anyway? (Y/N) : " delete_pkg_obj_from_jamf
                 case "$delete_pkg_obj_from_jamf" in
-                    Y|y)
-                        echo "   [delete_pkg] Deleting package object '$pkg_name'..."
+                Y | y)
+                    echo "   [delete_pkg] Deleting package object '$pkg_name'..."
                     ;;
-                    *)
-                        echo "   [delete_pkg] Not deleting package object '$pkg_name'"
-                        skip_delete_pkg_obj=1
+                *)
+                    echo "   [delete_pkg] Not deleting package object '$pkg_name'"
+                    skip_delete_pkg_obj=1
                     ;;
                 esac
             fi
@@ -1656,7 +1658,7 @@ delete_pkg() {
 
 encode_name() {
     # encode space, '&amp;', percent
-    name_url_encoded="$( echo "$1" | sed -e 's|\%|%25|g' | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' | sed -e 's|\#|%23|g' | sed -e 's|\+|%2B|g' )"
+    name_url_encoded="$(echo "$1" | sed -e 's|\%|%25|g' | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' | sed -e 's|\#|%23|g' | sed -e 's|\+|%2B|g')"
     echo "$name_url_encoded"
 }
 
@@ -1664,7 +1666,7 @@ fetch_api_object() {
     local api_xml_object="$1"
     local chosen_api_obj_id="$2"
 
-    api_object_type=$( get_api_object_type "$api_xml_object" )
+    api_object_type=$(get_api_object_type "$api_xml_object")
 
     # Get the full XML of the selected policy
     echo "   [fetch_api_object] ${api_xml_object} ID: ${chosen_api_obj_id}"
@@ -1695,14 +1697,14 @@ fetch_api_object() {
     send_curl_request
 
     # save formatted fetch file
-    xmllint --format "$curl_output_file" > "${xml_folder}/${api_xml_object}-${chosen_api_obj_id}-fetched.xml"
+    xmllint --format "$curl_output_file" >"${xml_folder}/${api_xml_object}-${chosen_api_obj_id}-fetched.xml"
 }
 
 fetch_api_object_by_name() {
     local api_xml_object="$1"
     local chosen_api_obj_name="$2"
 
-    api_object_type=$( get_api_object_type "$api_xml_object" )
+    api_object_type=$(get_api_object_type "$api_xml_object")
 
     chosen_api_obj_name_url_encoded=$(encode_name "$chosen_api_obj_name")
 
@@ -1732,7 +1734,7 @@ fetch_api_object_by_name() {
     send_curl_request
 
     # save formatted fetch file
-    xmllint --format "$curl_output_file" > "${xml_folder}/${api_xml_object}-${chosen_api_obj_name}-fetched.xml"
+    xmllint --format "$curl_output_file" >"${xml_folder}/${api_xml_object}-${chosen_api_obj_name}-fetched.xml"
 }
 
 fetch_icon() {
@@ -1740,13 +1742,13 @@ fetch_icon() {
 
     # get icon details from fetched xml
     echo "   [fetch_icon] Getting icon name from $fetched_file"
-    icon_filename=$( 
-        xmllint --xpath '//self_service/self_service_icon/filename/text()'\
-        "${fetched_file}" 2>/dev/null 
+    icon_filename=$(
+        xmllint --xpath '//self_service/self_service_icon/filename/text()' \
+            "${fetched_file}" 2>/dev/null
     )
-    icon_url=$( 
+    icon_url=$(
         xmllint --xpath '//self_service/self_service_icon/uri/text()' \
-        "${fetched_file}" 2>/dev/null 
+            "${fetched_file}" 2>/dev/null
     )
     # local_icon_url=$( echo "$icon_url" | sed 's|https://.*icon|'$jss_url'/icon|' )
     local_icon_url="$icon_url"
@@ -1754,7 +1756,7 @@ fetch_icon() {
     # download icon to local folder (no credentials required for this)
     if [[ $icon_filename && $local_icon_url ]]; then
         echo "   [fetch_icon] Downloading $icon_filename from $local_icon_url to '${xml_folder}/$icon_filename'"
-        for (( i=0; i<10; i++ )); do
+        for ((i = 0; i < 10; i++)); do
             curl -s \
                 -o "${xml_folder}/$icon_filename" \
                 "$local_icon_url"
@@ -1778,7 +1780,7 @@ mount_smb_share() {
     # Mount distribution point.
     # smb_mountpoint="/Volumes/$dp_share-$source_instance_list"
     smb_mountpoint="/Volumes/$dp_share"
-    if mount | grep "on $smb_mountpoint " > /dev/null; then
+    if mount | grep "on $smb_mountpoint " >/dev/null; then
         echo "Warning! $smb_mountpoint is already mounted which may be pointing to an incorrect mount point. Attempting to unmount..."
         unmount_smb_share
     fi
@@ -1795,7 +1797,7 @@ unmount_smb_share() {
     # Unmouint distribution point
     # smb_mountpoint="/Volumes/$dp_share-$source_instance_list"
     smb_mountpoint="/Volumes/$dp_share"
-    if mount | grep "on $smb_mountpoint " > /dev/null; then
+    if mount | grep "on $smb_mountpoint " >/dev/null; then
         if /usr/sbin/diskutil unmount "$smb_mountpoint"; then
             echo "   [unmount_smb_share] ${smb_mountpoint} successfully unmounted."
         else
@@ -1811,7 +1813,7 @@ parse_api_obj_for_copying() {
     local api_xml_object="$1"
     local chosen_api_obj_id=$2
 
-    api_object_type=$( get_api_object_type "$api_xml_object" )
+    api_object_type=$(get_api_object_type "$api_xml_object")
 
     fetched_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_id}-fetched.xml"
     parsed_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_id}-parsed.xml"
@@ -1826,7 +1828,7 @@ parse_api_object_by_name_for_copying() {
     local api_xml_object="$1"
     local chosen_api_obj_name="$2"
 
-    api_object_type=$( get_api_object_type "$api_xml_object" )
+    api_object_type=$(get_api_object_type "$api_xml_object")
 
     fetched_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_name}-fetched.xml"
     parsed_file="${xml_folder}/${api_xml_object}-${chosen_api_obj_name}-parsed.xml"
@@ -1842,13 +1844,13 @@ do_parsing() {
     local parsed_file="$2"
 
     # Strip out id, computer objects etc which are instance-specific
-    grep -v '<id>' < "${fetched_file}" \
-    | sed '/<computers>/,/<\/computers>/d' \
-    | sed '/<mobile_devices>/,/<\/mobile_devices>/d' \
-    | sed '/<users>/,/<\/users>/d' \
-    | sed '/<self_service_icon>/,/<\/self_service_icon>/d' \
-    | sed 's/<redeploy_on_update>Newly Assigned<\/redeploy_on_update>/<redeploy_on_update>All<\/redeploy_on_update>/g' \
-    > "${parsed_file}"
+    grep -v '<id>' <"${fetched_file}" |
+        sed '/<computers>/,/<\/computers>/d' |
+        sed '/<mobile_devices>/,/<\/mobile_devices>/d' |
+        sed '/<users>/,/<\/users>/d' |
+        sed '/<self_service_icon>/,/<\/self_service_icon>/d' |
+        sed 's/<redeploy_on_update>Newly Assigned<\/redeploy_on_update>/<redeploy_on_update>All<\/redeploy_on_update>/g' \
+            >"${parsed_file}"
 }
 
 strip_scope_from_api_object() {
@@ -1860,7 +1862,7 @@ strip_scope_from_api_object() {
 
     # Strip out id, computer objects etc which are instance-specific
     echo "   [strip_scope_from_api_object] Stripping scope from ${api_xml_object} '${chosen_api_obj_name}'"
-    sed '/<scope>/,/<\/scope>/d' < "${temp_parsed_file}" > "${parsed_file}"
+    sed '/<scope>/,/<\/scope>/d' <"${temp_parsed_file}" >"${parsed_file}"
 }
 
 disable_api_object() {
@@ -1872,7 +1874,7 @@ disable_api_object() {
 
     # disable
     echo "   [disable_api_object] Disabling ${api_xml_object} '${chosen_api_obj_name}'"
-    sed 's|<enabled>true</enabled>|<enabled>false</enabled>|' < "${temp_parsed_file}" > "${parsed_file}"
+    sed 's|<enabled>true</enabled>|<enabled>false</enabled>|' <"${temp_parsed_file}" >"${parsed_file}"
 }
 
 enable_api_object() {
@@ -1884,7 +1886,7 @@ enable_api_object() {
 
     # enable
     echo "   [enable_api_object] Enabling ${api_xml_object} '${chosen_api_obj_name}'"
-    sed 's|<enabled>false</enabled>|<enabled>true</enabled>|' < "${temp_parsed_file}" > "${parsed_file}"
+    sed 's|<enabled>false</enabled>|<enabled>true</enabled>|' <"${temp_parsed_file}" >"${parsed_file}"
 }
 
 remove_scope() {
@@ -1901,8 +1903,8 @@ remove_scope() {
 
     while read -r line || [[ -n "$line" ]]; do
         # shellcheck disable=SC2001
-        sed 's|%API_OBJECT_TYPE%|'"$api_xml_object"'|' <<< "$line"
-    done < "$empty_scope_template" > "${parsed_policy_file}"
+        sed 's|%API_OBJECT_TYPE%|'"$api_xml_object"'|' <<<"$line"
+    done <"$empty_scope_template" >"${parsed_policy_file}"
 }
 
 set_payload_organisation() {
@@ -1914,7 +1916,7 @@ set_payload_organisation() {
 
     echo "   [set_payload_organisation] Changing payload organisation in '${chosen_api_obj_name}' to '${new_org}'"
 
-    sed "s|PayloadOrganization\&lt\;\/key&gt\;\&lt\;string\&gt\;[A-Za-z ]*\&lt;\/string|PayloadOrganization\&lt;\/key\&gt\;\&lt\;string\&gt\;${new_org}\&lt\;\/string|g" < "${temp_parsed_file}" > "${parsed_file}"
+    sed "s|PayloadOrganization\&lt\;\/key&gt\;\&lt\;string\&gt\;[A-Za-z ]*\&lt;\/string|PayloadOrganization\&lt;\/key\&gt\;\&lt\;string\&gt\;${new_org}\&lt\;\/string|g" <"${temp_parsed_file}" >"${parsed_file}"
 }
 
 main() {
@@ -1928,10 +1930,10 @@ main() {
 
     # Logging
     if [[ ! -f "$log_file" ]]; then
-        mkdir -p "$( dirname "$log_file" )"
+        mkdir -p "$(dirname "$log_file")"
         touch "$log_file"
     fi
-    exec &> >( tee -a "$log_file" >&2 )
+    exec &> >(tee -a "$log_file" >&2)
 
     # -------------------------------------------------------------------------
     # Select the API object type
@@ -1966,82 +1968,81 @@ main() {
         echo "   V - Group"
         read -r -p "Enter a letter from the above options: " api_object_type_request
         case "$api_object_type_request" in
-            A|a)
-                api_xml_object="advanced_computer_search"
+        A | a)
+            api_xml_object="advanced_computer_search"
             ;;
-            B|b)
-                api_xml_object="advanced_mobile_device_search"
+        B | b)
+            api_xml_object="advanced_mobile_device_search"
             ;;
-            G|g)
-                api_xml_object="computer_group"
+        G | g)
+            api_xml_object="computer_group"
             ;;
-            H|h)
-                api_xml_object="mobile_device_group"
+        H | h)
+            api_xml_object="mobile_device_group"
             ;;
-            S|s)
-                api_xml_object="script"
+        S | s)
+            api_xml_object="script"
             ;;
-            E|e)
-                api_xml_object="computer_extension_attribute"
+        E | e)
+            api_xml_object="computer_extension_attribute"
             ;;
-            P|p)
-                api_xml_object="package"
+        P | p)
+            api_xml_object="package"
             ;;
-            C|c)
-                api_xml_object="os_x_configuration_profile"
+        C | c)
+            api_xml_object="os_x_configuration_profile"
             ;;
-            D|d)
-                api_xml_object="configuration_profile"
-                instance_list_type="ios"
+        D | d)
+            api_xml_object="configuration_profile"
+            instance_list_type="ios"
             ;;
-            O|o)
-                api_xml_object="os_x_configuration_profile"
-                ask_for_uuid=1
+        O | o)
+            api_xml_object="os_x_configuration_profile"
+            ask_for_uuid=1
             ;;
-            F|f)
-                api_xml_object="os_x_configuration_profile"
-                fix_org=1
+        F | f)
+            api_xml_object="os_x_configuration_profile"
+            fix_org=1
             ;;
-            M|m)
-                api_xml_object="mac_application"
+        M | m)
+            api_xml_object="mac_application"
             ;;
-            I|i)
-                api_xml_object="mobile_device_application"
-                instance_list_type="ios"
+        I | i)
+            api_xml_object="mobile_device_application"
+            instance_list_type="ios"
             ;;
-            R|r)
-                api_xml_object="restricted_software_title"
+        R | r)
+            api_xml_object="restricted_software_title"
             ;;
-            T|t)
-                api_xml_object="category"
-                instance_list_type="ios"
+        T | t)
+            api_xml_object="category"
+            instance_list_type="ios"
             ;;
-            L|l)
-                api_xml_object="policy"
+        L | l)
+            api_xml_object="policy"
             ;;
-            K|k)
-                api_xml_object="dock_item"
+        K | k)
+            api_xml_object="dock_item"
             ;;
-            U|u)
-                api_xml_object="user"
-                instance_list_type="ios"
+        U | u)
+            api_xml_object="user"
+            instance_list_type="ios"
             ;;
-            V|v)
-                api_xml_object="group"
-                instance_list_type="ios"
+        V | v)
+            api_xml_object="group"
+            instance_list_type="ios"
             ;;
-            X|x)
-                api_xml_object="mobile_device_extension_attribute"
+        X | x)
+            api_xml_object="mobile_device_extension_attribute"
             ;;
-            *)
-                api_xml_object="policy"
+        *)
+            api_xml_object="policy"
             ;;
         esac
     fi
 
     echo
     echo "   [main] $api_xml_object object type chosen"
-
 
     # -------------------------------------------------------------------------
     # Set the source and destination server(s) and instance(s)
@@ -2093,7 +2094,7 @@ main() {
         set_credentials "$source_instance"
         echo "   [request] Using stored credentials for $source_instance ($jss_api_user)"
     fi
-    api_object_type=$( get_api_object_type "$api_xml_object" )
+    api_object_type=$(get_api_object_type "$api_xml_object")
 
     # policies can be selected by category, other objects cannot
     if [[ $api_xml_object == "policy" ]]; then
@@ -2102,8 +2103,8 @@ main() {
         curl_args=("--header")
         curl_args+=("Accept: application/xml")
         send_curl_request
-    
-        xmllint --format "$curl_output_file" > "${formatted_list}" 2>/dev/null
+
+        xmllint --format "$curl_output_file" >"${formatted_list}" 2>/dev/null
 
         # Set up an array for IDs and Names, which will have matching array counts.
         category_count=0
@@ -2118,9 +2119,9 @@ main() {
             fi
             if [[ ${line} == *"<name>"* ]]; then
                 category_names[category_count]=$(echo "${line}" | awk -F '<name>|</name>' '{ print $2; exit; }')
-                category_count=$((category_count+1))
+                category_count=$((category_count + 1))
             fi
-        done < "$formatted_list"
+        done <"$formatted_list"
 
         # If policy was not selected at the command line, allow to select from category
         if [[ ! $policy_category ]]; then
@@ -2129,7 +2130,7 @@ main() {
             echo "   [main] Categories :"
             echo
 
-            for (( loop=0; loop<${#category_ids[@]}; loop++ )); do
+            for ((loop = 0; loop < ${#category_ids[@]}; loop++)); do
                 listed_category_name_xml_decoded="${category_names[$loop]//&amp;/&}"
                 printf '   %-7s %-30s\n' "($loop)" "${listed_category_name_xml_decoded}"
                 if [[ "${listed_category_name_xml_decoded}" == "${policy_testing_category}" ]]; then
@@ -2158,7 +2159,7 @@ main() {
                 done
             else
                 echo "   [$policy_testing_category_in_list] $policy_testing_category"
-                category_choice_array=( "$policy_testing_category_in_list" )
+                category_choice_array=("$policy_testing_category_in_list")
             fi
         fi
 
@@ -2174,7 +2175,7 @@ main() {
             send_curl_request
 
             # output formatted xml to list
-            xmllint --format "$curl_output_file" > "${formatted_list}"
+            xmllint --format "$curl_output_file" >"${formatted_list}"
         else
             # Clear the formatted list
             [[ -f "${formatted_list}" ]] && rm "${formatted_list}"
@@ -2192,10 +2193,10 @@ main() {
                 send_curl_request
 
                 # output formatted xml to list
-                xmllint --format "$curl_output_file" >> "${formatted_list}"
+                xmllint --format "$curl_output_file" >>"${formatted_list}"
             done
         fi
-        if [[ $( grep -c "<policy>" "${formatted_list}" | awk '{ print $1 }') == "0" ]]; then
+        if [[ $(grep -c "<policy>" "${formatted_list}" | awk '{ print $1 }') == "0" ]]; then
             echo
             echo "   [main] No policies found in the selected categories."
             cleanup_and_exit
@@ -2208,16 +2209,16 @@ main() {
         send_curl_request
 
         # output formatted xml to list
-        xmllint --format "$curl_output_file" > "${formatted_list}"
+        xmllint --format "$curl_output_file" >"${formatted_list}"
 
         # accounts have to be treated differently
         if [[ $api_xml_object == "user" ]]; then
             # first we have to remove sites and groups from the list
-            sed '/<site>/,/<\/site>/d' "$formatted_list"  | sed '/<groups>/,/<\/groups>/d' > "$formatted_list.tmp"
+            sed '/<site>/,/<\/site>/d' "$formatted_list" | sed '/<groups>/,/<\/groups>/d' >"$formatted_list.tmp"
             mv "$formatted_list.tmp" "$formatted_list"
-        elif  [[ $api_xml_object == "group" ]]; then
+        elif [[ $api_xml_object == "group" ]]; then
             # first we have to remove sites and users from the list
-            sed '/<site>/,/<\/site>/d' "$formatted_list"  | sed '/<users>/,/<\/users>/d' > "$formatted_list.tmp"
+            sed '/<site>/,/<\/site>/d' "$formatted_list" | sed '/<users>/,/<\/users>/d' >"$formatted_list.tmp"
             mv "$formatted_list.tmp" "$formatted_list"
         fi
 
@@ -2239,9 +2240,9 @@ main() {
         fi
         if [[ ${line} == *"<name>"* ]]; then
             api_obj_names[api_obj_count]=$(echo "${line}" | awk -F '<name>|</name>' '{ print $2; exit; }')
-            api_obj_count=$((api_obj_count+1))
+            api_obj_count=$((api_obj_count + 1))
         fi
-    done < "$formatted_list"
+    done <"$formatted_list"
 
     if [[ "$inputted_api_obj_name" ]]; then
         # if supplying an object name at the command line, we want to only find an exact match
@@ -2261,12 +2262,12 @@ main() {
 
         chosen_api_obj_name=""
         inputted_api_obj_name_lowercase=$(echo "${inputted_api_obj_name}" | tr '[:upper:]' '[:lower:]')
-        for (( loop=0; loop<${#api_obj_ids[@]}; loop++ )); do
+        for ((loop = 0; loop < ${#api_obj_ids[@]}; loop++)); do
             api_obj_name_lowercase=$(echo "${api_obj_names[$loop]}" | tr '[:upper:]' '[:lower:]')
             if [[ ("$api_obj_name_lowercase" == *"${inputted_api_obj_name_lowercase}"*) || "${api_obj_names[$loop]}" == "${inputted_api_obj_name}" ]]; then
                 chosen_api_obj_id="${api_obj_ids[$loop]}"
                 chosen_api_obj_name="${api_obj_names[$loop]}"
-                matches=$((matches+1))
+                matches=$((matches + 1))
                 api_obj_name_xml_decoded="${api_obj_names[$loop]//&amp;/&}"
                 if [[ "${api_obj_names[$loop]}" == "$inputted_api_obj_name" ]]; then
                     exact_match_exists=1
@@ -2320,7 +2321,7 @@ main() {
         # pre-create a list of every item in the selection so that we can choose "ALL"
         list_of_all=()
 
-        for (( loop=0; loop<${#api_obj_ids[@]}; loop++ )); do
+        for ((loop = 0; loop < ${#api_obj_ids[@]}; loop++)); do
             api_obj_name_xml_decoded="${api_obj_names[$loop]//&amp;/&}"
             printf '   %-7s %-30s\n' "($loop)" "$api_obj_name_xml_decoded"
             list_of_all+=("$loop")
@@ -2348,7 +2349,7 @@ main() {
         if [[ $sel == *"-"* ]]; then
             list_first=$(echo "$sel" | cut -d'-' -f1)
             list_last=$(echo "$sel" | cut -d'-' -f2)
-            for (( i=list_first; i<=list_last; i++ )); do
+            for ((i = list_first; i <= list_last; i++)); do
                 api_obj_choice_array+=("$i")
             done
         else
@@ -2391,70 +2392,70 @@ main() {
         read -r -p "Enter a letter from the above options: " action_question
 
         case "$action_question" in
-            CD|Cd|cd)
-                skip_dependencies="no"
-                ask_for_dependencies="yes"
+        CD | Cd | cd)
+            skip_dependencies="no"
+            ask_for_dependencies="yes"
+            api_obj_action="copy"
+            ;;
+        CF | Cf | cf)
+            echo "   [main] Force mode selected - all items including protected items will be force-copied!"
+            skip_dependencies="no"
+            ask_for_dependencies="no"
+            if [[ $api_xml_object == "computer_group" ]]; then
+                force_update_groups="$chosen_api_obj_name"
                 api_obj_action="copy"
-            ;;
-            CF|Cf|cf)
-                echo "   [main] Force mode selected - all items including protected items will be force-copied!"
-                skip_dependencies="no"
-                ask_for_dependencies="no"
-                if [[ $api_xml_object == "computer_group" ]]; then
-                    force_update_groups="$chosen_api_obj_name"
-                    api_obj_action="copy"
-                elif [[ $api_xml_object == "policy" ]]; then
-                    force_update_policies="$chosen_api_obj_name"
-                    api_obj_action="copy"
-                fi
-            ;;
-            CI|Ci|ci)
-                echo "   [main] Force icon mode selected - an existing icon with the same name will be replaced"
-                ask_for_dependencies="yes"
-                if [[ $api_xml_object == "policy" ]]; then
-                    force_icon_update="yes"
-                    api_obj_action="copy"
-                fi
-            ;;
-            CN|Cn|cn)
-                echo "   [main] Force copy selected - all non-protected items will be force-copied!"
-                skip_dependencies="no"
-                ask_for_dependencies="no"
+            elif [[ $api_xml_object == "policy" ]]; then
+                force_update_policies="$chosen_api_obj_name"
                 api_obj_action="copy"
+            fi
             ;;
-            CS|Cs|cs)
-                echo "   [main] Ultra Safe mode selected - no object dependencies will be checked or copied, scope is unaltered"
-                skip_dependencies="yes"
-                strip_scope="yes"
+        CI | Ci | ci)
+            echo "   [main] Force icon mode selected - an existing icon with the same name will be replaced"
+            ask_for_dependencies="yes"
+            if [[ $api_xml_object == "policy" ]]; then
+                force_icon_update="yes"
                 api_obj_action="copy"
+            fi
             ;;
-            C|c)
-                echo "   [main] Safe mode selected - no object dependencies will be checked or copied"
-                skip_dependencies="yes"
-                api_obj_action="copy"
+        CN | Cn | cn)
+            echo "   [main] Force copy selected - all non-protected items will be force-copied!"
+            skip_dependencies="no"
+            ask_for_dependencies="no"
+            api_obj_action="copy"
             ;;
-            R|r)
-                api_obj_action="copy"
-                remove_scope_only="yes"
-                skip_dependencies="yes"
+        CS | Cs | cs)
+            echo "   [main] Ultra Safe mode selected - no object dependencies will be checked or copied, scope is unaltered"
+            skip_dependencies="yes"
+            strip_scope="yes"
+            api_obj_action="copy"
             ;;
-            X|x)
-                api_obj_action="copy"
-                disable_only="yes"
-                skip_dependencies="yes"
+        C | c)
+            echo "   [main] Safe mode selected - no object dependencies will be checked or copied"
+            skip_dependencies="yes"
+            api_obj_action="copy"
             ;;
-            E|e)
-                api_obj_action="copy"
-                enable_only="yes"
-                skip_dependencies="yes"
+        R | r)
+            api_obj_action="copy"
+            remove_scope_only="yes"
+            skip_dependencies="yes"
             ;;
-            D|d)
-                api_obj_action="delete"
+        X | x)
+            api_obj_action="copy"
+            disable_only="yes"
+            skip_dependencies="yes"
             ;;
-            *)
-                echo
-                echo "   [main] No valid action chosen!"
-                cleanup_and_exit
+        E | e)
+            api_obj_action="copy"
+            enable_only="yes"
+            skip_dependencies="yes"
+            ;;
+        D | d)
+            api_obj_action="delete"
+            ;;
+        *)
+            echo
+            echo "   [main] No valid action chosen!"
+            cleanup_and_exit
             ;;
         esac
     elif [[ $api_obj_action != "copy" && $api_obj_action != "delete" ]]; then
@@ -2502,11 +2503,11 @@ main() {
         echo
         read -r -p "WARNING! This will affect the $api_xml_object on ALL chosen instances! Are you sure? (Y/N) : " are_you_sure
         case "$are_you_sure" in
-            Y|y)
-                echo "   [main] Confirmed"
+        Y | y)
+            echo "   [main] Confirmed"
             ;;
-            *)
-                cleanup_and_exit
+        *)
+            cleanup_and_exit
             ;;
         esac
     fi
@@ -2522,7 +2523,7 @@ main() {
         chosen_api_obj_name_decoded=${chosen_api_obj_name//&amp;/\&}
 
         # Create a URL-encoded version of the API object name, we need this later...
-        chosen_api_obj_name_url_encoded="$( echo "$chosen_api_obj_name" | sed -e 's|%|%25|g' | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' | sed -e 's|#|%23|g' )"
+        chosen_api_obj_name_url_encoded="$(echo "$chosen_api_obj_name" | sed -e 's|%|%25|g' | sed -e 's| |%20|g' | sed -e 's|&amp;|%26|g' | sed -e 's|#|%23|g')"
 
         if [[ $api_obj_action == "copy" ]]; then
             # grab the object from the source instance
@@ -2571,7 +2572,7 @@ main() {
         else
             # create an array of multiple instances as chosen from the cli
             for instance in "${instance_choice_array[@]}"; do
-                dest_instances_array+=( "$instance" )
+                dest_instances_array+=("$instance")
             done
         fi
 
@@ -2589,43 +2590,43 @@ main() {
             echo "   [main] Destination URL: $jss_url ($instance_count of ${#dest_instances_array[@]})"
 
             case $api_obj_action in
-                delete)
-                    # if deleting a package from an SMB repo, first remove the package itself (TODO - delete from S3)
-                    if [[ $api_obj_action == "delete" && $api_xml_object == "package" ]]; then
-                        delete_pkg "${chosen_api_obj_name}"
+            delete)
+                # if deleting a package from an SMB repo, first remove the package itself (TODO - delete from S3)
+                if [[ $api_obj_action == "delete" && $api_xml_object == "package" ]]; then
+                    delete_pkg "${chosen_api_obj_name}"
+                fi
+                # now delete the API object
+                if [[ $skip_delete_pkg_obj -ne 1 ]]; then
+                    echo "   [main] Deleting ${api_xml_object} '$chosen_api_obj_name_decoded'"
+                    delete_api_object "$api_xml_object" "$chosen_api_obj_name"
+                fi
+                ;;
+            copy)
+                echo "   [main] Copying ${api_xml_object} '$chosen_api_obj_name'"
+                if [[ $strip_scope == "yes" ]]; then
+                    strip_scope_from_api_object "$api_xml_object" "$chosen_api_obj_name"
+                fi
+                if [[ $api_xml_object == "policy" ]]; then
+                    copy_policy "$chosen_api_obj_name" "$chosen_api_obj_id"
+                elif [[ $api_xml_object == "computer_group" ]]; then
+                    if [[ $skip_dependencies == "no" ]]; then
+                        check_eas_in_groups "$chosen_api_obj_name"
+                        copy_groups_in_group "$chosen_api_obj_name"
                     fi
-                    # now delete the API object
-                    if [[ $skip_delete_pkg_obj -ne 1 ]]; then
-                        echo "   [main] Deleting ${api_xml_object} '$chosen_api_obj_name_decoded'"
-                        delete_api_object "$api_xml_object" "$chosen_api_obj_name"
+                    copy_computer_group "$chosen_api_obj_name"
+                elif [[ $api_xml_object == "mobile_device_group" ]]; then
+                    if [[ $skip_dependencies == "no" ]]; then
+                        check_eas_in_mobile_device_groups "$chosen_api_obj_name"
+                        copy_groups_in_mobile_device_group "$chosen_api_obj_name"
                     fi
-                    ;;
-                copy)
-                    echo "   [main] Copying ${api_xml_object} '$chosen_api_obj_name'"
-                    if [[ $strip_scope == "yes" ]]; then
-                        strip_scope_from_api_object "$api_xml_object" "$chosen_api_obj_name"
-                    fi
-                    if [[ $api_xml_object == "policy" ]]; then
-                        copy_policy "$chosen_api_obj_name" "$chosen_api_obj_id"
-                    elif [[ $api_xml_object == "computer_group" ]]; then
-                        if [[ $skip_dependencies == "no" ]]; then
-                            check_eas_in_groups "$chosen_api_obj_name"
-                            copy_groups_in_group "$chosen_api_obj_name"
-                        fi
-                        copy_computer_group "$chosen_api_obj_name"
-                    elif [[ $api_xml_object == "mobile_device_group" ]]; then
-                        if [[ $skip_dependencies == "no" ]]; then
-                            check_eas_in_mobile_device_groups "$chosen_api_obj_name"
-                            copy_groups_in_mobile_device_group "$chosen_api_obj_name"
-                        fi
-                        copy_mobile_device_group "$chosen_api_obj_name"
-                    else
-                        copy_api_object "$api_xml_object" "$chosen_api_obj_id" "$chosen_api_obj_name"
-                    fi
-                    # Send Slack notification
-                    slack_text="{'username': '$jss_url', 'text': '*jocads.sh*\n*API $api_xml_object copy action*\nUser: $jss_api_user\nObject Name: *$chosen_api_obj_name*\nInstance: $jss_url\nHTTP Response: $http_response'}"
-                    send_slack_notification "$slack_text"
-                    ;;
+                    copy_mobile_device_group "$chosen_api_obj_name"
+                else
+                    copy_api_object "$api_xml_object" "$chosen_api_obj_id" "$chosen_api_obj_name"
+                fi
+                # Send Slack notification
+                slack_text="{'username': '$jss_url', 'text': '*jocads.sh*\n*API $api_xml_object copy action*\nUser: $jss_api_user\nObject Name: *$chosen_api_obj_name*\nInstance: $jss_url\nHTTP Response: $http_response'}"
+                send_slack_notification "$slack_text"
+                ;;
             esac
             ((instance_count++))
         done
@@ -2653,221 +2654,221 @@ echo
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
-        --source=*)
-            source_instance="${key#*=}"
-            echo "   [main] CLI: Source instance: ${source_instance}"
+    --source=*)
+        source_instance="${key#*=}"
+        echo "   [main] CLI: Source instance: ${source_instance}"
         ;;
 
-        -i|-si|--source)
-            shift
-            source_instance="${1}"
-            echo "   [main] CLI: Source instance: ${source_instance}"
+    -i | -si | --source)
+        shift
+        source_instance="${1}"
+        echo "   [main] CLI: Source instance: ${source_instance}"
         ;;
 
-        --dest=*)
-            chosen_instance="${key#*=}"
-            echo "   [main] CLI: Destination instance(s): $dest_instance"
+    --dest=*)
+        chosen_instance="${key#*=}"
+        echo "   [main] CLI: Destination instance(s): $dest_instance"
         ;;
 
-        -di|--dest)
-            shift
-            chosen_instance="${1}"
-            echo "   [main] CLI: Destination instance(s): $dest_instance"
+    -di | --dest)
+        shift
+        chosen_instance="${1}"
+        echo "   [main] CLI: Destination instance(s): $dest_instance"
         ;;
 
-        --id|--client-id|--user|--username)
-            shift
-            chosen_id="$1"
+    --id | --client-id | --user | --username)
+        shift
+        chosen_id="$1"
         ;;
 
-        --source-list=*)
-            chosen_source_instance_list="${key#*=}"
-            echo "   [main] CLI: Source instance list: $chosen_source_instance_list"
+    --source-list=*)
+        chosen_source_instance_list="${key#*=}"
+        echo "   [main] CLI: Source instance list: $chosen_source_instance_list"
         ;;
 
-        -il|-sl|--source-list)
-            shift
-            chosen_source_instance_list="${1}"
-            echo "   [main] CLI: Source instance list: $chosen_source_instance_list"
+    -il | -sl | --source-list)
+        shift
+        chosen_source_instance_list="${1}"
+        echo "   [main] CLI: Source instance list: $chosen_source_instance_list"
         ;;
 
-        --dest-list=*)
-            chosen_source_instance_list="${key#*=}"
-            echo "   [main] CLI: Destination instance list: $chosen_source_instance_list"
+    --dest-list=*)
+        chosen_source_instance_list="${key#*=}"
+        echo "   [main] CLI: Destination instance list: $chosen_source_instance_list"
         ;;
 
-        -dl|--dest-list)
-            shift
-            chosen_dest_instance_list="${1}"
-            echo "   [main] CLI: Destination instance list: $chosen_dest_instance_list"
+    -dl | --dest-list)
+        shift
+        chosen_dest_instance_list="${1}"
+        echo "   [main] CLI: Destination instance list: $chosen_dest_instance_list"
         ;;
 
-        -c|--copy)
-            echo "   [main] CLI: Action: copy"
-            api_obj_action="copy"
+    -c | --copy)
+        echo "   [main] CLI: Action: copy"
+        api_obj_action="copy"
         ;;
 
-        -d|--delete)
-            if [[ ! "$api_obj_action" ]]; then
-                echo "   [main] CLI: Action: delete"
-                api_obj_action="delete"
-            else
-                echo "   [main] CLI: Error: You can't both copy and delete at the same time!"
-                echo
-                exit 1
-            fi
+    -d | --delete)
+        if [[ ! "$api_obj_action" ]]; then
+            echo "   [main] CLI: Action: delete"
+            api_obj_action="delete"
+        else
+            echo "   [main] CLI: Error: You can't both copy and delete at the same time!"
+            echo
+            exit 1
+        fi
         ;;
 
-        --force-update-groups=*)
-            force_update_groups="${key#*=}"
-            echo "   [main] CLI: Action: force update groups: $force_update_groups"
+    --force-update-groups=*)
+        force_update_groups="${key#*=}"
+        echo "   [main] CLI: Action: force update groups: $force_update_groups"
         ;;
 
-        --force|--force-update-groups)
-            shift
-            force_update_groups="${1}"
-            echo "   [main] CLI: Action: force update groups: $force_update_groups"
+    --force | --force-update-groups)
+        shift
+        force_update_groups="${1}"
+        echo "   [main] CLI: Action: force update groups: $force_update_groups"
         ;;
 
-        --policy=*)
-            inputted_policy_name="${key#*=}"
-            inputted_api_obj_name="${key#*=}"
-            api_object_type="policies"
-            api_xml_object="policy"
-            policy_category="ALL"
-            echo "   [main] CLI: Policy: $inputted_policy_name"
+    --policy=*)
+        inputted_policy_name="${key#*=}"
+        inputted_api_obj_name="${key#*=}"
+        api_object_type="policies"
+        api_xml_object="policy"
+        policy_category="ALL"
+        echo "   [main] CLI: Policy: $inputted_policy_name"
         ;;
 
-        --policy)
-            api_object_type="policies"
-            api_xml_object="policy"
-            echo "   [main] CLI: Policy: $inputted_policy_name"
+    --policy)
+        api_object_type="policies"
+        api_xml_object="policy"
+        echo "   [main] CLI: Policy: $inputted_policy_name"
         ;;
 
-        --all)
-            policy_category="ALL"
-            echo "   [main] CLI: Policy Category: $policy_category"
+    --all)
+        policy_category="ALL"
+        echo "   [main] CLI: Policy Category: $policy_category"
         ;;
 
-        --group=*)
-            inputted_api_obj_name="${key#*=}"
-            api_object_type="computergroups"
-            api_xml_object="computer_group"
-            echo "   [main] CLI: Group: $inputted_api_obj_name"
+    --group=*)
+        inputted_api_obj_name="${key#*=}"
+        api_object_type="computergroups"
+        api_xml_object="computer_group"
+        echo "   [main] CLI: Group: $inputted_api_obj_name"
         ;;
 
-        --group)
-            api_object_type="computergroups"
-            api_xml_object="computer_group"
-            echo "   [main] CLI: Group: $inputted_api_obj_name"
+    --group)
+        api_object_type="computergroups"
+        api_xml_object="computer_group"
+        echo "   [main] CLI: Group: $inputted_api_obj_name"
         ;;
 
-        --script=*)
-            inputted_api_obj_name="${key#*=}"
-            api_object_type="scripts"
-            api_xml_object="script"
-            echo "   [main] CLI: Script: $inputted_api_obj_name"
+    --script=*)
+        inputted_api_obj_name="${key#*=}"
+        api_object_type="scripts"
+        api_xml_object="script"
+        echo "   [main] CLI: Script: $inputted_api_obj_name"
         ;;
 
-        --script)
-            api_object_type="scripts"
-            api_xml_object="script"
-            echo "   [main] CLI: Script: $inputted_api_obj_name"
+    --script)
+        api_object_type="scripts"
+        api_xml_object="script"
+        echo "   [main] CLI: Script: $inputted_api_obj_name"
         ;;
 
-        --category=*)
-            inputted_api_obj_name="${key#*=}"
-            api_object_type="categories"
-            api_xml_object="category"
-            echo "   [main] CLI: Category: $inputted_api_obj_name"
+    --category=*)
+        inputted_api_obj_name="${key#*=}"
+        api_object_type="categories"
+        api_xml_object="category"
+        echo "   [main] CLI: Category: $inputted_api_obj_name"
         ;;
 
-        --category)
-            api_object_type="categories"
-            api_xml_object="category"
-            echo "   [main] CLI: Category: $inputted_api_obj_name"
+    --category)
+        api_object_type="categories"
+        api_xml_object="category"
+        echo "   [main] CLI: Category: $inputted_api_obj_name"
         ;;
 
-        --ea=*)
-            inputted_api_obj_name="${key#*=}"
-            api_object_type="computerextensionattributes"
-            api_xml_object="computer_extension_attribute"
-            echo "   [main] CLI: Computer Extension Attribute: $inputted_api_obj_name"
+    --ea=*)
+        inputted_api_obj_name="${key#*=}"
+        api_object_type="computerextensionattributes"
+        api_xml_object="computer_extension_attribute"
+        echo "   [main] CLI: Computer Extension Attribute: $inputted_api_obj_name"
         ;;
 
-        --ea)
-            api_object_type="computerextensionattributes"
-            api_xml_object="computer_extension_attribute"
-            echo "   [main] CLI: Computer Extension Attribute: $inputted_api_obj_name"
+    --ea)
+        api_object_type="computerextensionattributes"
+        api_xml_object="computer_extension_attribute"
+        echo "   [main] CLI: Computer Extension Attribute: $inputted_api_obj_name"
         ;;
 
-        --mea=*)
-            inputted_api_obj_name="${key#*=}"
-            api_object_type="mobiledeviceextensionattributes"
-            api_xml_object="mobile_device_extension_attribute"
-            echo "   [main] CLI: Mobile Device Extension Attribute: $inputted_api_obj_name"
+    --mea=*)
+        inputted_api_obj_name="${key#*=}"
+        api_object_type="mobiledeviceextensionattributes"
+        api_xml_object="mobile_device_extension_attribute"
+        echo "   [main] CLI: Mobile Device Extension Attribute: $inputted_api_obj_name"
         ;;
 
-        --mea)
-            api_object_type="mobiledeviceextensionattributes"
-            api_xml_object="mobile_device_extension_attribute"
-            echo "   [main] CLI: EMobile Device xtension Attribute: $inputted_api_obj_name"
+    --mea)
+        api_object_type="mobiledeviceextensionattributes"
+        api_xml_object="mobile_device_extension_attribute"
+        echo "   [main] CLI: EMobile Device xtension Attribute: $inputted_api_obj_name"
         ;;
 
-        --package=*)
-            inputted_api_obj_name="${key#*=}"
-            api_object_type="packages"
-            api_xml_object="package"
-            echo "   [main] CLI: Package: $inputted_api_obj_name"
+    --package=*)
+        inputted_api_obj_name="${key#*=}"
+        api_object_type="packages"
+        api_xml_object="package"
+        echo "   [main] CLI: Package: $inputted_api_obj_name"
         ;;
 
-        --package)
-            api_object_type="packages"
-            api_xml_object="package"
-            echo "   [main] CLI: Package: $inputted_api_obj_name"
+    --package)
+        api_object_type="packages"
+        api_xml_object="package"
+        echo "   [main] CLI: Package: $inputted_api_obj_name"
         ;;
 
-        --appstoreapp=*)
-            inputted_api_obj_name="${key#*=}"
-            api_object_type="macapplications"
-            api_xml_object="mac_application"
-            echo "   [main] CLI: Mac App Store App: $inputted_api_obj_name"
+    --appstoreapp=*)
+        inputted_api_obj_name="${key#*=}"
+        api_object_type="macapplications"
+        api_xml_object="mac_application"
+        echo "   [main] CLI: Mac App Store App: $inputted_api_obj_name"
         ;;
 
-        --appstoreapp)
-            api_object_type="macapplications"
-            api_xml_object="mac_application"
-            echo "   [main] CLI: Mac App Store App: $inputted_api_obj_name"
+    --appstoreapp)
+        api_object_type="macapplications"
+        api_xml_object="mac_application"
+        echo "   [main] CLI: Mac App Store App: $inputted_api_obj_name"
         ;;
 
-        --clean)
-            echo "   [main] CLI: Action: clean up working files"
-            clean_up="yes"
+    --clean)
+        echo "   [main] CLI: Action: clean up working files"
+        clean_up="yes"
         ;;
 
-        --confirm)
-            echo "   [main] CLI: Action: auto-confirm copy or delete, for non-interactive use."
-            confirmed="yes"
+    --confirm)
+        echo "   [main] CLI: Action: auto-confirm copy or delete, for non-interactive use."
+        confirmed="yes"
         ;;
 
-        --dp)
-            shift
-            dp_url_filter="$1"
-            echo "   [main] CLI: Distrivution Point filter applied: $dp_url_filter"
+    --dp)
+        shift
+        dp_url_filter="$1"
+        echo "   [main] CLI: Distrivution Point filter applied: $dp_url_filter"
         ;;
 
-        --dp=*)
-            dp_url_filter="${key#*=}"
-            echo "   [main] CLI: Distrivution Point filter applied: $dp_url_filter"
+    --dp=*)
+        dp_url_filter="${key#*=}"
+        echo "   [main] CLI: Distrivution Point filter applied: $dp_url_filter"
         ;;
 
-        -v|--verbose)
-            verbose=1
+    -v | --verbose)
+        verbose=1
         ;;
 
-        -h|--help)
-            usage
-            cleanup_and_exit
+    -h | --help)
+        usage
+        cleanup_and_exit
         ;;
 
     esac
@@ -2892,11 +2893,11 @@ if [[ ! $clean_up ]]; then
     echo
     read -r -t 3 -p "Clean up working files? (Y/N) : " are_you_sure
     case "$are_you_sure" in
-        N|n)
-            exit
+    N | n)
+        exit
         ;;
-        *)
-            cleanup_and_exit
+    *)
+        cleanup_and_exit
         ;;
     esac
 else

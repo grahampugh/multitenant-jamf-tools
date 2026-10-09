@@ -58,42 +58,46 @@ fi
 # MAIN
 # --------------------------------------------------------------------------------
 
+# make temp file for curl output
+curl_output_file=$(mktemp)
+trap 'rm -f "$curl_output_file"' EXIT
+
 # Get command line args
 while [[ "$#" -gt 0 ]]; do
     key="$1"
     case $key in
-        -il|--instance-list)
-            shift
-            chosen_instance_list_file="$1"
-            ;;
-        -i|--instance)
-            shift
-            chosen_instances+=("$1")
-            ;;
-        -a|-ai|--all|--all-instances)
-            all_instances=1
-            ;;
-        -x|--nointeraction)
-            no_interaction=1
-            ;;
-        -c|--csv)
-            shift
-            output_csv="$1"
+    -il | --instance-list)
+        shift
+        chosen_instance_list_file="$1"
         ;;
-        -o|--output)
-            shift
-            output_file="$1"
+    -i | --instance)
+        shift
+        chosen_instances+=("$1")
         ;;
-        -v|--verbose)
-            verbose=1
+    -a | -ai | --all | --all-instances)
+        all_instances=1
         ;;
-        -h|--help)
-            usage
-            exit
+    -x | --nointeraction)
+        no_interaction=1
         ;;
-        *)
-            usage
-            exit
+    -c | --csv)
+        shift
+        output_csv="$1"
+        ;;
+    -o | --output)
+        shift
+        output_file="$1"
+        ;;
+    -v | --verbose)
+        verbose=1
+        ;;
+    -h | --help)
+        usage
+        exit
+        ;;
+    *)
+        usage
+        exit
         ;;
     esac
     # Shift after checking all the cases to get the next option
@@ -111,9 +115,9 @@ fi
 
 # ensure the directories can be written to, and empty the files
 mkdir -p "$(dirname "$output_file")"
-echo "" > "$output_file"
+echo "" >"$output_file"
 mkdir -p "$(dirname "$output_csv")"
-echo "" > "$output_csv"
+echo "" >"$output_csv"
 
 if [[ ${#chosen_instances[@]} -eq 1 ]]; then
     chosen_instance="${chosen_instances[0]}"
@@ -126,7 +130,7 @@ fi
 choose_destination_instances
 
 # heading for csv
-echo "Context,Healthcheck" >> "$output_csv"
+echo "Context,Healthcheck" >>"$output_csv"
 # heading for text file
 (
     echo "-------------------------------------------------------------------------------------"
@@ -134,7 +138,7 @@ echo "Context,Healthcheck" >> "$output_csv"
     echo "-------------------------------------------------------------------------------------"
     printf "%-50s %+34s\n" "Context" "Healthcheck"
     echo "-------------------------------------------------------------------------------------"
-) >> "$output_file"
+) >>"$output_file"
 
 echo
 echo "Building List..."
@@ -147,10 +151,10 @@ for jss_instance in "${instance_choice_array[@]}"; do
     ((instance_count++))
     get_healthcheck
     check=$(cat "$curl_output_file")
-    if [[ $check == "[]" ]]; then 
+    if [[ $check == "[]" ]]; then
         check="Healthy"
         ((healthy_count++))
-    elif [[ $check == *"503 Server Unavailable"* ]]; then 
+    elif [[ $check == *"503 Server Unavailable"* ]]; then
         check="503 Server Unavailable"
         ((unhealthy_count++))
     elif [[ $check == *"Access Denied"* ]]; then
@@ -161,9 +165,9 @@ for jss_instance in "${instance_choice_array[@]}"; do
     fi
 
     # format for text file
-    printf "%-50s %+34s\n" "$jss_instance" "$check" >> "$output_file"
+    printf "%-50s %+34s\n" "$jss_instance" "$check" >>"$output_file"
     # format for csv
-    echo "$jss_instance,$check" >> "$output_csv"
+    echo "$jss_instance,$check" >>"$output_csv"
 done
 
 # summary for csv
@@ -173,10 +177,10 @@ done
 (
     echo "-------------------------------------------------------------------------------------"
     printf "Total Contexts: %-20s %+32s %+15s\n" \
-    "$instance_count" "Healthy: $healthy_count" "Unhealthy: $unhealthy_count"
+        "$instance_count" "Healthy: $healthy_count" "Unhealthy: $unhealthy_count"
     echo "-------------------------------------------------------------------------------------"
     echo
-) >> "$output_file"
+) >>"$output_file"
 
 # now echo the file
 echo
