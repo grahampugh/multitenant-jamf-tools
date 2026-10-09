@@ -30,17 +30,22 @@ fi
 # FUNCTIONS
 # --------------------------------------------------------------------------------
 
+usage() {
+    echo "Usage: $(basename "$0") [options]"
+    echo "Options:"
+    echo "  -t | --type | --object-type <type>    Jamf object type to check (required)"
+    echo "  -i | --instance <url>                 Run on a specific instance (repeatable)"
+    echo "  -il| --instance-list <file>           Run on instances from a file"
+    echo "  -a | --all-instances                  Run on all configured instances"
+    echo "  --id | --client-id | --user <id>      Use a specific client/user ID"
+    echo "  -x | --nointeraction                  Skip interactive prompts"
+    echo "  -v*                                   Verbosity level (e.g. -vvv)"
+    echo "  -h | --help                           Show this help message"
+}
+
 run_autopkg() {
     # Extract subdomain from jss_instance (e.g., "https://myinstance.jamfcloud.com" -> "myinstance")
     subdomain=$(echo "$jss_instance" | awk -F[/:] '{print $4}' | cut -d'.' -f1)
-
-    # Run the autopkg command with the extracted values
-    echo "   [request] OBJECT_TYPE=$OBJECT_TYPE"
-    echo
-    "$autopkg_binary" run "$verbosity_mode" "$this_script_dir/recipes/DownloadObjectList.jamf.recipe.yaml" \
-        --key OBJECT_TYPE="$OBJECT_TYPE" \
-        --key "JSS_URL=$jss_instance" \
-        --key OUTPUT_DIR="/Users/Shared/Jamf/JamfUploader"
 
     object_api_type=$(get_plural_from_api_xml_object "$OBJECT_TYPE")
     if [[ -z "$object_api_type" ]]; then
@@ -48,7 +53,26 @@ run_autopkg() {
         exit 1
     fi
 
-    output_file="/Users/Shared/Jamf/JamfUploader/${subdomain}-${object_api_type}.json"
+    output_dir="/Users/Shared/Jamf/JamfUploader"
+    output_file="${output_dir}/${subdomain}-${object_api_type}.json"
+
+    if ! mkdir -p "$output_dir"; then
+        echo "   [request] ERROR: Could not create output directory $output_dir. Aborting."
+        exit 1
+    fi
+
+    # Remove any stale output file so a failed AutoPkg run cannot be mistaken for success
+    rm -f "$output_file"
+
+    echo "   [request] OBJECT_TYPE=$OBJECT_TYPE"
+    echo
+    if ! "$autopkg_binary" run "$verbosity_mode" "$this_script_dir/recipes/DownloadObjectList.jamf.recipe.yaml" \
+        --key OBJECT_TYPE="$OBJECT_TYPE" \
+        --key "JSS_URL=$jss_instance"; then
+        echo "   [request] ERROR: AutoPkg run failed. Aborting."
+        exit 1
+    fi
+
     if [[ ! -f "$output_file" ]]; then
         echo "   [request] ERROR: Expected output file $output_file not found. Aborting."
         exit 1
@@ -129,6 +153,11 @@ while [[ "$#" -gt 0 ]]; do
         -t|-o|--type|--object-type)
             shift
             OBJECT_TYPE="$1"
+            ;;
+        *)
+            echo "   [request] ERROR: Unknown option: $key"
+            usage
+            exit 1
             ;;
     esac
     # Shift after checking all the cases to get the next option
