@@ -8,7 +8,6 @@ RequiredInputs:
 Input:
   OUTPUT_DIR: /Users/Shared/Jamf/JamfUploaderTests
 
-
 Process:
   - Processor: com.github.grahampugh.jamf-upload.processors/JamfObjectReader
     Arguments:
