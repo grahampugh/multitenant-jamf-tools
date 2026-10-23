@@ -921,6 +921,9 @@ handle_jpapi_get_request() {
 
 send_curl_request() {
     # send a curl request with retries
+    # Returns 0 on a 1xx/2xx/3xx response, 1 on a 400 response, a failed token
+    # check, or when the maximum number of attempts is reached. The last HTTP
+    # status is always left in $http_response.
     max_tries=3
     if [[ -n $max_tries_override ]]; then
         max_tries=$max_tries_override
@@ -990,7 +993,7 @@ send_curl_request() {
                 echo "   [send_curl_request] Success response ($http_response)"
                 echo "   [send_curl_request] Output file: $curl_output_file"
             fi
-            break
+            return 0
         elif [[ "$http_response" == "400" ]]; then
             echo "   [send_curl_request] Fail response ($http_response) - aborting"
             if [[ $verbose -gt 0 ]]; then
@@ -1001,7 +1004,7 @@ send_curl_request() {
                 echo
                 echo
             fi
-            break
+            return 1
         else
             echo "   [send_curl_request] Fail response ($http_response) - attempt #$try."
         fi
@@ -1012,7 +1015,9 @@ send_curl_request() {
         curl_failed="true"
         export curl_failed
         echo "   [send_curl_request] ERROR: fail response - maximum attempts reached - cannot continue."
+        return 1
     fi
+    return 0
 }
 
 get_template_files() {
