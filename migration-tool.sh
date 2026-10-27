@@ -17,10 +17,10 @@
 # apply changes to one destination instance per run.
 # --------------------------------------------------------------------------------
 
-xmlloc_default="/Users/Shared/Jamf/Migration-Tool-Archive"
+xml_folder_default="/Users/Shared/Jamf/Migration-Tool-Archive"
 log_file="$HOME/Library/Logs/JAMF/migration-tool.log"
 git_branch="tst-template"
-icons_folder="$xmlloc_default/icons"
+icons_folder="$xml_folder_default/icons"
 
 # reduce the curl tries
 max_tries_override=2
@@ -56,12 +56,14 @@ writeiosfile="${templates_folder}/write_ios.txt"
 check_xml_folder() {
     # Determine the storage directory
     if [[ ! "$xmlloc" ]]; then
-        xmlloc="$xmlloc_default"
+        xmlloc="$xml_folder_default"
     fi
 
     # Check and create the JSS xml folder and archive folders if missing
     if [[ ! -d "$xmlloc" ]]; then
-        mkdir -p "$xmlloc"
+        if ! mkdir -p "$xmlloc"; then
+            echo "ERROR: can't create $xmlloc"
+        fi
     else
         # if the storage directory is a git archive, make sure it's synced
         if [[ -d "$xmlloc/.git" ]]; then
@@ -94,10 +96,14 @@ check_xml_folder() {
         fi
 
         # Check and create the JSS xml resource folders if missing.
-        if [[ ! -f "$xmlloc/${readfiles[$loop]}" ]]; then
-            mkdir -p "$xmlloc/${readfiles[$loop]}/id_list"
-            mkdir -p "$xmlloc/${readfiles[$loop]}/fetched_xml"
-            mkdir -p "$xmlloc/${readfiles[$loop]}/parsed_xml"
+        if [[ ! -d "$xmlloc/${readfiles[$loop]}" ]]; then
+            if mkdir -p "$xmlloc/${readfiles[$loop]}"; then
+                mkdir "$xmlloc/${readfiles[$loop]}/id_list"
+                mkdir "$xmlloc/${readfiles[$loop]}/fetched_xml"
+                mkdir "$xmlloc/${readfiles[$loop]}/parsed_xml"
+            else
+                echo "ERROR: can't create $xmlloc/${readfiles[$loop]}"
+            fi
         fi
     done
 }
@@ -109,7 +115,9 @@ setup_the_action() {
 
     # Check and create the JSS xml folder and archive folders if missing.
     xml_folder="$xml_folder_default"
-    mkdir -p "${xml_folder}"
+    if ! mkdir -p "$xml_folder"; then
+        echo "ERROR: can't create $xml_folder"
+    fi
     formatted_list="${xml_folder}/formatted_list.xml"
 
     # ensure nothing carried over
@@ -1122,14 +1130,17 @@ main_menu() {
     # Configure Logging
     log_file="$HOME/Library/Logs/JAMF/jamf-migration-tool.log"
     if [[ ! -f "$log_file" ]]; then
-        mkdir -p "$( dirname "$log_file" )"
+        if ! mkdir -p "$(dirname "$log_file")"; then
+            echo "ERROR: can't create $(dirname "$log_file")"
+        fi
         touch "$log_file"
     fi
     exec &> >( tee -a "$log_file" >&2 )
 
     # Create icons folder
-    mkdir -p "$icons_folder"
-
+    if ! mkdir -p "$icons_folder"; then
+        echo "ERROR: can't create $icons_folder"
+    fi
 
     # Set the source and destination server(s) and instance(s)
     # These are the endpoints we're going to read
