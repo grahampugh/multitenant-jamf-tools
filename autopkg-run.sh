@@ -105,7 +105,8 @@ analyse_recipe() {
     if [[ -f "$recipe" ]]; then
         recipe_path="$recipe"
     else
-        recipe_path=$("$autopkg_binary" info "$recipe" 2>/dev/null | grep "^Recipe file:" | sed 's/^Recipe file:[[:space:]]*//')
+        # AutoPkg 3 labels the line "Recipe file path:"; older versions used "Recipe file:"
+        recipe_path=$("$autopkg_binary" info "$recipe" 2>/dev/null | grep -E "^Recipe file( path)?:" | sed -E 's/^Recipe file( path)?:[[:space:]]*//')
     fi
 
     # Parse RequiredInputs and OptionalInputs directly from recipe file
